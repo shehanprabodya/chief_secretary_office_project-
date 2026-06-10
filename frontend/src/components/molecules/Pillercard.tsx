@@ -15,7 +15,6 @@ interface PillarCardProps {
 }
 
 const PillarCard: React.FC<PillarCardProps> = ({
-  id,
   icon,
   iconColor,
   title,
