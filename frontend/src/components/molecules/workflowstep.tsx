@@ -132,7 +132,7 @@ const WorkflowStep: React.FC<WorkflowStepProps> = ({
             <Button variant="dark" size="sm" onClick={onAction}>
               Proceed to Review
             </Button>
-            <Button variant="ghost" size="sm" icon={<IcoDl />}>
+            <Button variant="ghost" size="sm" icon={<IcoDl c={''} />}>
               Download PDF
             </Button>
           </div>
