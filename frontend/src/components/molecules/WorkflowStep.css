@@ -1,0 +1,15 @@
+.workflow-step__label {
+  font-weight: 600;
+}
+
+.workflow-step__label--completed {
+  color: #16a34a;
+}
+
+.workflow-step__label--active {
+  color: #1e4a8f;
+}
+
+.workflow-step__label--pending {
+  color: #94a3b8;
+}
