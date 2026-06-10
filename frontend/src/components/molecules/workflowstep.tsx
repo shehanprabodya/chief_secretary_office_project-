@@ -82,11 +82,6 @@ const WorkflowStep: React.FC<WorkflowStepProps> = ({
 
   const config = configMap[status];
 
-  const labelColor = status === 'completed'
-    ? '#16a34a'
-    : status === 'active'
-    ? '#1e4a8f'
-    : '#94a3b8';
 
   return (
     <div className="workflow-step" id={id}>
