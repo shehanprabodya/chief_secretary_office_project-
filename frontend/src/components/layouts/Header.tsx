@@ -5,29 +5,25 @@ export default function Header() {
   const [language, setLanguage] = useState<"si" | "en">("en");
 
   return (
-    <header className="h-16 border-b border-white/10 bg-[var(--color-primary)]">
-      <div className="page-container flex h-full items-center justify-between">
+    <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-[var(--color-primary)]">
+      <div className="page-container flex h-full flex-row items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-3">
           <img
-            src="/images/logo.png"
+            src="logo.svg"
             alt="MMCS Logo"
             className="h-10 w-10 object-contain"
           />
 
           <div className="hidden sm:block">
-            <h1 className="text-sm font-semibold text-white">
-              MMCS
+            <h1 className=" text-white text-lg font-bold tracking-wide">
+              Meeting Management and coordination System
             </h1>
-
-            <p className="text-xs text-white/70">
-              Meeting Management System
-            </p>
           </div>
         </div>
 
         {/* Right Section */}
-        <div className="flex items-center gap-4 text-white">
+        <div className="flex items-center gap-3 text-white">
           {/* Language Switcher */}
           <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
             <Globe size={16} />
