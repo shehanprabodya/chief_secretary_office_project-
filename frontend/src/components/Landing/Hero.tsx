@@ -1,37 +1,29 @@
 import { Headphones, LogIn } from "lucide-react";
 import { Link } from "react-router-dom";
+import logo from "../../assets/Srilankaemblem.png";
+
+const officeNames = [
+  "දකුණු පළාත් ප්‍රධාන ලේකම් කාර්යාලය",
+  "தென் மாகாண பிரதான செயலாளர் அலுவலகம்",
+  "Southern Province Chief Secretariat",
+];
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden bg-[var(--color-primary)]">
-      <div className="page-container">
+    <section className="relative overflow-hidden bg-[var(--color-primary)] ">
+      <div className="page-container ">
         <div
           className="
             grid
             min-h-[700px]
             items-center
             gap-16
-            py-20
             lg:grid-cols-2
           "
         >
           {/* Content */}
           <div className="animate-fade-in">
-            <span
-              className="
-                inline-flex
-                rounded-full
-                border
-                border-white/20
-                px-4
-                py-2
-                text-sm
-                text-white/80
-              "
-            >
-              Southern Provincial Council
-            </span>
-
+            
             <h1
               className="
                 mt-6
@@ -41,6 +33,7 @@ export default function Hero() {
                 text-white
                 md:text-5xl
                 lg:text-6xl
+                py-5
               "
             >
               Strengthening Digital Governance
@@ -54,6 +47,7 @@ export default function Hero() {
                 text-lg
                 leading-8
                 text-white/75
+                py-5
               "
             >
               The Meeting Management &
@@ -112,29 +106,55 @@ export default function Hero() {
               flex
               items-center
               justify-center
-            "
+              "
           >
             <div
               className="
+                w-full
                 overflow-hidden
                 rounded-2xl
                 border
                 border-white/10
                 bg-white/5
-                p-4
                 backdrop-blur-sm
+                p-8
               "
             >
-              <img
-                src="/images/dashboard-preview.png"
-                alt="MMCS Dashboard"
-                className="
-                  w-full
-                  max-w-xl
-                  rounded-xl
-                  shadow-2xl
-                "
-              />
+              <div className="flex flex-col items-center gap-8">
+                <img
+                  src={logo}
+                  alt="MMCS Dashboard"
+                  className="
+                    h-78
+                    w-auto
+                    flex-shrink-0
+                  "
+                />
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {officeNames.map((name) => (
+                      <span
+                      key={name}
+                      className="
+                          flex
+                          items-center
+                          justify-center
+                          rounded-full
+                          border
+                          border-white/20
+                          px-6
+                          py-3
+                          text-sm
+                          text-white/80
+                          flex-shrink-0
+                          whitespace-nowrap
+                          w-96
+                      "
+                      >
+                      {name}
+                      </span>
+                  ))}
+              </div>
+              </div>
             </div>
           </div>
         </div>
