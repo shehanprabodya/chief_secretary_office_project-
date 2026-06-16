@@ -33,7 +33,7 @@ const pillars: Pillar[] = [
 
 function PillarCard({ title, description, accent }: Pillar) {
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_30px_60px_-30px_rgba(15,23,42,0.25)]">
+    <article className="flex h-full w-full max-w-[360px] flex-col overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_30px_60px_-30px_rgba(15,23,42,0.25)]">
       <div className={`h-48 w-full bg-gradient-to-r ${accent}`} />
       <div className="flex flex-1 flex-col justify-between p-8">
         <div>
@@ -50,9 +50,12 @@ export default function PillarsSection() {
     <section className="bg-[var(--color-background)] py-24">
       <div className="page-container">
         {/* Section Header */}
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="mx-auto w-full max-w-3xl px-6 text-center py-10">
           <h2
             className="
+              inline-block
+              w-full
+              text-center
               text-4xl
               font-bold
               text-[var(--color-primary)]
@@ -61,16 +64,10 @@ export default function PillarsSection() {
           >
             Core Operational Pillars
           </h2>
-
-          <p className="text-muted mt-4 text-lg">
-            Standardizing administrative excellence
-            through modern digital governance
-            frameworks and streamlined workflows.
-          </p>
         </div>
 
         {/* Pillars */}
-        <div className="mt-16 grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-16 grid mx-auto max-w-[1520px] grid-cols-1 justify-items-center gap-8 sm:grid-cols-2 xl:grid-cols-4">
           {pillars.map((pillar) => (
             <PillarCard
               key={pillar.title}

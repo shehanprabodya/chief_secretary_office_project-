@@ -27,12 +27,12 @@ export default function Hero() {
             <h1
               className="
                 mt-6
-                text-4xl
+                text-3xl
                 font-bold
                 leading-tight
                 text-white
-                md:text-5xl
-                lg:text-6xl
+                md:text-4xl
+                lg:text-5xl
                 py-5
               "
             >
