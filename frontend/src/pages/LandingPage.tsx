@@ -1,7 +1,7 @@
 import Header from "../components/layouts/Header";
 import Footer from "../components/layouts/Footer";
-import Hero from "../components/landing/HeroSection";
-import PillarsSection from "../components/landing/PillarsSection";
+import Hero from "../components/Landing/Hero";
+import PillarsSection from "../components/Landing/PillarsSection";
 
 export default function LandingPage() {
   return (
