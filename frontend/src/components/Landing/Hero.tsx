@@ -1,5 +1,4 @@
 import { Headphones, LogIn } from "lucide-react";
-import { Link } from "react-router-dom";
 import logo from "../../assets/Srilankaemblem.png";
 
 const officeNames = [
@@ -7,8 +6,14 @@ const officeNames = [
   "தென் மாகாண பிரதான செயலாளர் அலுவலகம்",
   "Southern Province Chief Secretariat",
 ];
+interface Props {
+  onLoginClick: () => void;
+}
 
-export default function Hero() {
+
+export default function Hero({
+  onLoginClick,
+}: Props) {
   return (
     <section className="relative overflow-hidden bg-[var(--color-primary)] ">
       <div className="page-container ">
@@ -59,25 +64,25 @@ export default function Hero() {
             </p>
 
             <div className="mt-10 flex flex-wrap gap-4">
-              <Link
-                to="/login"
-                className="
-                  inline-flex
-                  items-center
-                  gap-2
-                  rounded-lg
-                  bg-white
-                  px-6
-                  py-3
-                  font-medium
-                  text-[var(--color-primary)]
-                  transition-all
-                  hover:-translate-y-0.5
-                "
-              >
-                <LogIn size={18} />
-                Portal Login
-              </Link>
+                <button
+                    onClick={onLoginClick}
+                    className="
+                        inline-flex
+                        items-center
+                        gap-2
+                        rounded-lg
+                        bg-white
+                        px-6
+                        py-3
+                        font-medium
+                        text-[var(--color-primary)]
+                        transition-all
+                        hover:-translate-y-0.5
+                    "
+                    >
+                    <LogIn size={18} />
+                    Portal Login
+                </button>
 
               <button
                 className="
