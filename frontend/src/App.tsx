@@ -1,10 +1,10 @@
 import React from 'react';
 import Navbar from './components/molecules/navbar';
-import HeroSection from './components/organisms/herosection';
-import PillarsGrid from './components/organisms/PillarsGrid';
-import ApprovalWorkflow from './components/organisms/ApprovalWorkflow/ApprovalWorkflow';
-import Footer from './components/organisms/Footer/Footer';
-import './styles/globals.css';
+import HeroSection from './components/organism/herosection';
+import PillarsGrid from './components/organism/pillergrid';
+import ApprovalWorkflow from './components/organism/approvalworkflow';
+import Footer from './components/organism/footer';
+import './Style/globals.css';
 
 const App: React.FC = () => {
   const handleLoginClick = () => {

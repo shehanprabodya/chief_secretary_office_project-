@@ -1,5 +1,4 @@
 import React from 'react';
-import './ApprovalWorkflow.css';
 import Card from '../atoms/card';
 import WorkflowStep from '../molecules/workflowstep';
 import { H2 } from '../atoms/heading';

@@ -1,5 +1,4 @@
 import React from 'react';
-import './PillarCard.css';
 import Card from '../atoms/card';
 import IconBox from '../atoms/iconbox';
 import { H4, Paragraph } from '../atoms/heading';

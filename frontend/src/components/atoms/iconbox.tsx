@@ -1,5 +1,4 @@
 import React from 'react';
-import './IconBox.css';
 
 type IconColor = 'blue' | 'rose' | 'green' | 'slate' | 'purple' | 'amber';
 

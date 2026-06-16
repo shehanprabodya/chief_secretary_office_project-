@@ -1,5 +1,4 @@
 import React from 'react';
-import './WorkflowStep.css';
 import Badge from '../atoms/badge';
 import Button from '../atoms/button';
 import { Span } from '../atoms/heading';

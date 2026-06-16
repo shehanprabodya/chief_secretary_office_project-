@@ -1,5 +1,4 @@
 import React from 'react';
-import './Badge.css';
 
 interface BadgeProps {
   variant?: 'success' | 'warning' | 'info' | 'danger' | 'muted' | 'rose' | 'purple';

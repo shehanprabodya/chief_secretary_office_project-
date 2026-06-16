@@ -1,5 +1,4 @@
 import React from 'react';
-import './Text.css';
 
 interface HeadingProps {
   children: React.ReactNode;

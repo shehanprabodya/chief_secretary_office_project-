@@ -1,5 +1,4 @@
 import React from 'react';
-import './Button.css';
 
 interface ButtonProps {
   variant?: 'primary' | 'outline' | 'ghost' | 'dark' | 'success' | 'danger';
