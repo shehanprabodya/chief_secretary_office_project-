@@ -8,6 +8,8 @@ export default function WelcomeSection() {
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
         Welcome back, {user?.name}
       </h1>
+      
+      // need change this according to the real data
       <p className="mt-1 text-slate-600 dark:text-slate-400">
         You have 4 meetings scheduled for today.
       </p>
