@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
@@ -6,14 +5,6 @@ import DashboardPage from './pages/DashboardPage';
 // This component is inside AuthProvider so it can use useAuth
 const AppContent = () => {
   const { isAuthenticated, isLoading } = useAuth();
-
-  // Optional: Check if user is already logged in from localStorage
-  useEffect(() => {
-    // Auth context already handles this in its useEffect
-    // This is just for logging or analytics if needed
-    const token = localStorage.getItem('authToken');
-    console.log('Auth token exists:', !!token);
-  }, []);
 
   // Show loading spinner while checking authentication
   if (isLoading) {

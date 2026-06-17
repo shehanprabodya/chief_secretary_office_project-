@@ -1,24 +1,25 @@
 import React, { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { User, LoginCredentials, AuthContextType, AuthResponse } from '../types/auth';
+import type { User, LoginCredentials, AuthContextType } from '../types/auth';
+import { AUTH_STORAGE_KEYS, authService } from '../services/authService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getStoredToken = () => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token');
+  return localStorage.getItem(AUTH_STORAGE_KEYS.token);
 };
 
 const getStoredUser = (): User | null => {
   if (typeof window === 'undefined') return null;
-  const storedUser = localStorage.getItem('auth_user');
+  const storedUser = localStorage.getItem(AUTH_STORAGE_KEYS.user);
   if (!storedUser) return null;
 
   try {
     return JSON.parse(storedUser);
   } catch {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
+    localStorage.removeItem(AUTH_STORAGE_KEYS.token);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.user);
     return null;
   }
 };
@@ -34,48 +35,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
 
     try {
-      // TODO: Replace with actual API call to your Laravel backend
-      // const response = await fetch('http://your-api.com/api/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     email: credentials.email,
-      //     password: credentials.password
-      //   })
-      // });
-
-      // const data: AuthResponse = await response.json();
-
-      // For now, simulate API response
-      const mockResponse: AuthResponse = {
-        token: 'mock_jwt_token_' + Date.now(),
-        user: {
-          id: '1',
-          email: credentials.email,
-          name: 'Kumari Perera',
-          role: 'officer',
-          department: 'Finance & Treasury',
-          designation: 'Senior Accountant'
-        },
-        expiresIn: 86400
-      };
-
-      const data = mockResponse;
+      const data = await authService.login(credentials);
 
       // Store token and user
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
+      localStorage.setItem(AUTH_STORAGE_KEYS.token, data.token);
+      localStorage.setItem(AUTH_STORAGE_KEYS.user, JSON.stringify(data.user));
 
       // Remember me functionality
       if (credentials.rememberMe) {
-        localStorage.setItem('remember_me', 'true');
+        localStorage.setItem(AUTH_STORAGE_KEYS.rememberMe, 'true');
+      } else {
+        localStorage.removeItem(AUTH_STORAGE_KEYS.rememberMe);
       }
 
       setToken(data.token);
       setUser(data.user);
-
-      // Redirect to dashboard
-      // window.location.href = '/dashboard';
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       setError(errorMessage);
@@ -86,14 +60,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('remember_me');
+    void authService.logout();
+    localStorage.removeItem(AUTH_STORAGE_KEYS.token);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.user);
+    localStorage.removeItem(AUTH_STORAGE_KEYS.rememberMe);
     setToken(null);
     setUser(null);
     setError(null);
-    // Redirect to landing page
-    // window.location.href = '/';
   };
 
   return (
