@@ -1,6 +1,7 @@
 import Card from '../shared/Card';
 import MeetingItem from './MeetingItem';
 
+//this also need to update with real data from backend, currently it is hardcoded for demo purpose
 const meetings: {
   id: number;
   title: string;
