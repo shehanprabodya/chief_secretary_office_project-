@@ -1,8 +1,15 @@
 import Card from '../shared/Card';
-import Badge from '../shared/Badge';
 import MeetingItem from './MeetingItem';
 
-const meetings = [
+const meetings: {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  status: string;
+  statusColor: 'blue' | 'gray' | 'green' | 'orange' | 'red';
+}[] = [
   {
     id: 1,
     title: 'Infrastructure Budget Review 2024',
