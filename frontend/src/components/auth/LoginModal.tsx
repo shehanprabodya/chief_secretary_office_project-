@@ -1,7 +1,5 @@
-// src/components/auth/LoginModal.tsx
 import React, { useState } from 'react';
 import { X, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -9,29 +7,43 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
-  const { login, isLoading, error: authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    const trimmedEmail = email.trim();
-
-    if (!trimmedEmail || !password) {
-      setError('Please fill in all fields');
-      return;
-    }
-
+    // Simulate API call - replace with actual backend call
     try {
-      await login({ email: trimmedEmail, password, rememberMe });
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+      // const response = await fetch('https://your-api.com/login', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ email, password })
+      // });
+      // const data = await response.json();
+
+      // For now, simulate delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      if (!email || !password) {
+        setError('Please fill in all fields');
+        setIsLoading(false);
+        return;
+      }
+
+      // TODO: Handle successful login - redirect to dashboard
+      console.log('Login attempt:', { email, password, rememberMe });
+      // window.location.href = '/dashboard';
+    } catch {
+      setError('Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -133,10 +145,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               </div>
 
               {/* Error Message */}
-              {(error || authError) && (
+              {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
                   <X size={16} />
-                  {error || authError}
+                  {error}
                 </div>
               )}
 
