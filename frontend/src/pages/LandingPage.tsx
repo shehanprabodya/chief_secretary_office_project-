@@ -2,7 +2,7 @@ import Header from "../components/layouts/Header";
 import Footer from "../components/layouts/Footer";
 import Hero from "../components/Landing/Hero";
 import PillarsSection from "../components/Landing/PillarsSection";
-import LoginModal from "../components/auth/LoginModal";
+import { LoginModal } from "../components/auth/LoginModal";
 import { useState } from "react";
 
 export default function LandingPage() {
@@ -32,6 +32,7 @@ export default function LandingPage() {
 
       {showLogin && (
         <LoginModal
+          isOpen={showLogin}
           onClose={() => setShowLogin(false)}
         />
       )}
