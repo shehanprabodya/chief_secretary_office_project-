@@ -6,7 +6,7 @@ export default function WelcomeSection() {
   return (
     <div className="rounded-lg bg-white p-6 dark:bg-slate-800 shadow-sm">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-        Welcome back, {user?.name}
+        Welcome back, {user?.full_name}
       </h1>
       
       // need change this according to the real data
