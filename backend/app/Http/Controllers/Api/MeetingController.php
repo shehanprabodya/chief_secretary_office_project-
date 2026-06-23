@@ -1,0 +1,158 @@
+<?php
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Meeting;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
+
+class MeetingController extends Controller
+{
+    /**
+     * List meetings with search, department filter, date range, pagination
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $query = Meeting::with('department', 'creator');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('reference_id', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('department_id') && $request->department_id !== 'all') {
+            $query->where('department_id', $request->department_id);
+        }
+
+        if ($request->filled('start_date')) {
+            $query->whereDate('meeting_date', '>=', $request->start_date);
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('meeting_date', '<=', $request->end_date);
+        }
+
+        $meetings = $query->orderBy('meeting_date', 'desc')
+            ->paginate($request->get('per_page', 10));
+
+        return response()->json($meetings);
+    }
+
+    /**
+     * Single meeting with full details (for calendar popup / edit modal)
+     */
+    public function show(int $id): JsonResponse
+    {
+        $meeting = Meeting::with('department', 'creator', 'attendees')->findOrFail($id);
+        return response()->json(['meeting' => $meeting]);
+    }
+
+    /**
+     * Get meetings for a specific date (used by Calendar widget)
+     */
+    public function byDate(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Invalid date'], 422);
+        }
+
+        $meetings = Meeting::with('department', 'attendees')
+            ->whereDate('meeting_date', $request->date)
+            ->orderBy('start_time')
+            ->get();
+
+        return response()->json(['meetings' => $meetings]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255',
+            'meeting_date' => 'required|date',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i|after:start_time',
+            'location' => 'nullable|string|max:255',
+            'location_type' => 'required|in:physical,virtual,not_assigned',
+            'department_id' => 'nullable|exists:departments,department_id',
+            'status' => 'required|in:draft,scheduled,completed,cancelled',
+            'description' => 'nullable|string',
+            'attendee_ids' => 'nullable|array',
+            'attendee_ids.*' => 'exists:users,user_id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
+
+        $meeting = Meeting::create([
+            ...$validator->validated(),
+            'reference_id' => Meeting::generateReferenceId(),
+            'created_by' => $request->user()->user_id,
+        ]);
+
+        if ($request->filled('attendee_ids')) {
+            $meeting->attendees()->attach($request->attendee_ids);
+        }
+
+        return response()->json([
+            'message' => 'Meeting created successfully',
+            'meeting' => $meeting->load('department', 'attendees'),
+        ], 201);
+    }
+
+    /**
+     * Update meeting - this powers the Calendar click-to-edit popup
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $meeting = Meeting::findOrFail($id);
+        
+        $validator = Validator::make($request->all(), [
+            'title' => 'sometimes|string|max:255',
+            'meeting_date' => 'sometimes|date',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i|after:start_time',
+            'location' => 'nullable|string|max:255',
+            'location_type' => 'sometimes|in:physical,virtual,not_assigned',
+            'department_id' => 'nullable|exists:departments,department_id',
+            'status' => 'sometimes|in:draft,scheduled,completed,cancelled',
+            'description' => 'nullable|string',
+            'attendee_ids' => 'nullable|array',
+            'attendee_ids.*' => 'exists:users,user_id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
+
+        $meeting->update($validator->safe()->except('attendee_ids'));
+
+        if ($request->has('attendee_ids')) {
+            $meeting->attendees()->sync($request->attendee_ids);
+        }
+
+        return response()->json([
+            'message' => 'Meeting updated successfully',
+            'meeting' => $meeting->load('department', 'attendees'),
+        ]);
+    }
+
+    public function destroy(int $id): JsonResponse
+    {
+        $meeting = Meeting::findOrFail($id);
+        $meeting->update(['status' => 'cancelled']);
+
+        return response()->json(['message' => 'Meeting cancelled']);
+    }
+}
+
+
+?>
