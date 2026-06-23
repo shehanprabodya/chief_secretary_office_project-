@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('signatory_name', 150)->nullable();
             $table->date('signature_date')->nullable();
             $table->enum('status', ['draft', 'pending_approval', 'approved', 'rejected', 'dispatched'])->default('draft');
-            $table->unsignedInteger('created_by');
+            $table->unsignedBigInteger('created_by');
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
 

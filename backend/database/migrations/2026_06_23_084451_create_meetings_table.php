@@ -17,10 +17,10 @@ return new class extends Migration
             $table->time('end_time')->nullable();
             $table->string('location', 255)->nullable();
             $table->enum('location_type', ['physical', 'virtual', 'not_assigned'])->default('not_assigned');
-            $table->unsignedInteger('department_id')->nullable();
+            $table->unsignedBigInteger('department_id')->nullable();
             $table->enum('status', ['draft', 'scheduled', 'completed', 'cancelled'])->default('draft');
             $table->text('description')->nullable();
-            $table->unsignedInteger('created_by'); // user_id of officer who created it
+            $table->unsignedBigInteger('created_by'); // user_id of officer who created it
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
 

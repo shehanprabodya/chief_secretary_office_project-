@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('letter_departments', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('letter_id');
-            $table->unsignedInteger('department_id');
+            $table->unsignedBigInteger('department_id');
 
             $table->foreign('letter_id')->references('letter_id')->on('letters')->onDelete('cascade');
             $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');

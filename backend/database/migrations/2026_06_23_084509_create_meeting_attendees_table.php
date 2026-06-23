@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('meeting_attendees', function (Blueprint $table) {
             $table->increments('attendee_id');
             $table->unsignedInteger('meeting_id');
-            $table->unsignedInteger('user_id');
+            $table->unsignedBigInteger('user_id');
             $table->enum('attendance_role', ['assigned', 'observer'])->default('assigned');
             $table->timestamp('created_at')->useCurrent();
 

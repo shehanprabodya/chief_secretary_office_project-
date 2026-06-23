@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('step_name', 100); // 'Draft Created', 'Chief Secretary Review', 'Official Seal & Dispatch'
             $table->unsignedTinyInteger('step_order'); // 1, 2, 3
             $table->enum('status', ['pending', 'current', 'completed', 'rejected'])->default('pending');
-            $table->unsignedInteger('actioned_by')->nullable();
+            $table->unsignedBigInteger('actioned_by')->nullable();
             $table->text('notes')->nullable();
             $table->timestamp('actioned_at')->nullable();
             $table->timestamp('created_at')->useCurrent();
