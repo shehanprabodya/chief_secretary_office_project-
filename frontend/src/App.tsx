@@ -5,8 +5,8 @@ import LandingPage from './pages/LandingPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdminDashboard from './pages/AdminDashboard';
 import OfficerDashboard from './pages/OfficerDashbord';
-import DeptHeadDashboard from './pages/dashboards/DeptHeadDashboard';
-import DeputyDashboard from './pages/dashboards/DeputyDashboard';
+import DeptHeadDashboard from './pages/DeptHeadDashboard';
+import DeputyDashboard from './pages/DeputyDashboard';
 import ChiefSecretaryDashboard from './pages/dashboards/ChiefSecretaryDashboard';
 
 export default function App() {
