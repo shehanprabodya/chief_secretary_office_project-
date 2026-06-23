@@ -7,7 +7,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import OfficerDashboard from './pages/OfficerDashbord';
 import DeptHeadDashboard from './pages/DeptHeadDashboard';
 import DeputyDashboard from './pages/DeputyDashboard';
-import ChiefSecretaryDashboard from './pages/dashboards/ChiefSecretaryDashboard';
+import ChiefSecretaryDashboard from './pages/ChiefSecretaryDashboard';
 
 export default function App() {
   return (
