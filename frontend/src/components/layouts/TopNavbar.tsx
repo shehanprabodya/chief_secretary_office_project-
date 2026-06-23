@@ -1,75 +1,139 @@
-import { useState } from 'react';
-import { Menu, Bell, Globe, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Menu, Bell, Globe, ChevronDown, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface TopNavbarProps {
   onMenuClick: () => void;
+  pageTitle?: string;
 }
 
-export default function TopNavbar({ onMenuClick }: TopNavbarProps) {
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrator',
+  officer: 'Development Officer',
+  dept_head: 'Department Head',
+  deputy: 'Deputy Secretary',
+  chief_secretary: 'Chief Secretary',
+};
+
+export default function TopNavbar({ onMenuClick, pageTitle = 'Development Division' }: TopNavbarProps) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [language, setLanguage] = useState<'si' | 'en'>('en');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    setShowUserMenu(false);
+    await logout();
+    navigate('/', { replace: true });
+  };
+
+  const initials = user?.full_name
+    ? user.full_name
+        .split(' ')
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+    : 'U';
 
   return (
-    <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between px-6 py-4 lg:px-8">
-        {/* Left - Menu Button */}
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
-        >
-          <Menu className="h-6 w-6 text-slate-900 dark:text-white" />
-        </button>
-
-        {/* Center - Title */}
-        <h1 className="hidden lg:block text-xl font-semibold text-slate-900 dark:text-white">
-          Development Division
-        </h1>
+    <header className="sticky top-0 z-40 h-16 border-b border-white/10 bg-[var(--color-primary)]">
+      <div className="flex h-full items-center justify-between px-4 lg:px-8">
+        {/* Left - Menu Button (mobile) + Page Title */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onMenuClick}
+            className="rounded-lg p-2 text-white transition hover:bg-white/10 lg:hidden"
+            aria-label="Open sidebar menu"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <h1 className="hidden text-lg font-semibold text-white lg:block">
+            {pageTitle}
+          </h1>
+        </div>
 
         {/* Right - Actions */}
-        <div className="flex items-center gap-4 ml-auto">
-          {/* Language Selector */}
-          <button className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-            <Globe className="h-5 w-5" />
-            <span className="text-sm hidden sm:inline">English</span>
-          </button>
+        <div className="flex items-center gap-2 text-white">
+          {/* Language Switcher */}
+          <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
+            <Globe size={16} />
+            <button
+              onClick={() => setLanguage('si')}
+              className={`text-sm transition ${
+                language === 'si' ? 'font-semibold text-white' : 'text-white/60'
+              }`}
+            >
+              සිංහල
+            </button>
+            <span className="text-white/40">|</span>
+            <button
+              onClick={() => setLanguage('en')}
+              className={`text-sm transition ${
+                language === 'en' ? 'font-semibold text-white' : 'text-white/60'
+              }`}
+            >
+              English
+            </button>
+          </div>
 
           {/* Notifications */}
-          <button className="relative p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full" />
+          <button
+            className="relative rounded-lg p-2 transition hover:bg-white/10"
+            aria-label="Notifications"
+          >
+            <Bell size={20} />
+            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
           </button>
 
           {/* User Menu */}
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+              className="flex items-center gap-2 rounded-lg p-1.5 transition hover:bg-white/10"
             >
-              <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-semibold">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white">
+                {initials}
               </div>
-              <ChevronDown className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+              <ChevronDown
+                className={`h-4 w-4 text-white/70 transition-transform ${
+                  showUserMenu ? 'rotate-180' : ''
+                }`}
+              />
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Dropdown */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {user?.name}
+              <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                <div className="border-b border-slate-100 p-4">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {user?.full_name}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    {user?.email}
-                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">{user?.email}</p>
+                  {user?.role && (
+                    <span className="mt-2 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      {ROLE_LABELS[user.role] ?? user.role}
+                    </span>
+                  )}
                 </div>
                 <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    logout();
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-600 transition hover:bg-red-50"
                 >
+                  <LogOut className="h-4 w-4" />
                   Logout
                 </button>
               </div>
