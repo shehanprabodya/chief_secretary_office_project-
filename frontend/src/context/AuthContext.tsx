@@ -1,92 +1,77 @@
-import React, { createContext, useContext, useState } from 'react';
-import type { ReactNode } from 'react';
-import type { User, LoginCredentials, AuthContextType } from '../types/auth';
-import { AUTH_STORAGE_KEYS, authService } from '../services/authService';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { AuthContextType, AuthUser, LoginCredentials } from '../types/auth';
+import { authService } from '../services/authService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const getStoredToken = () => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(AUTH_STORAGE_KEYS.token);
-};
-
-const getStoredUser = (): User | null => {
-  if (typeof window === 'undefined') return null;
-  const storedUser = localStorage.getItem(AUTH_STORAGE_KEYS.user);
-  if (!storedUser) return null;
-
-  try {
-    return JSON.parse(storedUser);
-  } catch {
-    localStorage.removeItem(AUTH_STORAGE_KEYS.token);
-    localStorage.removeItem(AUTH_STORAGE_KEYS.user);
-    return null;
-  }
-};
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => getStoredUser());
-  const [token, setToken] = useState<string | null>(() => getStoredToken());
-  const [isLoading, setIsLoading] = useState(false);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const login = async (credentials: LoginCredentials) => {
+  useEffect(() => {
+    const restoreSession = async () => {
+      const token = localStorage.getItem('authToken');
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const { user } = await authService.getCurrentUser();
+        setUser(user);
+      } catch {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  const login = async (credentials: LoginCredentials): Promise<AuthUser> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await authService.login(credentials);
+      const response = await authService.login(credentials);
+      setUser(response.user);
 
-      // Store token and user
-      localStorage.setItem(AUTH_STORAGE_KEYS.token, data.token);
-      localStorage.setItem(AUTH_STORAGE_KEYS.user, JSON.stringify(data.user));
+      localStorage.setItem('authToken', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
 
-      // Remember me functionality
-      if (credentials.rememberMe) {
-        localStorage.setItem(AUTH_STORAGE_KEYS.rememberMe, 'true');
-      } else {
-        localStorage.removeItem(AUTH_STORAGE_KEYS.rememberMe);
-      }
-
-      setToken(data.token);
-      setUser(data.user);
+      return response.user;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Login failed';
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : 'Login failed';
+      setError(message);
       throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    void authService.logout();
-    localStorage.removeItem(AUTH_STORAGE_KEYS.token);
-    localStorage.removeItem(AUTH_STORAGE_KEYS.user);
-    localStorage.removeItem(AUTH_STORAGE_KEYS.rememberMe);
-    setToken(null);
+  const logout = async () => {
     setUser(null);
     setError(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    await authService.logout();
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: !!user && !!token,
-        isLoading,
-        error,
-        login,
-        logout
-      }}
+      value={{ user, isLoading, isAuthenticated: !!user, login, logout, error }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -94,5 +79,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-export default AuthContext;

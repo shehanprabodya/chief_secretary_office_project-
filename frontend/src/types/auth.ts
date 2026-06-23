@@ -1,31 +1,30 @@
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'officer' | 'head' | 'secretary' | 'admin';
-  department: string;
-  designation: string;
-  avatar?: string;
-}
+export type UserRole = 'admin' | 'officer' | 'dept_head' | 'deputy' | 'chief_secretary';
 
 export interface LoginCredentials {
-  email: string;
+  identifier: string; // email OR username
   password: string;
   rememberMe?: boolean;
 }
 
+export interface AuthUser {
+  id: string;
+  full_name: string;
+  email: string;
+  username: string;
+  role: UserRole;
+  department?: string | null;
+}
+
 export interface AuthResponse {
+  user: AuthUser;
   token: string;
-  user: User;
-  expiresIn: number;
 }
 
 export interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
+  user: AuthUser | null;
   isLoading: boolean;
-  token: string | null;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  isAuthenticated: boolean;
+  login: (credentials: LoginCredentials) => Promise<AuthUser>;
+  logout: () => Promise<void>;
   error: string | null;
 }

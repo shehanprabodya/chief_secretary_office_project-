@@ -1,4 +1,3 @@
-
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import WelcomeSection from '../components/Dashboard/WelcomeSection';
 import AssignedMeetingsCard from '../components/Dashboard/AssignedMeetingsCard';
