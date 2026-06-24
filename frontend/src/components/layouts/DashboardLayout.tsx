@@ -10,17 +10,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+     <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+      {/* Top Navbar */}
+      <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+      {/* Sidebar + Content */}
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
-        {/* Content Area */}
         <main className="flex-1 overflow-auto">
-          <div className="p-6 lg:p-8">{children}</div>
+          <div className="p-6 lg:p-8">
+            {children}
+          </div>
         </main>
       </div>
     </div>

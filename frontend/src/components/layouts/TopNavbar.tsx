@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Bell, Globe, ChevronDown, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import logo from '../../assets/logo.svg';
 
 interface TopNavbarProps {
   onMenuClick: () => void;
@@ -61,6 +62,11 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
           >
             <Menu className="h-6 w-6" />
           </button>
+          <img
+            src={logo}
+            alt="Sri Lanka Emblem"
+            className="h-10 w-10 object-contain"
+          />
           <h1 className="hidden text-lg font-semibold text-white lg:block">
             {pageTitle}
           </h1>
