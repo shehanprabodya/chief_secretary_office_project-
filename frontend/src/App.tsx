@@ -8,6 +8,8 @@ import OfficerDashboard from './pages/OfficerDashbord';
 import DeptHeadDashboard from './pages/DeptHeadDashboard';
 import DeputyDashboard from './pages/DeputyDashboard';
 import ChiefSecretaryDashboard from './pages/ChiefSecretaryDashboard';
+import MeetingsPage from './pages/MeetingsPage';
+import GenerateLetterPage from './pages/GenerateLetterPage';
 
 export default function App() {
   return (
@@ -36,7 +38,13 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['chief_secretary']} />}>
             <Route path="/dashboard/chief-secretary" element={<ChiefSecretaryDashboard />} />
           </Route>
-
+          
+           <Route element={<ProtectedRoute allowedRoles={['officer', 'admin']} />}>
+            <Route path="/meetings" element={<MeetingsPage />} />
+            <Route path="/letters/new" element={<GenerateLetterPage />} />
+            
+            
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
