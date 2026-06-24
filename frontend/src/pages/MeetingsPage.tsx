@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,  List, Grid3x3, Plus,
-  Eye, Pencil, MoreVertical, RotateCcw, Trash2, MapPin, Laptop,
+  Eye, Pencil, MoreVertical, RotateCcw, Trash2, MapPin, Laptop,Funnel
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import StatusBadge from '../components/shared/StatusBadge';
@@ -145,8 +145,9 @@ export default function MeetingsPage() {
             <div className="flex items-end">
               <button
                 onClick={fetchMeetings}
-                className="w-full rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-500 text-sm font-medium text-white hover:bg-blue-800"
               >
+               <Funnel className='h-4 w-4 shrink-0' />
                 Apply Filters
               </button>
             </div>
