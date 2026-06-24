@@ -5,7 +5,6 @@ import DashboardLayout from '../components/layouts/DashboardLayout';
 import DepartmentTagInput from '../components/Letters/DepartmentTagInput';
 import ApprovalWorkflowSidebar from '../components/Letters/ApprovalWorkflowSidebar';
 import { letterService } from '../services/letterService';
-import { useAuth } from '../context/AuthContext';
 import type { ApprovalStep } from '../types/letter';
 
 
@@ -26,7 +25,7 @@ const DEFAULT_STEPS: ApprovalStep[] = [
 export default function GenerateLetterPage() {  
     const { id } = useParams();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    
 
     const [letterId, setLetterId] = useState<number | null>(id ? Number(id) : null);
     const [senderName] = useState('Office of the Chief Secretary, Southern Provincial Council');
@@ -126,15 +125,15 @@ export default function GenerateLetterPage() {
   };
   return (
     <DashboardLayout pageTitle="Generate Meeting Letter">
-      <div className="space-y-4">
+      <div className="flex flex-col gap-6">
         {/* Breadcrumb */}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-slate-400">
               Meetings <span className="mx-1">›</span>
-              <span className="font-semibold text-slate-900">Generate Letter</span>
+              <span className="testfont-semibold text-slate-900">Generate Letter</span>
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-900">Generate Meeting Letter</h1>
+            <h1 className="mt-2 text-2xl font-bold text-slate-900"> Letter Details</h1>
           </div>
           <div className="flex items-center gap-3">
             <button className="flex items-center gap-2 rounded-lg border border-blue-300 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">
@@ -151,11 +150,7 @@ export default function GenerateLetterPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Form */}
           <div className="lg:col-span-2 rounded-lg border border-slate-200 bg-white p-6">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <span className="text-slate-400">≡</span> Letter Details
-            </h2>
-            <div className="mb-6 h-px bg-slate-100" />
-
+            
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">From (Sender Details)</label>
@@ -245,10 +240,10 @@ export default function GenerateLetterPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <div className="rounded-lg border border-slate-200 bg-white p-5">
               <h3 className="mb-4 text-sm font-semibold text-slate-700">✦ Letter Actions</h3>
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 <button
                   onClick={handleSendForApproval}
                   disabled={isSubmitting}
@@ -269,22 +264,22 @@ export default function GenerateLetterPage() {
 
               <div className="my-4 h-px bg-slate-100" />
 
-              <div className="space-y-3">
+              <div className="flex flex-col gap-6 ">
                 <button
                   onClick={handleSaveDraft}
                   disabled={isSaving}
-                  className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline disabled:opacity-50"
+                  className="flex items-center justify-center  gap-2 text-sm font-medium text-blue-600 hover:underline disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" />
                   {isSaving ? 'Saving...' : 'Download as PDF'}
                 </button>
-                <button className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline">
+                <button className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:underline">
                   <History className="h-4 w-4" />
                   View Revision History
                 </button>
                 <button
                   onClick={handleDiscard}
-                  className="flex items-center gap-2 text-sm font-medium text-red-600 hover:underline"
+                  className="flex items-center justify-center gap-2 text-sm font-medium text-red-600 hover:underline"
                 >
                   <Trash2 className="h-4 w-4" />
                   Discard Draft

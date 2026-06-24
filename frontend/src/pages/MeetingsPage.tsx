@@ -81,7 +81,7 @@ export default function MeetingsPage() {
               </button>
             </div>
             <button
-              onClick={() => navigate('/meetings/create')}
+              onClick={() => navigate('/letters/new')}
               className="flex items-center gap-2 bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500"
             >
               <Plus className="h-4 w-4" />
