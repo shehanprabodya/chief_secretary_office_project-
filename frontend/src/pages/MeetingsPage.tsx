@@ -65,24 +65,24 @@ export default function MeetingsPage() {
 
   return (
     <DashboardLayout pageTitle="Meeting Management">
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-slate-900">Meeting Management</h1>
           <div className="flex items-center gap-3">
-            <div className="flex rounded-lg border border-slate-300 bg-white">
-              <button className="flex items-center gap-2 rounded-l-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+            <div className="flex  border border-slate-300 bg-white">
+              <button className="flex items-center gap-2  bg-slate-900 px-4 py-2 text-sm font-medium text-white">
                 <List className="h-4 w-4" />
                 List
               </button>
-              <button className="flex items-center gap-2 rounded-r-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+              <button className="flex items-center gap-2  px-4 py-2 text-sm font-medium text-slate-900 bg-slate-100 hover:bg-slate-400">
                 <Grid3x3 className="h-4 w-4" />
                 Calendar
               </button>
             </div>
             <button
               onClick={() => navigate('/meetings/create')}
-              className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="flex items-center gap-2 bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500"
             >
               <Plus className="h-4 w-4" />
               Create Meeting
@@ -91,7 +91,7 @@ export default function MeetingsPage() {
         </div>
 
         {/* Filters */}
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className=" rounded-lg border border-slate-200 bg-white p-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">Search Meeting</label>
@@ -145,7 +145,7 @@ export default function MeetingsPage() {
             <div className="flex items-end">
               <button
                 onClick={fetchMeetings}
-                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className="w-full rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
               >
                 Apply Filters
               </button>
@@ -157,7 +157,7 @@ export default function MeetingsPage() {
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-slate-200 bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-6 py-3">Meeting Title</th>
                 <th className="px-6 py-3">Date & Time</th>
                 <th className="px-6 py-3">Location</th>
@@ -258,7 +258,7 @@ export default function MeetingsPage() {
           </table>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3">
+          <div className="flex items-center justify-between bg-slate-100 border-t border-slate-200 px-6 py-3">
             <p className="text-sm text-slate-500">
               Showing {meetings.length} of {total} meetings
             </p>
