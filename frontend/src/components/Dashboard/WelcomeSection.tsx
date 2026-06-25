@@ -9,7 +9,7 @@ export default function WelcomeSection() {
         Welcome back, {user?.full_name}
       </h1>
       
-      // need change this according to the real data
+      
       <p className="mt-1 text-slate-600 dark:text-slate-400">
         You have 4 meetings scheduled for today.
       </p>
