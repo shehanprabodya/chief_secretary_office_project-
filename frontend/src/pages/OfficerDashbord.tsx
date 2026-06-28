@@ -9,29 +9,44 @@ import DraftLettersCard from '../components/Dashboard/DraftLettersCard';
 export default function DashboardPage() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Welcome Section */}
-        <WelcomeSection />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Main Content - Left Side */}
+        <div className="lg:col-span-2">
+          
+          {/* Welcome Section */}
+          <section className="mb-10">
+            <WelcomeSection />
+          </section>
 
-        {/* Main Grid */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Meetings & Timeline */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* Assigned Meetings */}
+          <section className="mb-10">
             <AssignedMeetingsCard />
-          </div>
+          </section>
 
-          {/* Right Column - Calendar & Actions */}
-          <div className="space-y-6">
+          {/* Draft Cards */}
+          <section>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <DraftMinutesCard />
+              <DraftLettersCard />
+            </div>
+          </section>
+
+        </div>
+
+        {/* Sidebar - Right Side */}
+        <div className="space-y-8">
+          
+          <section>
             <CalendarWidget />
+          </section>
+
+          <section>
             <TimelineWidget />
-          </div>
+          </section>
+
         </div>
 
-        {/* Draft Items Grid */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <DraftMinutesCard />
-          <DraftLettersCard />
-        </div>
       </div>
     </DashboardLayout>
   );
