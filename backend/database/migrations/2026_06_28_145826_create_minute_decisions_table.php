@@ -12,8 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('minute_decisions', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+            $table->increments('decision_id');
+            $table->unsignedInteger('minute_id');
+            $table->unsignedSmallInteger('decision_order');
+            $table->text('decision_text');
+            $table->timestamp('created_at')->useCurrent();
+
+            $table->foreign('minute_id')->references('minute_id')->on('meeting_minutes')->onDelete('cascade');
         });
     }
 
