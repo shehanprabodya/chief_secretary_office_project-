@@ -12,8 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('attendance_records', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+            $table->increments('attendance_id');
+            $table->unsignedInteger('meeting_id');
+            $table->unsignedInteger('user_id');
+            $table->enum('status', ['present', 'absent', 'excused'])->default('present');
+            $table->boolean('is_draft')->default(true); // true until "Submit Attendance" clicked
+            $table->unsignedInteger('recorded_by');
+            $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+
+            $table->foreign('meeting_id')->references('meeting_id')->on('meetings')->onDelete('cascade');
+            $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
+            $table->foreign('recorded_by')->references('user_id')->on('users');
+            $table->unique(['meeting_id', 'user_id']);
         });
     }
 
