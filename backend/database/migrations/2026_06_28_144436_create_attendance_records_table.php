@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::create('attendance_records', function (Blueprint $table) {
             $table->increments('attendance_id');
             $table->unsignedInteger('meeting_id');
-            $table->unsignedInteger('user_id');
+            $table->unsignedBigInteger('user_id');
             $table->enum('status', ['present', 'absent', 'excused'])->default('present');
             $table->boolean('is_draft')->default(true); // true until "Submit Attendance" clicked
-            $table->unsignedInteger('recorded_by');
+            $table->unsignedBigInteger('recorded_by');
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
 
