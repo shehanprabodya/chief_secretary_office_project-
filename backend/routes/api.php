@@ -40,5 +40,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/letters/{id}/approve', [LetterController::class, 'approve']);
     Route::post('/letters/{id}/reject', [LetterController::class, 'reject']);
     Route::delete('/letters/{id}', [LetterController::class, 'destroy']);
+
+    // Attendance
+    Route::get('/meetings/{meetingId}/attendance', [AttendanceController::class, 'show']);
+    Route::post('/meetings/{meetingId}/attendance/draft', [AttendanceController::class, 'saveDraft']);
+    Route::post('/meetings/{meetingId}/attendance/submit', [AttendanceController::class, 'submit']);
+    Route::get('/meetings/{meetingId}/attendance/search', [AttendanceController::class, 'search']);
+
 });
 ?>
