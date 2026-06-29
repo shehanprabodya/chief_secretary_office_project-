@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('step_order');
             $table->string('required_role', 50); // matches roles.role_name
             $table->enum('status', ['waiting', 'pending', 'approved', 'rejected'])->default('waiting');
-            $table->unsignedInteger('actioned_by')->nullable();
+            $table->unsignedBigInteger('actioned_by')->nullable();
             $table->timestamp('actioned_at')->nullable();
             $table->timestamp('created_at')->useCurrent();
 

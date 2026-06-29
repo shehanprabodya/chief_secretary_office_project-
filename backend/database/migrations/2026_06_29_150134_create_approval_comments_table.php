@@ -14,7 +14,7 @@ return new class extends Migration
             Schema::create('approval_comments', function (Blueprint $table) {
             $table->increments('comment_id');
             $table->unsignedInteger('document_id');
-            $table->unsignedInteger('user_id');
+            $table->unsignedBigInteger('user_id');
             $table->text('comment');
             $table->timestamp('created_at')->useCurrent();
 

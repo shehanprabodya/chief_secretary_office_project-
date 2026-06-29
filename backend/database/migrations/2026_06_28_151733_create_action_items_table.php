@@ -15,7 +15,7 @@ return new class extends Migration
             $table->increments('action_item_id');
             $table->unsignedInteger('minute_id');
             $table->string('task_description', 500);
-            $table->unsignedInteger('responsible_officer_id')->nullable();
+            $table->unsignedBigInteger('responsible_officer_id')->nullable();
             $table->date('deadline')->nullable();
             $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
             $table->timestamp('created_at')->useCurrent();

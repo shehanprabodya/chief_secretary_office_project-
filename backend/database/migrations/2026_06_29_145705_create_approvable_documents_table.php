@@ -21,7 +21,7 @@ return new class extends Migration
             $table->longText('full_content')->nullable(); // rendered document body (for preview pane)
             $table->decimal('amount', 15, 2)->nullable(); // for grants/budget requests
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
-            $table->unsignedInteger('submitted_by');
+            $table->unsignedBigInteger('submitted_by');
             $table->unsignedInteger('current_step_order')->default(1);
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
