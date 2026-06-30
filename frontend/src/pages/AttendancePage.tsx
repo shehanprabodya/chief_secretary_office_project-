@@ -99,7 +99,7 @@ export default function AttendancePage() {
 
   return (
     <DashboardLayout pageTitle="Attendance Tracking">
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {/* Header + Live Stats */}
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -109,14 +109,13 @@ export default function AttendancePage() {
             </p>
           </div>
 
-          <div className="w-full max-w-xs rounded-xl bg-[var(--color-primary)] p-5 text-white">
+          <div className=" flex flex-col gap-6 w-full max-w-xs rounded-xl bg-[var(--color-primary)] p-5 text-white">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Live Statistics</p>
               <BarChart3 className="h-5 w-5 text-white/40" />
             </div>
             <p className="text-4xl font-bold">
               {percentage}%
-              <span className="ml-2 text-sm font-normal text-white/70">Attendance</span>
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2">
               <div className="rounded-lg bg-white/10 px-2 py-2 text-center">
