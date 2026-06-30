@@ -11,6 +11,7 @@ import ChiefSecretaryDashboard from './pages/ChiefSecretaryDashboard';
 import MeetingsPage from './pages/MeetingsPage';
 import GenerateLetterPage from './pages/GenerateLetterPage';
 import AttendancePage from './pages/AttendancePage';
+import ApprovalsPage from './pages/ApprovalsPage';
 
 export default function App() {
   return (
@@ -46,6 +47,10 @@ export default function App() {
             <Route path="/attendance" element={<AttendancePage />} />
             
           
+          </Route>
+          // Approvals visible to ALL roles that participate in workflow
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'officer', 'dept_head', 'deputy', 'chief_secretary']} />}>
+            <Route path="/approvals" element={<ApprovalsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
