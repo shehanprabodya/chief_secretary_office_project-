@@ -12,6 +12,7 @@ import MeetingsPage from './pages/MeetingsPage';
 import GenerateLetterPage from './pages/GenerateLetterPage';
 import AttendancePage from './pages/AttendancePage';
 import ApprovalsPage from './pages/ApprovalsPage';
+import CreateMinutesPage from './pages/CreateMinutesPage';
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/meetings" element={<MeetingsPage />} />
             <Route path="/letters/new" element={<GenerateLetterPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/minutes/:meetingId" element={<CreateMinutesPage />} />
             
           
           </Route>
