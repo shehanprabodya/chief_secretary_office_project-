@@ -3,11 +3,12 @@ import {
   Search, Filter, Download, Users, Shield,
   Building2, UserX, Pencil, RotateCcw, UserMinus, UserCheck, UserPlus
 } from 'lucide-react';
-import AdminLayout from '../components/layouts/AdminLayout';
+
 import AddUserModal from '../components/Admin/AddUserModal';
 import ResetPasswordModal from '../components/Admin/ResetPasswordModal';
 import { adminService } from '../services/adminService';
 import type { AdminUser, UserStats } from '../types/admin';
+import DashboardLayout from '../components/layouts/DashboardLayout';
 
 type Tab = 'users' | 'roles' | 'logs';
 
@@ -80,7 +81,7 @@ export default function UserManagementPage() {
   };
 
   return (
-    <AdminLayout pageTitle="User & Role Management">
+    <DashboardLayout pageTitle="User & Role Management">
       <div className="flex flex-col gap-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -287,6 +288,6 @@ export default function UserManagementPage() {
       {resetUser && (
         <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />
       )}
-    </AdminLayout>
+    </DashboardLayout>
   );
 }

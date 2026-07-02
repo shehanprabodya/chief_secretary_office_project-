@@ -4,10 +4,10 @@ import {
   Users, Calendar, Bell, BarChart3, TrendingUp,
   Plus, UserPlus, History
 } from 'lucide-react';
-import AdminLayout from '../components/layouts/AdminLayout';
 import { adminService } from '../services/adminService';
 import type { AdminStats, ActivityItem, UpcomingMeeting } from '../types/admin';
 import { useAuth } from '../context/AuthContext';
+import DashboardLayout from '../components/layouts/DashboardLayout';
 
 // KPI card color config matching screenshot exactly
 type KPICard = {
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <AdminLayout pageTitle="Admin Dashboard">
+    <DashboardLayout pageTitle="Admin Dashboard">
       <div className="flex flex-col gap-6">
         {/* Welcome header */}
         <div className="flex items-center justify-between">
@@ -239,6 +239,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
-    </AdminLayout>
+    </DashboardLayout>
   );
 }
