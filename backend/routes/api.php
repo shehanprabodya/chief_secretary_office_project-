@@ -55,5 +55,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/approvals/{id}/reject', [ApprovalController::class, 'reject']);
     Route::post('/approvals/{id}/comments', [ApprovalController::class, 'addComment']);
 
+    //minutes
+    Route::get('/minutes', [MinuteController::class, 'index']);
+    Route::get('/minutes/{id}', [MinuteController::class, 'show']);
+    Route::get('/meetings/{meetingId}/minutes', [MinuteController::class, 'getOrCreateForMeeting']);
+    Route::put('/minutes/{id}', [MinuteController::class, 'saveDraft']);
+    Route::post('/minutes/{id}/submit', [MinuteController::class, 'submitForApproval']);
+
+    Route::post('/minutes/{minuteId}/decisions', [MinuteController::class, 'addDecision']);
+    Route::delete('/decisions/{decisionId}', [MinuteController::class, 'deleteDecision']);
+
+    Route::post('/minutes/{minuteId}/action-items', [MinuteController::class, 'addActionItem']);
+    Route::delete('/action-items/{itemId}', [MinuteController::class, 'deleteActionItem']);
+
 });
 ?>
