@@ -26,35 +26,28 @@ export default function AdminLayout({ children, pageTitle }: AdminLayoutProps) {
 
   const Sidebar = (
     <div className="flex h-full w-56 flex-col bg-[var(--color-primary)] text-white">
-      {/* Logo */}
-      <div className="flex items-center gap-3 border-b border-white/10 p-5">
-        <img src={logo} alt="Logo" className="h-8 w-8" />
-        <div>
-          <p className="text-sm font-bold">MMCS</p>
-          <p className="text-[10px] text-white/50">v2.4.1</p>
-        </div>
-      </div>
+      
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 p-4">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.label}
-            to={item.href}
-            onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                isActive ? 'bg-white text-[var(--color-primary)]' : 'text-white/80 hover:bg-white/10'
-              }`
-            }
-          >
+        <nav className='mt-12'>
+          {navItems.map((item) => (
+                <NavLink
+                  key={item.label}
+                  to={item.href}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3  px-4 py-3  transition-all duration-200  ${
+                      isActive
+                        ? 'border-r-4 border-slate-600 bg-slate-200 text-black font-bold'
+                        : 'border-r-4 border-transparent text-slate-100 font-medium hover:bg-slate-100'
+                    }`
+                  }
+                >
             <item.icon className="h-5 w-5" />
-            {item.label}
+            <span className="font-medium">{item.label}</span>
           </NavLink>
         ))}
-      </nav>
-    </div>
-     
+        </nav>
+     </div>
   );
 
   return (
