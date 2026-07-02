@@ -102,7 +102,7 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout pageTitle="Admin Dashboard">
-      <div className="space-y-8">
+      <div className="flex flex-col gap-6">
         {/* Welcome header */}
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-slate-900">
