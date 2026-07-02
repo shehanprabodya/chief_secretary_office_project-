@@ -46,7 +46,7 @@ export default function App() {
             <Route path="/meetings" element={<MeetingsPage />} />
             <Route path="/letters/new" element={<GenerateLetterPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
-            <Route path="/minutes/:meetingId" element={<CreateMinutesPage />} />
+            <Route path="/minutes" element={<CreateMinutesPage />} />
             
           
           </Route>
