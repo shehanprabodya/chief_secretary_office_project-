@@ -1,24 +1,21 @@
-import {LayoutDashboard,Calendar,CheckCircle,FileText,Users,Files,BarChart3,LogOut,X,} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { NavLink } from 'react-router-dom';
+import { LogOut, X } from 'lucide-react';
+import { navigation } from "./navigation";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const navigationItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard/officer' },
-  { icon: Calendar, label: 'Meetings', href: '/meetings' },
-  { icon: CheckCircle, label: 'Approvals', href: '/approvals' },
-  { icon: FileText, label: 'Minutes', href: '/minutes' },
-  { icon: Users, label: 'Attendance', href: '/attendance' },
-  { icon: Files, label: 'Documents', href: '/documents' },
-  { icon: BarChart3, label: 'Reports', href: '/reports' },
-];
+
+
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+
+  const navigationItems =
+    navigation[user?.role as keyof typeof navigation] ?? [];
 
   const handleLogout = () => {
     logout();
