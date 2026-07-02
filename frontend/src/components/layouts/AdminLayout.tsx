@@ -98,14 +98,7 @@ export default function AdminLayout({ children, pageTitle }: AdminLayoutProps) {
 
         <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
 
-        <footer className="border-t border-slate-200 bg-white px-8 py-3 text-xs text-slate-400 flex justify-between">
-          <span>MMCS v2.4.1 © 2024 Office of the Chief Secretary - Southern Provincial Council. All Rights Reserved.</span>
-          <div className="flex gap-4">
-            <button className="hover:underline">Accessibility</button>
-            <button className="hover:underline">Privacy Policy</button>
-            <button className="hover:underline">Technical Support</button>
-          </div>
-        </footer>
+        
       </div>
     </div>
   );
