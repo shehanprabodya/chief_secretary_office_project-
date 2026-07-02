@@ -13,6 +13,7 @@ import GenerateLetterPage from './pages/GenerateLetterPage';
 import AttendancePage from './pages/AttendancePage';
 import ApprovalsPage from './pages/ApprovalsPage';
 import CreateMinutesPage from './pages/CreateMinutesPage';
+import UserManagementPage from './pages/UserManagementPage';
 
 export default function App() {
   return (
@@ -26,6 +27,11 @@ export default function App() {
             <Route path="/dashboard/admin" element={<AdminDashboard />} />
           </Route>
 
+          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/dashboard/admin" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<UserManagementPage />} />
+          </Route>
+          
           <Route element={<ProtectedRoute allowedRoles={['officer']} />}>
             <Route path="/dashboard/officer" element={<OfficerDashboard />} />
           </Route>
