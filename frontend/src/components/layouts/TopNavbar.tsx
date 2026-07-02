@@ -6,6 +6,7 @@ import logo from '../../assets/logo.svg';
 
 interface TopNavbarProps {
   onMenuClick: () => void;
+  
   pageTitle?: string;
 }
 
