@@ -53,13 +53,8 @@ export default function AdminLayout({ children, pageTitle }: AdminLayoutProps) {
           </NavLink>
         ))}
       </nav>
-
-      {/* Footer */}
-      <div className="border-t border-white/10 p-4">
-        <p className="px-4 text-xs text-white/40">Office of the Chief Secretary</p>
-        <p className="px-4 text-[10px] text-white/30">© 2024 Southern Provincial Council</p>
-      </div>
     </div>
+     
   );
 
   return (
