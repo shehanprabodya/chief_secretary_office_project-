@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, LogOut,  Menu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import logo from '../../assets/Srilankaemblem.png';
+
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -72,22 +72,7 @@ export default function AdminLayout({ children, pageTitle }: AdminLayoutProps) {
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-[var(--color-primary)] px-6">
-          <button onClick={() => setSidebarOpen(true)} className="text-white lg:hidden">
-            <Menu className="h-5 w-5" />
-          </button>
-          <span className="hidden text-sm font-medium text-white lg:block">{pageTitle}</span>
-          <div className="ml-auto flex items-center gap-4 text-white">
-            <button className="text-sm font-medium">English</button>
-            <button>🔔</button>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{user?.full_name ?? 'Admin'}</span>
-              <button onClick={handleLogout} title="Logout">
-                <LogOut className="h-4 w-4 text-white/70 hover:text-white" />
-              </button>
-            </div>
-          </div>
-        </header>
+        
 
         <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
 
