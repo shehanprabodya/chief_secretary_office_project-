@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('username', 100)->unique();
             $table->string('password_hash', 255);
             $table->string('designation', 150)->nullable();
+            
         
             $table->foreignId('role_id')->constrained('roles', 'role_id');
             $table->foreignId('organization_id')->constrained('organizations', 'organization_id');
