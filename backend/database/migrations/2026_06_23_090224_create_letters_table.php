@@ -10,20 +10,27 @@ return new class extends Migration
     {
         Schema::create('letters', function (Blueprint $table) {
             $table->increments('letter_id');
-            $table->unsignedInteger('meeting_id')->nullable(); // optional link to a meeting
+            $table->unsignedInteger('meeting_id')->nullable();
+            $table->string('meeting_code', 50)->nullable(); // optional link to a meeting
             $table->string('sender_name', 255);
             $table->string('title', 255);
             $table->longText('content')->nullable();
             $table->string('designation', 150)->nullable();
+            $table->string('organization_name', 255)->nullable();
+            $table->text('organization_address')->nullable();
             $table->string('signatory_name', 150)->nullable();
             $table->date('signature_date')->nullable();
             $table->enum('status', ['draft', 'pending_approval', 'approved', 'rejected', 'dispatched'])->default('draft');
             $table->unsignedBigInteger('created_by');
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
-
+            
+            $table->foreignId('subject_id')->nullable()->constrained('subjects')->nullOnDelete();
+            $table->foreign('meeting_code')->references('meeting_code')->on('meetings')->onDelete('set null');
             $table->foreign('meeting_id')->references('meeting_id')->on('meetings')->onDelete('set null');
             $table->foreign('created_by')->references('user_id')->on('users');
+           
+            
         });
     }
 
