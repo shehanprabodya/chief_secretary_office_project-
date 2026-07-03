@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'officer' | 'dept_head' | 'deputy' | 'chief_secretary';
+export type UserRole = 'admin' | 'officer' | 'dept_head' | 'deputy' | 'chief_secretary'|'external_officer';
 
 export interface LoginCredentials {
   identifier: string; // email OR username
@@ -7,12 +7,14 @@ export interface LoginCredentials {
 }
 
 export interface AuthUser {
-  id: string;
-  full_name: string;
-  email: string;
-  username: string;
-  role: UserRole;
-  department?: string | null;
+    id: string;
+    full_name: string;
+    email: string;
+    username: string;
+    role: UserRole;
+    organization?: string | null;
+    designation?: string | null;
+    status: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface AuthResponse {
