@@ -21,7 +21,9 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by');
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
-
+            $table->unsignedInteger('subject_id')->nullable()->after('meeting_id');
+            
+            $table->foreign('subject_id')->references('subject_id')->on('subjects')->onDelete('set null');
             $table->foreign('meeting_id')->references('meeting_id')->on('meetings')->onDelete('set null');
             $table->foreign('created_by')->references('user_id')->on('users');
         });
