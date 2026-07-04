@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
+use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +21,7 @@ class UserManagementController extends Controller
         return response()->json([
             'total_users' => User::count(),
             'admins' => User::whereHas('role', fn($q) => $q->where('role_name', 'admin'))->count(),
-            'departments' => Department::count(),
+            'organizations' => Organization::count(),
             'inactive' => User::where('status', 'INACTIVE')->count(),
         ]);
     }
@@ -31,7 +31,7 @@ class UserManagementController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = User::with('role', 'department');
+        $query = User::with('role', 'organization');
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -59,7 +59,7 @@ class UserManagementController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $user = User::with('role', 'department')->findOrFail($id);
+        $user = User::with('role', 'organization')->findOrFail($id);
         return response()->json(['user' => $user]);
     }
 
@@ -74,7 +74,7 @@ class UserManagementController extends Controller
             'username' => 'required|string|max:100|unique:users,username',
             'password' => 'required|string|min:8',
             'role_id' => 'required|exists:roles,role_id',
-            'department_id' => 'nullable|exists:departments,department_id',
+            'organization_id' => 'nullable|exists:organizations,organization_id',
             'status' => 'nullable|in:ACTIVE,INACTIVE',
         ]);
 
@@ -86,18 +86,19 @@ class UserManagementController extends Controller
         }
 
         $user = User::create([
-            'full_name' => $request->full_name,
-            'email' => $request->email,
-            'username' => $request->username,
-            'password_hash' => Hash::make($request->password),
-            'role_id' => $request->role_id,
-            'department_id' => $request->department_id,
-            'status' => $request->status ?? 'ACTIVE',
+            'full_name'=>$request->full_name,
+            'email'=>$request->email,
+            'username'=>$request->username,
+            'password_hash'=>Hash::make($request->password),
+            'designation'=>$request->designation,
+            'role_id'=>$request->role_id,
+            'organization_id'=>$request->organization_id,
+            'status'=>$request->status ?? 'ACTIVE',
         ]);
 
         return response()->json([
             'message' => 'User created successfully',
-            'user' => $user->load('role', 'department'),
+            'user' => $user->load('role', 'organization'),
         ], 201);
     }
 
@@ -113,7 +114,7 @@ class UserManagementController extends Controller
             'email' => "sometimes|email|unique:users,email,{$id},user_id",
             'username' => "sometimes|string|max:100|unique:users,username,{$id},user_id",
             'role_id' => 'sometimes|exists:roles,role_id',
-            'department_id' => 'nullable|exists:departments,department_id',
+            'organization_id' => 'nullable|exists:organizations,organization_id',
             'status' => 'sometimes|in:ACTIVE,INACTIVE',
         ]);
 
@@ -128,7 +129,7 @@ class UserManagementController extends Controller
 
         return response()->json([
             'message' => 'User updated successfully',
-            'user' => $user->load('role', 'department'),
+            'user' => $user->load('role', 'organization'),
         ]);
     }
 

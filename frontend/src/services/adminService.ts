@@ -1,8 +1,5 @@
 import { api } from '../lib/axios';
-import type {
-  AdminStats, UserStats, ActivityItem, AdminUser,
-  CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting
-} from '../types/admin';
+import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting} from '../types/admin';
 
 export interface UserFilters {
   search?: string;
