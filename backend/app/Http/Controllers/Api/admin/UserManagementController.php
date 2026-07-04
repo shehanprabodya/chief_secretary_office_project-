@@ -114,6 +114,7 @@ class UserManagementController extends Controller
             'email' => "sometimes|email|unique:users,email,{$id},user_id",
             'username' => "sometimes|string|max:100|unique:users,username,{$id},user_id",
             'role_id' => 'sometimes|exists:roles,role_id',
+            'designation'=>'nullable|string|max:150',
             'organization_id' => 'nullable|exists:organizations,organization_id',
             'status' => 'sometimes|in:ACTIVE,INACTIVE',
         ]);
