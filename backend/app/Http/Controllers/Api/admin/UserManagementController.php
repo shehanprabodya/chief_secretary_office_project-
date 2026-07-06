@@ -66,6 +66,29 @@ class UserManagementController extends Controller
     /**
      * Create new user (Admin operation from "Add New User" button)
      */
+    public function organizations(): JsonResponse
+    {
+        $organizations = Organization::where('status', 'ACTIVE')
+            ->select('organization_id', 'organization_name')
+            ->orderBy('organization_name')
+            ->get();
+
+        return response()->json([
+            'organizations' => $organizations
+        ]);
+    }
+    public function roles(): JsonResponse
+       {
+            $roles = Role::select('role_id', 'role_name')
+            ->orderBy('role_name')
+            ->get();
+
+            return response()->json([
+            'roles' => $roles
+             ]);
+        }
+    
+
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -178,15 +201,8 @@ class UserManagementController extends Controller
         ]);
     }
 
-    /**
-     * Role management tab — list all roles
-     */
-    public function roles(): JsonResponse
-    {
-        $roles = Role::withCount('users')->get();
-        return response()->json(['roles' => $roles]);
-    }
-
+    
+      
     /**
      * Access logs tab - recent token activity
      */

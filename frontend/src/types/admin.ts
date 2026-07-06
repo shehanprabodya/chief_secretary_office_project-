@@ -5,11 +5,16 @@ export interface AdminStats {
   pending_approvals: number;
   avg_attendance: number;
 }
-
+export interface Organization {
+  organization_id: number;
+  organization_name: string;
+  abbreviation: string | null;
+  status: 'ACTIVE' | 'INACTIVE';
+}
 export interface UserStats {
   total_users: number;
   admins: number;
-  departments: number;
+  organizations: number;
   inactive: number;
 }
 
@@ -28,7 +33,8 @@ export interface AdminUser {
   username: string;
   status: 'ACTIVE' | 'INACTIVE';
   role: { role_id: number; role_name: string };
-  department: { department_id: number; department_name: string } | null;
+  designation: string | null;
+  organization: {organization_id: number;organization_name: string;abbreviation: string | null;} | null;
   created_at: string;
 }
 
@@ -45,7 +51,8 @@ export interface CreateUserPayload {
   username: string;
   password: string;
   role_id: number;
-  department_id?: number | null;
+  designation?: string;
+  organization_id?: number | null;
   status?: 'ACTIVE' | 'INACTIVE';
 }
 

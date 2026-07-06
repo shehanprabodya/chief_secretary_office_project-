@@ -121,7 +121,7 @@ export default function UserManagementPage() {
               {[
                 { label: 'Total Users', value: stats?.total_users, icon: Users, color: 'text-blue-600 bg-blue-50' },
                 { label: 'Admins', value: stats?.admins, icon: Shield, color: 'text-orange-600 bg-orange-50' },
-                { label: 'Departments', value: stats?.departments, icon: Building2, color: 'text-slate-600 bg-slate-100' },
+                { label: 'Organizations', value: stats?.organizations, icon: Building2, color: 'text-slate-600 bg-slate-100' },
                 { label: 'Inactive', value: stats?.inactive, icon: UserX, color: 'text-red-600 bg-red-50' },
               ].map((s) => (
                 <div key={s.label} className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-4">
@@ -144,7 +144,7 @@ export default function UserManagementPage() {
                   type="text"
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                  placeholder="Search by name, email, or role..."
+                  placeholder="Search by name, username, email, organization or role..."
                   className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
@@ -165,16 +165,17 @@ export default function UserManagementPage() {
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <th className="px-6 py-3">User</th>
                     <th className="px-6 py-3">Role</th>
-                    <th className="px-6 py-3">Department</th>
+                    <th className="px-6 py-3">Organization</th>
+                    <th className="px-6 py-3">Designation</th>
                     <th className="px-6 py-3">Status</th>
                     <th className="px-6 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {isLoading ? (
-                    <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-400">Loading...</td></tr>
+                    <tr><td colSpan={6} className="py-10 text-center text-sm text-slate-400">Loading...</td></tr>
                   ) : users.length === 0 ? (
-                    <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-400">No users found</td></tr>
+                    <tr><td colSpan={6} className="py-10 text-center text-sm text-slate-400">No users found</td></tr>
                   ) : (
                     users.map((u) => (
                       <tr key={u.user_id} className="hover:bg-slate-50/50">
@@ -194,8 +195,12 @@ export default function UserManagementPage() {
                             {u.role.role_name.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                           </span>
                         </td>
+                        
                         <td className="px-6 py-4 text-sm text-slate-700">
-                          {u.department?.department_name ?? '—'}
+                          {u.organization?.organization_name ?? '—'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          {u.designation ?? '—'}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`flex w-fit items-center gap-1.5 text-sm font-medium ${u.status === 'ACTIVE' ? 'text-green-600' : 'text-slate-400'}`}>

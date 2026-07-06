@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { adminService } from '../../services/adminService';
-import type { AdminUser, CreateUserPayload, Role } from '../../types/admin';
+import type { AdminUser, CreateUserPayload, Role,Organization } from '../../types/admin';
 
 interface AddUserModalProps {
   editUser?: AdminUser | null;
@@ -9,18 +9,15 @@ interface AddUserModalProps {
   onSaved: () => void;
 }
 
-const DEPARTMENTS = [
-  { department_id: 1, department_name: 'Development Division' },
-  { department_id: 2, department_name: 'Human Resources' },
-  { department_id: 3, department_name: 'Finance & Treasury' },
-  { department_id: 4, department_name: "Chief Secretary's Office" },
-  { department_id: 5, department_name: 'Administration Unit' },
-];
+
 
 export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModalProps) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  
+ 
 
   const [form, setForm] = useState<CreateUserPayload>({
     full_name: editUser?.full_name ?? '',
@@ -28,13 +25,15 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
     username: editUser?.username ?? '',
     password: '',
     role_id: editUser?.role.role_id ?? 0,
-    department_id: editUser?.department?.department_id ?? null,
+    designation: editUser?.designation ?? '',
+    organization_id: editUser?.organization?.organization_id ?? null,
     status: editUser?.status ?? 'ACTIVE',
   });
 
   useEffect(() => {
     adminService.getRoles().then(setRoles);
-  }, []);
+    adminService.getOrganizations().then(setOrganizations);
+}, []);
 
   const handleChange = (field: keyof CreateUserPayload, value: string | number | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -43,7 +42,7 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.full_name || !form.email || !form.username || !form.role_id) {
+    if (!form.full_name || !form.email || !form.username || !form.role_id ||  !form.organization_id) {
       setError('Please fill in all required fields');
       return;
     }
@@ -159,18 +158,40 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
                 ))}
               </select>
             </div>
+            <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Designation </label>
 
+                <input
+                type="text"
+                value={form.designation ?? ''}
+                onChange={(e)=>handleChange('designation',e.target.value)}
+                placeholder="Assistant Secretary"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                />
+            </div>   
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">Department</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Organization</label>
+
               <select
-                value={form.department_id ?? ''}
-                onChange={(e) => handleChange('department_id', e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                value={form.organization_id ?? ''}
+                onChange={(e)=>
+                  handleChange(
+                    'organization_id',
+                    e.target.value ? Number(e.target.value) : null
+                  )
+                }
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               >
-                <option value="">No department</option>
-                {DEPARTMENTS.map((d) => (
-                  <option key={d.department_id} value={d.department_id}>
-                    {d.department_name}
+                <option value="">
+                  Select Organization
+                </option>
+
+                {organizations.map((org)=>(
+                  <option
+                    key={org.organization_id}
+                    value={org.organization_id}
+                  >
+                    {org.organization_name}
                   </option>
                 ))}
               </select>
