@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users/{id}/reset-password', [UserManagementController::class, 'resetPassword']);
     Route::patch('/users/{id}/toggle-status', [UserManagementController::class, 'toggleStatus']);
     Route::get('/roles', [UserManagementController::class, 'roles']);
+    Route::get('/organizations', [UserManagementController::class, 'organizations']);
     Route::get('/users/{id}/logs', [UserManagementController::class, 'accessLogs']);
     });
 
