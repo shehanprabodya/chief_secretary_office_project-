@@ -16,6 +16,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
+    // Lookups - accessible to all authenticated users (needed for forms)
+    Route::prefix('admin')->group(function () {
+        Route::prefix('lookups')->group(function () {
+            Route::get('/roles', [UserManagementController::class, 'roles']);
+            Route::get('/organizations', [UserManagementController::class, 'organizations']);
+        });
+    });
+
     Route::middleware(['role:admin'])->prefix('admin')->group(function () {
         // Dashboard
         Route::get('/stats', [AdminDashboardController::class, 'stats']);
@@ -39,11 +47,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/{id}/toggle-status', [UserManagementController::class, 'toggleStatus']);
 
             Route::get('/{id}/logs', [UserManagementController::class, 'accessLogs']);
-        });
-
-        Route::prefix('lookups')->group(function () {
-            Route::get('/roles', [UserManagementController::class, 'roles']);
-            Route::get('/organizations', [UserManagementController::class, 'organizations']);
         });
     });
 
