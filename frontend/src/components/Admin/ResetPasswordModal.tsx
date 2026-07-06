@@ -43,7 +43,7 @@ export default function ResetPasswordModal({ user, onClose }: ResetPasswordModal
         </button>
 
         <h2 className="text-lg font-bold text-slate-900">Reset Password</h2>
-        <p className="mt-1 text-sm text-slate-500">For: {user.full_name} ({user.email})</p>
+        <p className="mt-2 text-sm text-slate-500">For: {user.full_name} ({user.email})</p>
 
         {success ? (
           <div className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
