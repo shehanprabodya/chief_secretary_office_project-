@@ -62,12 +62,12 @@ export const adminService = {
   },
 
   async getRoles(): Promise<Role[]> {
-    const { data } = await api.get<{ roles: Role[] }>('/admin/roles');
+    const { data } = await api.get<{ roles: Role[] }>('/admin/lookups/roles');
     return data.roles;
   },
 
   async getOrganizations(): Promise<Organization[]> {
-  const { data } = await api.get<{organizations: Organization[];}>('/admin/organizations');
+  const { data } = await api.get<{organizations: Organization[];}>('/admin/lookups/organizations');
 
   return data.organizations;
   },
