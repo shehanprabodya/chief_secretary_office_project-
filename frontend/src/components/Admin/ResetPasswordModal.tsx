@@ -50,7 +50,7 @@ export default function ResetPasswordModal({ user, onClose }: ResetPasswordModal
             ✓ Password reset successfully
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6 mt-4">
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="relative">
               <input
