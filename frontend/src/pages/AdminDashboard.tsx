@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Users, Calendar, Bell, BarChart3, TrendingUp,
-  Plus, UserPlus, History
-} from 'lucide-react';
+import { Users, Calendar, Bell, BarChart3, TrendingUp,Plus, UserPlus, History} from 'lucide-react';
 import { adminService } from '../services/adminService';
 import type { AdminStats, ActivityItem, UpcomingMeeting } from '../types/admin';
 import { useAuth } from '../context/AuthContext';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 
-// KPI card color config matching screenshot exactly
+
 type KPICard = {
   key: keyof AdminStats;
   label: string;

@@ -6,6 +6,7 @@ export const ROLE_DASHBOARD_PATH: Record<UserRole, string> = {
   dept_head: '/dashboard/dept-head',
   deputy: '/dashboard/deputy',
   chief_secretary: '/dashboard/chief-secretary',
+  external_officer: '/dashboard/external-officer',
 };
 
 export function getDashboardPathForRole(role: UserRole): string {

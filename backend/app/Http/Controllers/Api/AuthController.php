@@ -29,7 +29,7 @@ class AuthController extends Controller
 
         $identifier = $request->input('identifier');
 
-        $user = User::with('role', 'department')
+        $user = User::with('role', 'organization')
             ->where('email', $identifier)
             ->orWhere('username', $identifier)
             ->first();
@@ -78,7 +78,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load('role', 'department');
+        $user = $request->user()->load('role', 'organization');
 
         return response()->json([
             'user' => $this->formatUser($user),
@@ -95,8 +95,10 @@ class AuthController extends Controller
             'full_name' => $user->full_name,
             'email' => $user->email,
             'username' => $user->username,
-            'role' => $user->role->role_name,
-            'department' => $user->department->department_name ?? null,
+            'role' => $user->role->role_name ?? null,
+            'organization' => $user->organization->organization_name ?? null,
+            'designation'   => $user->designation,
+            'status'        => $user->status,
         ];
     }
 }

@@ -25,8 +25,9 @@ class User extends Authenticatable
         'email',
         'username',
         'password_hash',
+        'designation',
         'role_id',
-        'department_id',
+        'organization_id',
         'status',
     ];
 
@@ -49,11 +50,14 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class, 'role_id', 'role_id');
     }
 
-    public function department(): BelongsTo
+    public function organization(): BelongsTo
     {
-        return $this->belongsTo(Department::class, 'department_id', 'department_id');
+    return $this->belongsTo(
+        Organization::class,
+        'organization_id',
+        'organization_id'
+    );
     }
-
     public function isActive(): bool
     {
         return $this->status === 'ACTIVE';
