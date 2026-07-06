@@ -165,8 +165,8 @@ export default function UserManagementPage() {
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <th className="px-6 py-3">User</th>
                     <th className="px-6 py-3">Role</th>
-                    <th className="px-6 py-3">Designation</th>
                     <th className="px-6 py-3">Organization</th>
+                    <th className="px-6 py-3">Designation</th>
                     <th className="px-6 py-3">Status</th>
                     <th className="px-6 py-3 text-right">Actions</th>
                   </tr>
