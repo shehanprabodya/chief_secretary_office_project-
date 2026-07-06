@@ -66,6 +66,21 @@ class UserManagementController extends Controller
     /**
      * Create new user (Admin operation from "Add New User" button)
      */
+    public function organizations(): JsonResponse
+{
+    $organizations = Organization::where('status', 'ACTIVE')
+        ->orderBy('organization_name')
+        ->get([
+            'organization_id',
+            'organization_name',
+            'abbreviation',
+            'status',
+        ]);
+
+    return response()->json([
+        'organizations' => $organizations,
+    ]);
+}
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

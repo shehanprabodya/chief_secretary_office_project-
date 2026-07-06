@@ -3,6 +3,11 @@ use App\Http\Controllers\Api\AuthController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\LetterController;
+use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\ApprovalController;
+use App\Http\Controllers\Api\MinuteController;
+use App\Http\Controllers\Api\admin\AdminDashboardController;
+use App\Http\Controllers\Api\admin\UserManagementController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
