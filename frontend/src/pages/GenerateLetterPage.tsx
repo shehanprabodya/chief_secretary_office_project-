@@ -2,19 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Eye, Printer, Send, Download, History, Trash2, Bold, Italic, List, Link as LinkIcon } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
-import DepartmentTagInput from '../components/Letters/DepartmentTagInput';
 import ApprovalWorkflowSidebar from '../components/Letters/ApprovalWorkflowSidebar';
 import { letterService } from '../services/letterService';
 import type { ApprovalStep } from '../types/letter';
 
 
-const ALL_DEPARTMENTS = [
-  { department_id: 1, department_name: 'Development Division' },
-  { department_id: 2, department_name: 'Human Resources' },
-  { department_id: 3, department_name: 'Finance & Treasury' },
-  { department_id: 4, department_name: 'Department of Education' },
-  { department_id: 5, department_name: 'Provincial Treasury' },
-];
+
 
 const DEFAULT_STEPS: ApprovalStep[] = [
   { step_id: 1, step_name: 'Draft Created', step_order: 1, status: 'current', actioned_at: null },
@@ -26,12 +19,10 @@ export default function GenerateLetterPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     
-
+    const [projectId, setProjectId] = useState('');
+    const [organizationName, setOrganizationName] = useState('');
     const [letterId, setLetterId] = useState<number | null>(id ? Number(id) : null);
     const [senderName] = useState('Office of the Chief Secretary, Southern Provincial Council');
-    const [selectedDepartments, setSelectedDepartments] = useState(
-    ALL_DEPARTMENTS.filter((d) => [4, 5].includes(d.department_id))
-    );
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [designation, setDesignation] = useState('Chief Secretary');
@@ -44,12 +35,14 @@ export default function GenerateLetterPage() {
     useEffect(() => {
     if (id) {
         letterService.getById(Number(id)).then((letter) => {
+
+            setProjectId(letter.project_id ?? '');
+            setOrganizationName(letter.organization_name ?? '');
             setTitle(letter.title);
             setContent(letter.content ?? '');
             setDesignation(letter.designation ?? 'Chief Secretary');
             setSignatoryName(letter.signatory_name ?? '');
             setSignatureDate(letter.signature_date ?? '');
-            if (letter.departments) setSelectedDepartments(letter.departments);
             if (letter.approval_steps) setApprovalSteps(letter.approval_steps);
         });
         }
@@ -65,7 +58,6 @@ export default function GenerateLetterPage() {
         designation,
         signatory_name: signatoryName,
         signature_date: signatureDate || undefined,
-        department_ids: selectedDepartments.map((d) => d.department_id),
       };
 
       if (letterId) {
@@ -131,7 +123,7 @@ export default function GenerateLetterPage() {
           <div>
             <p className="text-sm text-slate-400">
               Meetings <span className="mx-1">›</span>
-              <span className="testfont-semibold text-slate-900">Generate Letter</span>
+              <span className="font-semibold text-slate-900">Generate Letter</span>
             </p>
             <h1 className="mt-2 text-2xl font-bold text-slate-900"> Letter Details</h1>
           </div>
@@ -150,24 +142,54 @@ export default function GenerateLetterPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Form */}
           <div className="lg:col-span-2 rounded-lg border border-slate-200 bg-white p-6">
-            
+
             <div className="grid gap-6 sm:grid-cols-2">
+
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">From (Sender Details)</label>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
-                  {senderName}
-                </div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Sender
+                  </label>
+                  <div className="rounded-lg border bg-slate-50 px-3 py-2.5">
+                    {senderName}
+                  </div>  
+              </div>
+              <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Project ID
+                  </label>
+                  <input
+                      value={projectId}
+                      onChange={(e)=>setProjectId(e.target.value)}
+                      className="w-full rounded-lg border px-3 py-2.5"
+                      placeholder="SPC-PRJ-2026-001"
+                  />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">To (Recipient Details)</label>
-                <DepartmentTagInput
-                  allDepartments={ALL_DEPARTMENTS}
-                  selected={selectedDepartments}
-                  onChange={setSelectedDepartments}
-                />
+                  <label className="mb-2 block text-sm font-medium">
+                    Organization Name
+                  </label>
+                  <input
+                      value={organizationName}
+                      onChange={(e)=>setOrganizationName(e.target.value)}
+                      className="w-full rounded-lg border px-3 py-2.5"
+                      placeholder="Southern Provincial Council"
+                  />
               </div>
+
+              <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Designation
+                  </label>
+                  <input
+                      value={designation}
+                      onChange={(e)=>setDesignation(e.target.value)}
+                      className="w-full rounded-lg border px-3 py-2.5"
+                  />
+              </div>
+
             </div>
+            
 
             <div className="mt-6">
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Title (Subject of the Letter)</label>
