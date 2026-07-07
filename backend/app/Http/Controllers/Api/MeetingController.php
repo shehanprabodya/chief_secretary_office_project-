@@ -10,22 +10,34 @@ use Illuminate\Support\Facades\Validator;
 class MeetingController extends Controller
 {
     /**
-     * List meetings with search, department filter, date range, pagination
+     * List meetings with subject and date filters.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Meeting::with('department', 'creator');
+        $query = Meeting::with('subject', 'creator');
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('reference_id', 'like', "%{$search}%");
+                  ->orWhere('reference_id', 'like', "%{$search}%")
+                  ->orWhere('meeting_code', 'like', "%{$search}%")
+                  ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                      $subjectQuery->where('title', 'like', "%{$search}%")
+                          ->orWhere('code', 'like', "%{$search}%");
+                  });
             });
         }
 
-        if ($request->filled('department_id') && $request->department_id !== 'all') {
-            $query->where('department_id', $request->department_id);
+        if ($request->filled('subject_code')) {
+            $query->where('meeting_code', 'like', "%{$request->subject_code}%");
+        }
+
+        if ($request->filled('subject_title')) {
+            $subjectTitle = $request->subject_title;
+            $query->whereHas('subject', function ($subjectQuery) use ($subjectTitle) {
+                $subjectQuery->where('title', 'like', "%{$subjectTitle}%");
+            });
         }
 
         if ($request->filled('start_date')) {

@@ -1,66 +1,71 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search,  List, Grid3x3, Plus,
-  Eye, Pencil, MoreVertical, RotateCcw, Trash2, MapPin, Laptop,Funnel
+  List, Grid3x3, Plus,
+  Eye, Funnel
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
-import StatusBadge from '../components/shared/StatusBadge';
-import { meetingService } from '../services/meetingService';
-import type { Meeting } from '../types/meeting';
+import { letterService } from '../services/letterService';
+import type { Letter, Subject } from '../types/letter';
 
 export default function MeetingsPage() {
   const navigate = useNavigate();
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [draftLetters, setDraftLetters] = useState<Letter[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [departmentId, setDepartmentId] = useState('all');
+  const [subjectCode, setSubjectCode] = useState('');
+  const [subjectTitle, setSubjectTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [page, setPage] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
-  const fetchMeetings = useCallback(async () => {
+  const loadDraftLetters = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await meetingService.list({
-        search: search || undefined,
-        department_id: departmentId !== 'all' ? departmentId : undefined,
-        start_date: startDate || undefined,
-        end_date: endDate || undefined,
-        page,
-      });
-      setMeetings(result.data);
-      setLastPage(result.last_page);
-      setTotal(result.total);
+      const letters = await letterService.getMyLetters();
+      setDraftLetters(letters.filter((letter) => letter.status === 'draft'));
     } catch (err) {
-      console.error('Failed to fetch meetings:', err);
+      console.error('Failed to fetch draft letters:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [search, departmentId, startDate, endDate, page]);
+  }, []);
 
   useEffect(() => {
-    fetchMeetings();
-  }, [fetchMeetings]);
+    loadDraftLetters();
+  }, [loadDraftLetters]);
 
-  const handleCancel = async (id: number) => {
-    if (!confirm('Cancel this meeting?')) return;
-    await meetingService.cancel(id);
-    fetchMeetings();
-  };
+  useEffect(() => {
+    letterService.getSubjects()
+      .then(setSubjects)
+      .catch((err) => console.error('Failed to fetch subjects:', err));
+  }, []);
+
+  const filteredDraftLetters = useMemo(() => {
+    const code = subjectCode.trim().toLowerCase();
+    const titleFilter = subjectTitle.trim().toLowerCase();
+
+    return draftLetters.filter((letter) => {
+      const letterDate = (letter.signature_date || letter.created_at || '').slice(0, 10);
+      const letterCode = (letter.subject?.code || letter.meeting_code || '').toLowerCase();
+      const letterSubjectTitle = (letter.subject?.title || '').toLowerCase();
+      const matchesCode = !code || letterCode === code;
+      const matchesTitle = !titleFilter || letterSubjectTitle === titleFilter;
+      const matchesStart = !startDate || !letterDate || letterDate >= startDate;
+      const matchesEnd = !endDate || !letterDate || letterDate <= endDate;
+
+      return matchesCode && matchesTitle && matchesStart && matchesEnd;
+    });
+  }, [draftLetters, subjectCode, subjectTitle, startDate, endDate]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
   };
 
-  const formatTimeRange = (meeting: Meeting) => {
-    if (!meeting.start_time) return 'TBD';
-    const start = meeting.start_time.slice(0, 5);
-    const end = meeting.end_time?.slice(0, 5) ?? '';
-    return end ? `${start} - ${end}` : start;
+  const formatLetterTitle = (title?: string) => {
+    if (!title) return 'Untitled draft letter';
+
+    const document = new DOMParser().parseFromString(title, 'text/html');
+    return document.body.textContent?.trim() || 'Untitled draft letter';
   };
 
   return (
@@ -85,7 +90,7 @@ export default function MeetingsPage() {
               className="flex items-center gap-2 bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500"
             >
               <Plus className="h-4 w-4" />
-              Create Meeting
+              Generate Letter
             </button>
           </div>
         </div>
@@ -94,49 +99,51 @@ export default function MeetingsPage() {
         <div className=" rounded-lg border border-slate-200 bg-white p-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600">Search Meeting</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                  placeholder="Title, ID or Signatory..."
-                  className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600">Department</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">Subject Code</label>
               <select
-                value={departmentId}
-                onChange={(e) => { setDepartmentId(e.target.value); setPage(1); }}
+                value={subjectCode}
+                onChange={(e) => setSubjectCode(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
-                <option value="all">All Departments</option>
-                <option value="1">Development Division</option>
-                <option value="2">Human Resources</option>
-                <option value="3">Finance & Treasury</option>
-                <option value="4">Office of the Chief Secretary</option>
-                <option value="5">Public Health</option>
+                <option value="">All Subject Codes</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.code}>
+                    {subject.code}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-600">Date Range</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">Subject Title</label>
+              <select
+                value={subjectTitle}
+                onChange={(e) => setSubjectTitle(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                <option value="">All Subject Titles</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.title}>
+                    {subject.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">From Date / To Date</label>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
                 <span className="text-slate-400">/</span>
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                  onChange={(e) => setEndDate(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </div>
@@ -144,7 +151,8 @@ export default function MeetingsPage() {
 
             <div className="flex items-end">
               <button
-                onClick={fetchMeetings}
+                type="button"
+                onClick={loadDraftLetters}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-500 text-sm font-medium text-white hover:bg-blue-800"
               >
                <Funnel className='h-4 w-4 shrink-0' />
@@ -154,15 +162,15 @@ export default function MeetingsPage() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Search Results */}
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <th className="px-6 py-3">Meeting Title</th>
-                <th className="px-6 py-3">Date & Time</th>
-                <th className="px-6 py-3">Location</th>
-                <th className="px-6 py-3">Department</th>
+                <th className="px-6 py-3">Letter Title</th>
+                <th className="px-6 py-3">Subject Code</th>
+                <th className="px-6 py-3">Subject Title</th>
+                <th className="px-6 py-3">Letter Date</th>
                 <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3 text-right">Actions</th>
               </tr>
@@ -171,85 +179,55 @@ export default function MeetingsPage() {
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
-                    Loading meetings...
+                    Loading draft letters...
                   </td>
                 </tr>
-              ) : meetings.length === 0 ? (
+              ) : filteredDraftLetters.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
-                    No meetings found.
+                    No drafted letters found for the selected filters.
                   </td>
                 </tr>
               ) : (
-                meetings.map((meeting) => (
-                  <tr key={meeting.meeting_id} className="hover:bg-slate-50/50">
+                filteredDraftLetters.map((letter) => (
+                  <tr
+                    key={letter.letter_id}
+                    onClick={() => navigate(`/letters/${letter.letter_id}`)}
+                    className="cursor-pointer hover:bg-blue-50/60"
+                  >
                     <td className="px-6 py-4">
-                      <p className={`font-semibold text-blue-700 hover:underline cursor-pointer ${meeting.status === 'cancelled' ? 'line-through text-slate-400' : ''}`}>
-                        {meeting.title}
+                      <p className="font-semibold text-blue-700 hover:underline">{formatLetterTitle(letter.title)}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {letter.signatory_name || 'No signatory'} · {letter.designation || 'No designation'}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-400">ID: {meeting.reference_id}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      <p>{formatDate(meeting.meeting_date)}</p>
-                      <p className="text-xs text-slate-400">{formatTimeRange(meeting)}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      <div className="flex items-center gap-1.5">
-                        {meeting.location_type === 'virtual' ? (
-                          <Laptop className="h-4 w-4 text-slate-400" />
-                        ) : meeting.location_type === 'physical' ? (
-                          <MapPin className="h-4 w-4 text-slate-400" />
-                        ) : null}
-                        <span className={meeting.location ? '' : 'text-slate-400'}>
-                          {meeting.location ?? 'Not Assigned'}
-                        </span>
-                      </div>
+                      {letter.subject?.code || letter.meeting_code || '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-                        {meeting.department?.department_name ?? '—'}
+                      <p className="max-w-72 truncate text-sm text-slate-700">{letter.subject?.title || '—'}</p>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {letter.signature_date ? formatDate(letter.signature_date) : 'Not set'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                        Draft
                       </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={meeting.status} />
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => navigate(`/meetings/${meeting.meeting_id}`)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/letters/${letter.letter_id}`);
+                          }}
                           className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                          title="View"
+                          title="Open letter"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        {meeting.status !== 'cancelled' && (
-                          <button
-                            onClick={() => navigate(`/meetings/${meeting.meeting_id}/edit`)}
-                            className="rounded p-1.5 text-blue-400 hover:bg-blue-50 hover:text-blue-700"
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        )}
-                        <div className="relative">
-                          <button
-                            onClick={() => setOpenMenuId(openMenuId === meeting.meeting_id ? null : meeting.meeting_id)}
-                            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                          >
-                            {meeting.status === 'cancelled' ? <RotateCcw className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
-                          </button>
-                          {openMenuId === meeting.meeting_id && meeting.status !== 'cancelled' && (
-                            <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                              <button
-                                onClick={() => { handleCancel(meeting.meeting_id); setOpenMenuId(null); }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Cancel Meeting
-                              </button>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </td>
                   </tr>
@@ -258,38 +236,11 @@ export default function MeetingsPage() {
             </tbody>
           </table>
 
-          {/* Pagination */}
           <div className="flex items-center justify-between bg-slate-100 border-t border-slate-200 px-6 py-3">
             <p className="text-sm text-slate-500">
-              Showing {meetings.length} of {total} meetings
+              Showing {filteredDraftLetters.length} draft letters
             </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-40"
-              >
-                ‹
-              </button>
-              {Array.from({ length: lastPage }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`h-8 w-8 rounded text-sm font-medium ${
-                    p === page ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-                disabled={page === lastPage}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-40"
-              >
-                ›
-              </button>
-            </div>
+            <p className="text-xs text-slate-400">Click a row to open the generate letter form.</p>
           </div>
         </div>
       </div>

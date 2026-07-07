@@ -12,7 +12,7 @@ class Meeting extends Model
     protected $primaryKey = 'meeting_id';
 
     protected $fillable = [
-        'reference_id', 'title', 'meeting_date', 'start_time', 'end_time',
+        'reference_id', 'meeting_code', 'title', 'meeting_date', 'start_time', 'end_time',
         'location', 'location_type', 'department_id', 'status', 'description', 'created_by',
     ];
 
@@ -28,6 +28,11 @@ class Meeting extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by', 'user_id');
+    }
+
+    public function subject(): BelongsTo
+    {
+        return $this->belongsTo(Subject::class, 'meeting_code', 'code');
     }
 
     public function attendees(): BelongsToMany

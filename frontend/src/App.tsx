@@ -51,6 +51,7 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['officer', 'admin']} />}>
             <Route path="/meetings" element={<MeetingsPage />} />
             <Route path="/letters/new" element={<GenerateLetterPage />} />
+            <Route path="/letters/:id" element={<GenerateLetterPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/minutes" element={<CreateMinutesPage />} />
             
@@ -66,4 +67,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
