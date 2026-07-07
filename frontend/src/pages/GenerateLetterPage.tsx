@@ -79,6 +79,14 @@ export default function GenerateLetterPage() {
   const [currentStep] = useState(1); // draft = step 1, changes after send-for-approval
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('unsaved');
 
+  const getErrorMessage = (err: any, fallback: string) => {
+    const message = err?.response?.data?.message;
+    const errors = err?.response?.data?.errors;
+    const firstError = errors ? Object.values(errors).flat()[0] : null;
+
+    return String(firstError || message || fallback);
+  };
+
   // Load data
   useEffect(() => {
     letterService.getOrganizations().then(setOrganizations);
@@ -141,32 +149,31 @@ export default function GenerateLetterPage() {
       if (!silent) {
         navigate(`/letters/${saved.letter_id}`, { replace: true });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setSaveStatus('unsaved');
+      if (!silent) {
+        alert(getErrorMessage(err, 'Failed to save draft'));
+      }
     } finally {
       if (!silent) setIsSaving(false);
     }
   };
 
   const handleGenerate = async () => {
-    if (!letterId) {
-      const saved = await letterService.saveDraft(buildPayload());
-      setLetterId(saved.letter_id);
-      const result = await letterService.generate(saved.letter_id);
-      setPreviewHtml(result.generated_html);
-      setShowPreview(true);
-      return;
-    }
-
     setIsGenerating(true);
     try {
-      await letterService.saveDraft(buildPayload());
-      const result = await letterService.generate(letterId);
+      const saved = await letterService.saveDraft(buildPayload());
+      const idToGenerate = saved.letter_id;
+
+      setLetterId(idToGenerate);
+      const result = await letterService.generate(idToGenerate);
       setPreviewHtml(result.generated_html);
       setShowPreview(true);
     } catch (err: any) {
-      alert(err?.response?.data?.message ?? 'Failed to generate letter');
+      console.error(err);
+      setSaveStatus('unsaved');
+      alert(getErrorMessage(err, 'Failed to generate letter'));
     } finally {
       setIsGenerating(false);
     }
@@ -177,10 +184,15 @@ export default function GenerateLetterPage() {
       alert('Save the draft first to preview');
       return;
     }
-    await letterService.saveDraft(buildPayload());
-    const result = await letterService.preview(letterId);
-    setPreviewHtml(result.preview_html);
-    setShowPreview(true);
+    try {
+      await letterService.saveDraft(buildPayload());
+      const result = await letterService.preview(letterId);
+      setPreviewHtml(result.preview_html);
+      setShowPreview(true);
+    } catch (err: any) {
+      console.error(err);
+      alert(getErrorMessage(err, 'Failed to preview letter'));
+    }
   };
 
   const handlePrint = () => {
@@ -197,8 +209,13 @@ export default function GenerateLetterPage() {
 
   const handleDownloadPdf = async () => {
     if (!letterId) { alert('Save the draft first'); return; }
-    await letterService.saveDraft(buildPayload());
-    await letterService.downloadPdf(letterId);
+    try {
+      await letterService.saveDraft(buildPayload());
+      await letterService.downloadPdf(letterId);
+    } catch (err: any) {
+      console.error(err);
+      alert(getErrorMessage(err, 'Failed to download PDF'));
+    }
   };
 
   const handleDiscard = async () => {

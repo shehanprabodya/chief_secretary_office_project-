@@ -67,10 +67,22 @@ class LetterController extends Controller
         }
 
         $user = $request->user();
+        $meeting = null;
+
+        if ($request->filled('meeting_code')) {
+            $meeting = Meeting::where('meeting_code', $request->meeting_code)->first();
+
+            if (!$meeting && !$request->filled('subject_id')) {
+                return response()->json([
+                    'message' => 'Selected meeting code does not exist. Please choose a valid subject or leave the meeting code empty.',
+                ], 422);
+            }
+        }
 
         $data = [
             'sender_name'    => 'දකුණු පළාත් ප්‍රධාන ලේකම් කාර්යාලය',
-            'meeting_code'   => $request->meeting_code,
+            'meeting_code'   => $meeting?->meeting_code,
+            'meeting_id'     => $meeting?->meeting_id,
             'subject_id'     => $request->subject_id,
             'title'          => $request->title ?? '',
             'content'        => $request->content ?? '',
@@ -80,14 +92,6 @@ class LetterController extends Controller
             'status'         => 'draft',
             'created_by'     => $user->user_id,
         ];
-
-        // Resolve meeting_id from meeting_code if provided
-        if ($request->filled('meeting_code')) {
-            $meeting = Meeting::where('meeting_code', $request->meeting_code)->first();
-            if ($meeting) {
-                $data['meeting_id'] = $meeting->meeting_id;
-            }
-        }
 
         if ($request->filled('letter_id')) {
             $letter = Letter::where('letter_id', $request->letter_id)
@@ -315,5 +319,4 @@ HTML;
         return response()->json(['subjects' => $subjects]);
     }
 }
-
 

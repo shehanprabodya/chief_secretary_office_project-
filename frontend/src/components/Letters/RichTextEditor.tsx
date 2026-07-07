@@ -6,6 +6,8 @@ import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import Placeholder from '@tiptap/extension-placeholder';
+import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
@@ -41,10 +43,9 @@ const Divider = () => <div className="mx-1 h-5 w-px bg-slate-300" />;
 export default function RichTextEditor({ value, onChange, placeholder = 'Write here...', minHeight = '300px' }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        underline: {},
-        link: { openOnClick: false },
-      }),
+      StarterKit,
+      Underline,
+      Link.configure({ openOnClick: false }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Table.configure({ resizable: true }),
       TableRow,

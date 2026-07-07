@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import type { Letter, Organization, Subject, RecipientTag } from '../types/letter';
+import type { Letter, Organization, Subject } from '../types/letter';
 
 export interface DraftPayload {
   letter_id?: number;
