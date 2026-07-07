@@ -1,8 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import Link from '@tiptap/extension-link';
 import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
@@ -13,7 +11,6 @@ import {
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered, Indent, Outdent,
   Link as LinkIcon, Table as TableIcon,
-  ChevronDown,
 } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -44,10 +41,11 @@ const Divider = () => <div className="mx-1 h-5 w-px bg-slate-300" />;
 export default function RichTextEditor({ value, onChange, placeholder = 'Write here...', minHeight = '300px' }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Underline,
+      StarterKit.configure({
+        underline: {},
+        link: { openOnClick: false },
+      }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
