@@ -10,8 +10,7 @@ import RichTextEditor from '../components/Letters/RichTextEditor';
 import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import PreviewModal from '../components/Letters/PreviewModal';
 import { letterService } from '../services/letterService';
-import { useAuth } from '../context/AuthContext';
-import type { Letter, Organization, Subject, RecipientTag } from '../types/letter';
+import type {  Organization, Subject, RecipientTag } from '../types/letter';
 
 // Status Workflow Sidebar 
 const WORKFLOW_STEPS = [
@@ -55,7 +54,6 @@ function StatusStep({ step, label, sub, currentStep }: {
 export default function GenerateLetterPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   // Form state
   const [letterId, setLetterId] = useState<number | null>(id ? Number(id) : null);
@@ -226,20 +224,20 @@ export default function GenerateLetterPage() {
             <button
               onClick={() => handleSaveDraft()}
               disabled={isSaving}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex w-36 items-center gap-2  border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
               {isSaving ? 'Saving...' : 'Save Draft'}
             </button>
             <button
               onClick={handlePreview}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex w-36 items-center gap-2  border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
             >
               <Eye className="h-4 w-4" /> Preview
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex-1 flex items-center gap-2 border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
             >
               <Printer className="h-4 w-4" /> Print
             </button>
@@ -253,7 +251,7 @@ export default function GenerateLetterPage() {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
           {/* Main Form  */}
-          <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-6">
+          <div className="flex flex-col gap-6 rounded-xl border border-slate-200 bg-white p-6">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
               <span className="text-slate-400">≡</span>
               <h2 className="text-sm font-semibold text-slate-700">Letter Details</h2>
@@ -262,7 +260,7 @@ export default function GenerateLetterPage() {
             {/* Row 1: Meeting Code + Recipient Details */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                   Meeting Code
                 </label>
                 <div className="flex gap-2">
@@ -291,7 +289,7 @@ export default function GenerateLetterPage() {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                   Recipient Details
                 </label>
                 <RecipientTagInput
@@ -304,7 +302,7 @@ export default function GenerateLetterPage() {
 
             {/* Letter Title */}
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                 Letter Title
               </label>
               <RichTextEditor
@@ -317,7 +315,7 @@ export default function GenerateLetterPage() {
 
             {/* Content */}
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                 Content
               </label>
               <RichTextEditor
@@ -332,7 +330,7 @@ export default function GenerateLetterPage() {
             <div className="border-t border-slate-100 pt-6">
               <div className="grid gap-6 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                     Primary Designation
                   </label>
                   <input
@@ -355,7 +353,7 @@ export default function GenerateLetterPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                     Acting / Departmental Authority (Optional)
                   </label>
                   <input
@@ -369,7 +367,7 @@ export default function GenerateLetterPage() {
 
                 <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                       Name of Signatory
                     </label>
                     <input
@@ -381,7 +379,7 @@ export default function GenerateLetterPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
                       Letter Date
                     </label>
                     <input
@@ -403,7 +401,7 @@ export default function GenerateLetterPage() {
               <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
                 <span className="text-slate-400">⚡</span> Execution
               </h3>
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
@@ -420,23 +418,21 @@ export default function GenerateLetterPage() {
                   <Send className="h-4 w-4" />
                   Send for Approval
                 </button>
-              </div>
-
-              <div className="my-4 h-px bg-slate-100" />
-
-              <div className="space-y-3">
+              
                 <button
                   onClick={handleDownloadPdf}
-                  className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-200 py-2.5 text-sm font-medium text-teal hover:bg-teal-500"
                 >
                   <Download className="h-4 w-4" /> Download PDF
                 </button>
-                <button className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline">
+                <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate- hover:opacity-90 disabled:opacity-50"
+                  title="Revision history - coming soon"
+                >
                   <History className="h-4 w-4" /> Revision History
                 </button>
                 <button
                   onClick={handleDiscard}
-                  className="flex items-center gap-2 text-sm font-medium text-red-600 hover:underline"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400 bg-red-50 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100"
                 >
                   <Trash2 className="h-4 w-4" /> Discard Draft
                 </button>
