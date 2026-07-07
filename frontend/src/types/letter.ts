@@ -1,24 +1,46 @@
 export type LetterStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'dispatched';
-export type ApprovalStepStatus = 'pending' | 'current' | 'completed' | 'rejected';
 
-export interface ApprovalStep {
-  step_id: number;
-  step_name: string;
-  step_order: number;
-  status: ApprovalStepStatus;
-  actioned_at: string | null;
+export interface Organization {
+  organization_id: number;
+  organization_name: string;
+  abbreviation: string | null;
+  officers?: ExternalOfficer[];
+}
+
+export interface ExternalOfficer {
+  user_id: number;
+  full_name: string;
+  designation: string;
+  label: string; // "Chief Engineer, Water Board"
+}
+
+export interface Subject {
+  id: number;
+  code: string;
+  title: string;
+}
+
+export interface RecipientTag {
+  id: string; // temp UI id
+  organization_id?: number;
+  user_id?: number;
+  recipient_label: string; // "designation, organization name"
+  organization_name?: string;
+  designation?: string;
 }
 
 export interface Letter {
   letter_id: number;
-  meeting_id: number | null;
+  meeting_code: string | null;
+  subject_id: number | null;
+  subject?: Subject;
   sender_name: string;
   title: string;
-  content: string | null;
+  content: string;
   designation: string | null;
   signatory_name: string | null;
   signature_date: string | null;
   status: LetterStatus;
-  departments?: { department_id: number; department_name: string }[];
-  approval_steps?: ApprovalStep[];
+  recipients: RecipientTag[];
+  generated_html?: string;
 }

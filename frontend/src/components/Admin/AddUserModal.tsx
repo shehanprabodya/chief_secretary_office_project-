@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { adminService } from '../../services/adminService';
-import type { AdminUser, CreateUserPayload, Role,Organization } from '../../types/admin';
+import type { AdminUser, CreateUserPayload, Role, Organization } from '../../types/admin';
 
 interface AddUserModalProps {
   editUser?: AdminUser | null;
@@ -9,15 +9,13 @@ interface AddUserModalProps {
   onSaved: () => void;
 }
 
-
-
 export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModalProps) {
   const [roles, setRoles] = useState<Role[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  
- 
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [form, setForm] = useState<CreateUserPayload>({
     full_name: editUser?.full_name ?? '',
@@ -31,9 +29,27 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
   });
 
   useEffect(() => {
-    adminService.getRoles().then(setRoles);
-    adminService.getOrganizations().then(setOrganizations);
-}, []);
+    const fetchOptions = async () => {
+      try {
+        setIsLoadingOptions(true);
+        setLoadError(null);
+        const [rolesData, organizationsData] = await Promise.all([
+          adminService.getRoles(),
+          adminService.getOrganizations(),
+        ]);
+        setRoles(rolesData);
+        setOrganizations(organizationsData);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load form options';
+        setLoadError(message);
+        console.error('Error loading form options:', err);
+      } finally {
+        setIsLoadingOptions(false);
+      }
+    };
+
+    fetchOptions();
+  }, []);
 
   const handleChange = (field: keyof CreateUserPayload, value: string | number | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -42,7 +58,7 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.full_name || !form.email || !form.username || !form.role_id ||  !form.organization_id) {
+    if (!form.full_name || !form.email || !form.username || !form.role_id) {
       setError('Please fill in all required fields');
       return;
     }
@@ -90,8 +106,16 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
         </p>
 
         {error && (
-          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 border border-red-200 flex gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
             {error}
+          </div>
+        )}
+
+        {loadError && (
+          <div className="mt-4 rounded-lg bg-yellow-50 p-3 text-sm text-yellow-700 border border-yellow-200 flex gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            Failed to load form options: {loadError}
           </div>
         )}
 
@@ -148,9 +172,15 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
               <select
                 value={form.role_id}
                 onChange={(e) => handleChange('role_id', Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                disabled={isLoadingOptions}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-500"
               >
-                <option value={0} disabled>Select role...</option>
+                <option value={0} disabled>
+                  {isLoadingOptions ? 'Loading roles...' : 'Select role...'}
+                </option>
+                {roles.length === 0 && !isLoadingOptions && (
+                  <option disabled>No roles available</option>
+                )}
                 {roles.map((r) => (
                   <option key={r.role_id} value={r.role_id}>
                     {r.role_name.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -174,19 +204,24 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
 
               <select
                 value={form.organization_id ?? ''}
-                onChange={(e)=>
+                onChange={(e) =>
                   handleChange(
                     'organization_id',
                     e.target.value ? Number(e.target.value) : null
                   )
                 }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                disabled={isLoadingOptions}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-500"
               >
                 <option value="">
-                  Select Organization
+                  {isLoadingOptions ? 'Loading organizations...' : 'Select Organization (Optional)'}
                 </option>
 
-                {organizations.map((org)=>(
+                {organizations.length === 0 && !isLoadingOptions && (
+                  <option disabled>No organizations available</option>
+                )}
+
+                {organizations.map((org) => (
                   <option
                     key={org.organization_id}
                     value={org.organization_id}
@@ -220,7 +255,7 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || isLoadingOptions}
               className="rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
               {isSaving ? 'Saving...' : editUser ? 'Update User' : 'Create User'}

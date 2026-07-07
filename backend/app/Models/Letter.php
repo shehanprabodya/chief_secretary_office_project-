@@ -3,7 +3,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Letter extends Model
@@ -12,8 +11,9 @@ class Letter extends Model
     protected $primaryKey = 'letter_id';
 
     protected $fillable = [
-        'meeting_id', 'sender_name', 'title', 'content', 'designation',
-        'signatory_name', 'signature_date', 'status', 'created_by',
+        'meeting_id', 'meeting_code', 'sender_name', 'title', 'content',
+        'designation', 'organization_name', 'organization_address',
+        'signatory_name', 'signature_date', 'status', 'created_by', 'subject_id',
     ];
 
     public function meeting(): BelongsTo
@@ -26,30 +26,13 @@ class Letter extends Model
         return $this->belongsTo(User::class, 'created_by', 'user_id');
     }
 
-    public function departments(): BelongsToMany
+    public function subject(): BelongsTo
     {
-        return $this->belongsToMany(Department::class, 'letter_departments', 'letter_id', 'department_id');
+        return $this->belongsTo(Subject::class, 'subject_id');
     }
 
-    public function approvalSteps(): HasMany
+    public function recipients(): HasMany
     {
-        return $this->hasMany(ApprovalStep::class, 'letter_id', 'letter_id')->orderBy('step_order');
-    }
-
-    /**
-     * Create the standard 3-stage workflow when a letter is first saved.
-     */
-    public function initializeApprovalWorkflow(): void
-    {
-        $steps = [
-            ['step_name' => 'Draft Created', 'step_order' => 1, 'status' => 'completed'],
-            ['step_name' => 'Chief Secretary Review', 'step_order' => 2, 'status' => 'pending'],
-            ['step_name' => 'Official Seal & Dispatch', 'step_order' => 3, 'status' => 'pending'],
-        ];
-
-        foreach ($steps as $step) {
-            $this->approvalSteps()->create($step);
-        }
+        return $this->hasMany(LetterRecipient::class, 'letter_id', 'letter_id');
     }
 }
-?>
