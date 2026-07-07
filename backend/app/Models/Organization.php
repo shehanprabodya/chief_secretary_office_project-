@@ -18,4 +18,9 @@ class Organization extends Model
         'email',
         'status'
     ];
+
+     public function users(): HasMany
+    {
+        return $this->hasMany(User::class, 'organization_id', 'organization_id');
+    }
 }
