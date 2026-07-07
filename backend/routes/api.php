@@ -63,15 +63,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/meetings/{id}', [MeetingController::class, 'destroy']);
 
         // Letters
-        Route::get('/letters', [LetterController::class, 'index']);
-        Route::get('/letters/{id}', [LetterController::class, 'show']);
-        Route::post('/letters', [LetterController::class, 'store']);
-        Route::put('/letters/{id}', [LetterController::class, 'update']);
-        Route::post('/letters/{id}/send-for-approval', [LetterController::class, 'sendForApproval']);
-        Route::post('/letters/{id}/approve', [LetterController::class, 'approve']);
-        Route::post('/letters/{id}/reject', [LetterController::class, 'reject']);
-        Route::delete('/letters/{id}', [LetterController::class, 'destroy']);
-
+        Route::get('/letters',                   [LetterController::class, 'index']);
+        Route::get('/letters/{id}',              [LetterController::class, 'show']);
+        Route::post('/letters/draft',            [LetterController::class, 'saveDraft']);
+        Route::get('/letters/{id}/generate',     [LetterController::class, 'generate']);
+        Route::get('/letters/{id}/preview',      [LetterController::class, 'preview']);
+        Route::get('/letters/{id}/download/pdf', [LetterController::class, 'downloadPdf']);
+        Route::get('/letter-recipients/orgs',    [LetterController::class, 'getOrganizations']);
+        Route::get('/subjects',                  [LetterController::class, 'getSubjects']);
+        
         // Attendance
         Route::get('/meetings/{meetingId}/attendance', [AttendanceController::class, 'show']);
         Route::post('/meetings/{meetingId}/attendance/draft', [AttendanceController::class, 'saveDraft']);
