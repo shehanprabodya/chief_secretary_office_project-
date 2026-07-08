@@ -10,6 +10,7 @@ import RichTextEditor from '../components/Letters/RichTextEditor';
 import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import PreviewModal from '../components/Letters/PreviewModal';
 import { letterService } from '../services/letterService';
+import { approvalService } from '../services/approvalService';
 import type {  Organization, Subject, RecipientTag } from '../types/letter';
 
 // Status Workflow Sidebar 
@@ -34,6 +35,8 @@ const getErrorMessage = (err: unknown, fallback: string) => {
 
   return String(firstError || data?.message || fallback);
 };
+
+const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
 function StatusStep({ step, label, sub, currentStep }: {
   step: number; label: string; sub: string; currentStep: number;
@@ -89,6 +92,7 @@ export default function GenerateLetterPage() {
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSendingApproval, setIsSendingApproval] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [currentStep] = useState(1); // draft = step 1, changes after send-for-approval
@@ -247,6 +251,35 @@ export default function GenerateLetterPage() {
     } catch (err: unknown) {
       console.error(err);
       alert(getErrorMessage(err, 'Failed to download DOCX'));
+    }
+  };
+
+  const handleSendForApproval = async () => {
+    setIsSendingApproval(true);
+    try {
+      const saved = await letterService.saveDraft(buildPayload());
+      setLetterId(saved.letter_id);
+
+      const result = await letterService.generate(saved.letter_id);
+      const selectedSubject = subjects.find((subject) => subject.id === subjectId);
+      const approvalSubject = stripHtml(title) || selectedSubject?.title || selectedSubject?.code || `Letter ${saved.letter_id}`;
+      const description = stripHtml(content).slice(0, 300);
+
+      await approvalService.submit({
+        document_type: 'letter',
+        source_id: saved.letter_id,
+        subject: approvalSubject,
+        description,
+        full_content: result.generated_html,
+      });
+
+      alert('Letter sent for approval successfully');
+      navigate('/approvals');
+    } catch (err: unknown) {
+      console.error(err);
+      alert(getErrorMessage(err, 'Failed to send letter for approval'));
+    } finally {
+      setIsSendingApproval(false);
     }
   };
 
@@ -450,12 +483,12 @@ export default function GenerateLetterPage() {
                   {isGenerating ? 'Generating...' : 'Generate Letter'}
                 </button>
                 <button
-                  disabled
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-400 cursor-not-allowed"
-                  title="Approval workflow - coming soon"
+                  onClick={handleSendForApproval}
+                  disabled={isSendingApproval}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-60"
                 >
                   <Send className="h-4 w-4" />
-                  Send for Approval
+                  {isSendingApproval ? 'Sending...' : 'Send for Approval'}
                 </button>
               
                 <button

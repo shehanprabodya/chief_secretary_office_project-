@@ -30,16 +30,31 @@ export default function ApprovalsPage() {
   const [activeTab, setActiveTab] = useState<'preview' | 'history' | 'attachments'>('preview');
   const [commentText, setCommentText] = useState('');
   const [isActing, setIsActing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchList = useCallback(async () => {
-    const docs = await approvalService.list(search || undefined);
-    setDocuments(docs);
-    if (docs.length > 0 && !selectedDoc) setSelectedDoc(docs[0]);
-  }, [search, selectedDoc]);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const docs = await approvalService.list(search || undefined);
+      setDocuments(docs);
+      setSelectedDoc((current) => {
+        if (docs.length === 0) return null;
+        return current && docs.some((doc) => doc.document_id === current.document_id) ? current : docs[0];
+      });
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load approvals. Please refresh or login again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [search]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchList();
-  }, []);
+  }, [fetchList]);
 
   const handleSelectDoc = async (id: number) => {
     const doc = await approvalService.getById(id);
@@ -47,7 +62,7 @@ export default function ApprovalsPage() {
     setActiveTab('preview');
   };
 
-  const currentStep = selectedDoc?.steps.find((s) => s.step_order === selectedDoc.current_step_order);
+  const currentStep = selectedDoc?.steps?.find((s) => s.step_order === selectedDoc.current_step_order);
   const canAct = currentStep && user && currentStep.required_role === user.role && currentStep.status === 'pending';
 
   const handleApprove = async () => {
@@ -80,7 +95,7 @@ export default function ApprovalsPage() {
   const handlePostComment = async () => {
     if (!selectedDoc || !commentText.trim()) return;
     const comment = await approvalService.addComment(selectedDoc.document_id, commentText);
-    setSelectedDoc((prev) => prev ? { ...prev, comments: [...prev.comments, comment] } : prev);
+    setSelectedDoc((prev) => prev ? { ...prev, comments: [...(prev.comments ?? []), comment] } : prev);
     setCommentText('');
   };
 
@@ -122,6 +137,24 @@ export default function ApprovalsPage() {
               />
             </div>
 
+            {isLoading && (
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
+                Loading approvals...
+              </div>
+            )}
+
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {!isLoading && !error && documents.length === 0 && (
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
+                No approvals found.
+              </div>
+            )}
+
             {documents.map((doc) => (
               <button
                 key={doc.document_id}
@@ -143,9 +176,9 @@ export default function ApprovalsPage() {
                 <div className="mt-3 flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1.5 text-slate-500">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold">
-                      {doc.submitter.full_name.charAt(0)}
+                      {doc.submitter?.full_name?.charAt(0) ?? '?'}
                     </span>
-                    {doc.submitter.full_name}
+                    {doc.submitter?.full_name ?? 'Unknown submitter'}
                   </span>
                   <span className="text-slate-400">{timeAgo(doc.created_at)}</span>
                 </div>
@@ -185,7 +218,7 @@ export default function ApprovalsPage() {
                 )}
               </div>
 
-              <WorkflowTracker steps={selectedDoc.steps} />
+              <WorkflowTracker steps={selectedDoc.steps ?? []} />
 
               {/* Tabs */}
               <div className="mt-6 flex gap-6 border-b border-slate-200">
@@ -232,7 +265,7 @@ export default function ApprovalsPage() {
                   <div className="mt-10 flex justify-between text-sm">
                     <div>
                       <p className="border-t border-slate-400 pt-1 text-slate-500">Prepared By</p>
-                      <p className="font-semibold text-slate-900">{selectedDoc.submitter.full_name}</p>
+                      <p className="font-semibold text-slate-900">{selectedDoc.submitter?.full_name ?? 'Unknown submitter'}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-blue-900">SIGNED</p>
@@ -247,7 +280,7 @@ export default function ApprovalsPage() {
 
               {activeTab === 'history' && (
                 <div className="mt-6 space-y-3">
-                  {selectedDoc.steps.map((step) => (
+                  {(selectedDoc.steps ?? []).map((step) => (
                     <div key={step.step_id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 text-sm">
                       <span className="font-medium text-slate-700">{step.step_label}</span>
                       <span className="text-slate-400">
@@ -266,14 +299,14 @@ export default function ApprovalsPage() {
               <div className="mt-8">
                 <h3 className="mb-4 text-sm font-semibold text-slate-700">💬 Comments & Discussion</h3>
                 <div className="space-y-4">
-                  {selectedDoc.comments.map((c) => (
+                  {(selectedDoc.comments ?? []).map((c) => (
                     <div key={c.comment_id} className="flex gap-3">
                       <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
-                        {c.user.full_name.charAt(0)}
+                        {c.user?.full_name?.charAt(0) ?? '?'}
                       </div>
                       <div className="flex-1 rounded-lg bg-slate-50 p-3">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-slate-900">{c.user.full_name}</p>
+                          <p className="text-sm font-semibold text-slate-900">{c.user?.full_name ?? 'Unknown user'}</p>
                           <p className="text-xs text-slate-400">{timeAgo(c.created_at)}</p>
                         </div>
                         <p className="mt-1 text-sm text-slate-700">{c.comment}</p>

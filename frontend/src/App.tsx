@@ -57,7 +57,7 @@ export default function App() {
             
           
           </Route>
-          // Approvals visible to ALL roles that participate in workflow
+          {/* Approvals visible to ALL roles that participate in workflow */}
           <Route element={<ProtectedRoute allowedRoles={['admin', 'officer', 'dept_head', 'deputy', 'chief_secretary']} />}>
             <Route path="/approvals" element={<ApprovalsPage />} />
           </Route>

@@ -305,41 +305,41 @@ class LetterController extends Controller
         $zip->open($docxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
         $zip->addFromString('[Content_Types].xml', <<<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-    <Default Extension="xml" ContentType="application/xml"/>
-    <Default Extension="html" ContentType="text/html"/>
-    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>
-XML);
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+            <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+            <Default Extension="xml" ContentType="application/xml"/>
+            <Default Extension="html" ContentType="text/html"/>
+            <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+        </Types>
+        XML);
 
         $zip->addFromString('_rels/.rels', <<<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>
-XML);
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+        </Relationships>
+        XML);
 
         $zip->addFromString('word/_rels/document.xml.rels', <<<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="htmlChunk" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk" Target="letter.html"/>
-</Relationships>
-XML);
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="htmlChunk" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk" Target="letter.html"/>
+        </Relationships>
+        XML);
 
         $zip->addFromString('word/document.xml', <<<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-    <w:body>
-        <w:altChunk r:id="htmlChunk"/>
-        <w:sectPr>
-            <w:pgSz w:w="11906" w:h="16838"/>
-            <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
-        </w:sectPr>
-    </w:body>
-</w:document>
-XML);
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <w:body>
+                <w:altChunk r:id="htmlChunk"/>
+                <w:sectPr>
+                    <w:pgSz w:w="11906" w:h="16838"/>
+                    <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
+                </w:sectPr>
+            </w:body>
+        </w:document>
+        XML);
 
         $zip->addFromString('word/letter.html', $html);
         $zip->close();
@@ -397,25 +397,25 @@ XML);
         $zip->open($docxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
         $zip->addFromString('[Content_Types].xml', <<<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-    <Default Extension="xml" ContentType="application/xml"/>
-    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>
-XML);
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+            <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+            <Default Extension="xml" ContentType="application/xml"/>
+            <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+        </Types>
+        XML);
 
         $zip->addFromString('_rels/.rels', <<<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>
-XML);
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+        </Relationships>
+        XML);
 
         $zip->addFromString('word/_rels/document.xml.rels', <<<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>
-XML);
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>
+        XML);
 
         $zip->addFromString('word/document.xml', $documentXml);
         $zip->close();
@@ -464,17 +464,17 @@ XML);
         $body = implode('', $paragraphs);
 
         return <<<XML
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-    <w:body>
-        {$body}
-        <w:sectPr>
-            <w:pgSz w:w="11906" w:h="16838"/>
-            <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
-        </w:sectPr>
-    </w:body>
-</w:document>
-XML;
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                {$body}
+                <w:sectPr>
+                    <w:pgSz w:w="11906" w:h="16838"/>
+                    <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
+                </w:sectPr>
+            </w:body>
+        </w:document>
+        XML;
     }
 
     private function docxTwoColumnParagraph(string $left, string $right): string
@@ -483,16 +483,16 @@ XML;
         $right = $this->escapeXml($right);
 
         return <<<XML
-<w:p>
-    <w:pPr>
-        <w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>
-        <w:spacing w:after="0" w:line="420" w:lineRule="auto"/>
-    </w:pPr>
-    <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
-    <w:r><w:tab/></w:r>
-    <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$right}</w:t></w:r>
-</w:p>
-XML;
+        <w:p>
+            <w:pPr>
+                <w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>
+                <w:spacing w:after="0" w:line="420" w:lineRule="auto"/>
+            </w:pPr>
+            <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
+            <w:r><w:tab/></w:r>
+            <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$right}</w:t></w:r>
+        </w:p>
+        XML;
     }
 
     private function docxParagraph(string $text, array $options = []): string
@@ -503,22 +503,22 @@ XML;
         $underline = !empty($options['underline']) ? '<w:u w:val="single"/>' : '';
 
         return <<<XML
-<w:p>
-    <w:pPr>
-        <w:jc w:val="{$alignment}"/>
-        <w:spacing w:after="160" w:line="420" w:lineRule="auto"/>
-    </w:pPr>
-    <w:r>
-        <w:rPr>
-            <w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/>
-            <w:sz w:val="24"/>
-            {$bold}
-            {$underline}
-        </w:rPr>
-        <w:t xml:space="preserve">{$text}</w:t>
-    </w:r>
-</w:p>
-XML;
+        <w:p>
+            <w:pPr>
+                <w:jc w:val="{$alignment}"/>
+                <w:spacing w:after="160" w:line="420" w:lineRule="auto"/>
+            </w:pPr>
+            <w:r>
+                <w:rPr>
+                    <w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/>
+                    <w:sz w:val="24"/>
+                    {$bold}
+                    {$underline}
+                </w:rPr>
+                <w:t xml:space="preserve">{$text}</w:t>
+            </w:r>
+        </w:p>
+        XML;
     }
 
     private function docxEmptyParagraph(): string

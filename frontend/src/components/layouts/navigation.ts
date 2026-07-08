@@ -64,12 +64,12 @@ export const navigation = {
     {
       icon: LayoutDashboard,
       label: "Dashboard",
-      href: "/dashboard/chief",
+      href: "/dashboard/chief-secretary",
     },
     {
       icon: CheckCircle,
       label: "Approvals",
-      href: "/chief/approvals",
+      href: "/approvals",
     },
   ],
 
@@ -79,13 +79,23 @@ export const navigation = {
       label: "Dashboard",
       href: "/dashboard/deputy",
     },
+    {
+      icon: CheckCircle,
+      label: "Approvals",
+      href: "/approvals",
+    },
   ],
 
   dept_head: [
     {
       icon: LayoutDashboard,
       label: "Dashboard",
-      href: "/dashboard/head",
+      href: "/dashboard/dept-head",
+    },
+    {
+      icon: CheckCircle,
+      label: "Approvals",
+      href: "/approvals",
     },
   ],
 };
