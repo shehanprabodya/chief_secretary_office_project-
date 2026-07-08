@@ -5,6 +5,7 @@ import {
   Eye, Funnel
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import PreviewModal from '../components/Letters/PreviewModal';
 import { letterService } from '../services/letterService';
 import type { Letter, Subject } from '../types/letter';
 
@@ -45,6 +46,8 @@ export default function MeetingsPage() {
   const [subjectTitle, setSubjectTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
 
   const loadLetters = useCallback(async () => {
     setIsLoading(true);
@@ -95,6 +98,17 @@ export default function MeetingsPage() {
 
     const document = new DOMParser().parseFromString(title, 'text/html');
     return document.body.textContent?.trim() || 'Untitled draft letter';
+  };
+
+  const handleViewLetter = async (letterId: number) => {
+    try {
+      const result = await letterService.preview(letterId);
+      setPreviewHtml(result.preview_html);
+      setPreviewLetterId(letterId);
+    } catch (err) {
+      console.error('Failed to preview letter:', err);
+      alert('Failed to preview letter');
+    }
   };
 
   return (
@@ -201,7 +215,7 @@ export default function MeetingsPage() {
                 <th className="px-6 py-3">Subject Title</th>
                 <th className="px-6 py-3">Letter Date</th>
                 <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+                <th className="px-6 py-3 text-right">View</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -221,14 +235,10 @@ export default function MeetingsPage() {
                 filteredLetters.map((letter) => (
                   <tr
                     key={letter.letter_id}
-                    onClick={() => navigate(`/letters/${letter.letter_id}`)}
-                    className="cursor-pointer hover:bg-blue-50/60"
+                    className="hover:bg-blue-50/60"
                   >
                     <td className="px-6 py-4">
                       <p className="font-semibold text-blue-700 hover:underline">{formatLetterTitle(letter.title)}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        {letter.signatory_name || 'No signatory'} · {letter.designation || 'No designation'}
-                      </p>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {letter.subject?.code || letter.meeting_code || '—'}
@@ -250,10 +260,10 @@ export default function MeetingsPage() {
                         <button
                           onClick={(event) => {
                             event.stopPropagation();
-                            navigate(`/letters/${letter.letter_id}`);
+                            handleViewLetter(letter.letter_id);
                           }}
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                          title="Open letter"
+                          className="rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                          title="View letter preview"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
@@ -273,6 +283,16 @@ export default function MeetingsPage() {
           </div>
         </div>
       </div>
+      {previewLetterId && (
+        <PreviewModal
+          html={previewHtml}
+          letterId={previewLetterId}
+          onClose={() => {
+            setPreviewLetterId(null);
+            setPreviewHtml('');
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
