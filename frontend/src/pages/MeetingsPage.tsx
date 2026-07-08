@@ -8,9 +8,37 @@ import DashboardLayout from '../components/layouts/DashboardLayout';
 import { letterService } from '../services/letterService';
 import type { Letter, Subject } from '../types/letter';
 
+const STATUS_BADGE: Record<string, { label: string; className: string; dotClassName: string }> = {
+  draft: {
+    label: 'Draft',
+    className: 'bg-slate-100 text-slate-600',
+    dotClassName: 'bg-slate-400',
+  },
+  pending_approval: {
+    label: 'Pending Approval',
+    className: 'bg-orange-50 text-orange-700',
+    dotClassName: 'bg-orange-500',
+  },
+  approved: {
+    label: 'Approved',
+    className: 'bg-green-50 text-green-700',
+    dotClassName: 'bg-green-500',
+  },
+  rejected: {
+    label: 'Rejected',
+    className: 'bg-red-50 text-red-700',
+    dotClassName: 'bg-red-500',
+  },
+  dispatched: {
+    label: 'Dispatched',
+    className: 'bg-blue-50 text-blue-700',
+    dotClassName: 'bg-blue-500',
+  },
+};
+
 export default function MeetingsPage() {
   const navigate = useNavigate();
-  const [draftLetters, setDraftLetters] = useState<Letter[]>([]);
+  const [letters, setLetters] = useState<Letter[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [subjectCode, setSubjectCode] = useState('');
@@ -18,21 +46,22 @@ export default function MeetingsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const loadDraftLetters = useCallback(async () => {
+  const loadLetters = useCallback(async () => {
     setIsLoading(true);
     try {
       const letters = await letterService.getMyLetters();
-      setDraftLetters(letters.filter((letter) => letter.status === 'draft'));
+      setLetters(letters);
     } catch (err) {
-      console.error('Failed to fetch draft letters:', err);
+      console.error('Failed to fetch letters:', err);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadDraftLetters();
-  }, [loadDraftLetters]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadLetters();
+  }, [loadLetters]);
 
   useEffect(() => {
     letterService.getSubjects()
@@ -40,11 +69,11 @@ export default function MeetingsPage() {
       .catch((err) => console.error('Failed to fetch subjects:', err));
   }, []);
 
-  const filteredDraftLetters = useMemo(() => {
+  const filteredLetters = useMemo(() => {
     const code = subjectCode.trim().toLowerCase();
     const titleFilter = subjectTitle.trim().toLowerCase();
 
-    return draftLetters.filter((letter) => {
+    return letters.filter((letter) => {
       const letterDate = (letter.signature_date || letter.created_at || '').slice(0, 10);
       const letterCode = (letter.subject?.code || letter.meeting_code || '').toLowerCase();
       const letterSubjectTitle = (letter.subject?.title || '').toLowerCase();
@@ -55,7 +84,7 @@ export default function MeetingsPage() {
 
       return matchesCode && matchesTitle && matchesStart && matchesEnd;
     });
-  }, [draftLetters, subjectCode, subjectTitle, startDate, endDate]);
+  }, [letters, subjectCode, subjectTitle, startDate, endDate]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
@@ -152,7 +181,7 @@ export default function MeetingsPage() {
             <div className="flex items-end">
               <button
                 type="button"
-                onClick={loadDraftLetters}
+                onClick={loadLetters}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-500 text-sm font-medium text-white hover:bg-blue-800"
               >
                <Funnel className='h-4 w-4 shrink-0' />
@@ -179,17 +208,17 @@ export default function MeetingsPage() {
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
-                    Loading draft letters...
+                    Loading letters...
                   </td>
                 </tr>
-              ) : filteredDraftLetters.length === 0 ? (
+              ) : filteredLetters.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
-                    No drafted letters found for the selected filters.
+                    No letters found for the selected filters.
                   </td>
                 </tr>
               ) : (
-                filteredDraftLetters.map((letter) => (
+                filteredLetters.map((letter) => (
                   <tr
                     key={letter.letter_id}
                     onClick={() => navigate(`/letters/${letter.letter_id}`)}
@@ -211,9 +240,9 @@ export default function MeetingsPage() {
                       {letter.signature_date ? formatDate(letter.signature_date) : 'Not set'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                        Draft
+                      <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[letter.status]?.className ?? 'bg-slate-100 text-slate-600'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${STATUS_BADGE[letter.status]?.dotClassName ?? 'bg-slate-400'}`} />
+                        {STATUS_BADGE[letter.status]?.label ?? letter.status}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -238,9 +267,9 @@ export default function MeetingsPage() {
 
           <div className="flex items-center justify-between bg-slate-100 border-t border-slate-200 px-6 py-3">
             <p className="text-sm text-slate-500">
-              Showing {filteredDraftLetters.length} draft letters
+              Showing {filteredLetters.length} letters
             </p>
-            <p className="text-xs text-slate-400">Click a row to open the generate letter form.</p>
+            <p className="text-xs text-slate-400">Click a row to open the letter.</p>
           </div>
         </div>
       </div>
