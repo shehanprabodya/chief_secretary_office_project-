@@ -43,4 +43,6 @@ export interface Letter {
   status: LetterStatus;
   recipients: RecipientTag[];
   generated_html?: string;
+  created_at?: string;
+  updated_at?: string;
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApprovableDocument;
+use App\Models\Letter;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -16,7 +17,7 @@ class ApprovalController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = ApprovableDocument::with('submitter', 'steps');
+        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -61,18 +62,40 @@ class ApprovalController extends Controller
             return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
+        $validated = $validator->validated();
+
+        if (!empty($validated['source_id'])) {
+            $existingDocument = ApprovableDocument::where('document_type', $validated['document_type'])
+                ->where('source_id', $validated['source_id'])
+                ->whereIn('status', ['pending', 'approved'])
+                ->with('submitter', 'steps.actionedBy', 'comments.user')
+                ->first();
+
+            if ($existingDocument) {
+                return response()->json([
+                    'message' => 'Document is already in the approval workflow',
+                    'document' => $existingDocument,
+                ]);
+            }
+        }
+
         $document = ApprovableDocument::create([
-            ...$validator->validated(),
+            ...$validated,
             'reference_id' => ApprovableDocument::generateReferenceId($request->document_type),
             'submitted_by' => $request->user()->user_id,
             'status' => 'pending',
+            'current_step_order' => 2,
         ]);
 
         $document->initializeWorkflow();
 
+        if ($document->document_type === 'letter' && $document->source_id) {
+            Letter::where('letter_id', $document->source_id)->update(['status' => 'pending_approval']);
+        }
+
         return response()->json([
             'message' => 'Document submitted for approval',
-            'document' => $document->load('steps'),
+            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
         ], 201);
     }
 
@@ -101,6 +124,10 @@ class ApprovalController extends Controller
             $document->update(['current_step_order' => $nextStep->step_order]);
         } else {
             $document->update(['status' => 'approved']);
+
+            if ($document->document_type === 'letter' && $document->source_id) {
+                Letter::where('letter_id', $document->source_id)->update(['status' => 'approved']);
+            }
         }
 
         if ($request->filled('notes')) {
@@ -112,7 +139,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Approved',
-            'document' => $document->load('steps.actionedBy', 'comments.user'),
+            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
         ]);
     }
 
@@ -129,6 +156,10 @@ class ApprovalController extends Controller
 
         $document->update(['status' => 'rejected']);
 
+        if ($document->document_type === 'letter' && $document->source_id) {
+            Letter::where('letter_id', $document->source_id)->update(['status' => 'rejected']);
+        }
+
         if ($request->filled('notes')) {
             $document->comments()->create([
                 'user_id' => $request->user()->user_id,
@@ -138,7 +169,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Rejected',
-            'document' => $document->load('steps.actionedBy', 'comments.user'),
+            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
         ]);
     }
 

@@ -3,7 +3,8 @@ import type { Meeting, PaginatedMeetings } from '../types/meeting';
 
 export interface MeetingFilters {
   search?: string;
-  department_id?: string;
+  subject_code?: string;
+  subject_title?: string;
   start_date?: string;
   end_date?: string;
   page?: number;
@@ -11,33 +12,33 @@ export interface MeetingFilters {
 
 export const meetingService = {
   async list(filters: MeetingFilters = {}): Promise<PaginatedMeetings> {
-    const { data } = await api.get<PaginatedMeetings>('/meetings', { params: filters });
+    const { data } = await api.get<PaginatedMeetings>('/officer/meetings', { params: filters });
     return data;
   },
 
   async getByDate(date: string): Promise<Meeting[]> {
-    const { data } = await api.get<{ meetings: Meeting[] }>('/meetings/by-date', {
+    const { data } = await api.get<{ meetings: Meeting[] }>('/officer/meetings/by-date', {
       params: { date },
     });
     return data.meetings;
   },
 
   async getById(id: number): Promise<Meeting> {
-    const { data } = await api.get<{ meeting: Meeting }>(`/meetings/${id}`);
+    const { data } = await api.get<{ meeting: Meeting }>(`/officer/meetings/${id}`);
     return data.meeting;
   },
 
   async create(payload: Partial<Meeting> & { attendee_ids?: number[] }): Promise<Meeting> {
-    const { data } = await api.post<{ meeting: Meeting }>('/meetings', payload);
+    const { data } = await api.post<{ meeting: Meeting }>('/officer/meetings', payload);
     return data.meeting;
   },
 
   async update(id: number, payload: Partial<Meeting> & { attendee_ids?: number[] }): Promise<Meeting> {
-    const { data } = await api.put<{ meeting: Meeting }>(`/meetings/${id}`, payload);
+    const { data } = await api.put<{ meeting: Meeting }>(`/officer/meetings/${id}`, payload);
     return data.meeting;
   },
 
   async cancel(id: number): Promise<void> {
-    await api.delete(`/meetings/${id}`);
+    await api.delete(`/officer/meetings/${id}`);
   },
 };

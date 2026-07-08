@@ -10,6 +10,7 @@ export interface MeetingAttendee {
 export interface Meeting {
   meeting_id: number;
   reference_id: string;
+  meeting_code: string;
   title: string;
   meeting_date: string;
   start_time: string | null;
@@ -18,6 +19,7 @@ export interface Meeting {
   location_type: LocationType;
   department_id: number | null;
   department?: { department_id: number; department_name: string };
+  subject?: { id: number; code: string; title: string };
   status: MeetingStatus;
   description: string | null;
   attendees?: MeetingAttendee[];

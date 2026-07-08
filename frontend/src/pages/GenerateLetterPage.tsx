@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Save, Eye, Printer, Play, Send,
   Download, History, Trash2,
-  CheckCircle, Clock, 
+  CheckCircle, Clock, FileText,
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import RichTextEditor from '../components/Letters/RichTextEditor';
 import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import PreviewModal from '../components/Letters/PreviewModal';
 import { letterService } from '../services/letterService';
+import { approvalService } from '../services/approvalService';
 import type {  Organization, Subject, RecipientTag } from '../types/letter';
 
 // Status Workflow Sidebar 
@@ -18,6 +19,24 @@ const WORKFLOW_STEPS = [
   { step: 2, label: 'Review',       sub: 'PENDING' },
   { step: 3, label: 'Dispatch',     sub: 'FINAL' },
 ];
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: unknown;
+      errors?: Record<string, unknown>;
+    };
+  };
+};
+
+const getErrorMessage = (err: unknown, fallback: string) => {
+  const data = (err as ApiError)?.response?.data;
+  const firstError = data?.errors ? Object.values(data.errors).flat()[0] : null;
+
+  return String(firstError || data?.message || fallback);
+};
+
+const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
 function StatusStep({ step, label, sub, currentStep }: {
   step: number; label: string; sub: string; currentStep: number;
@@ -57,7 +76,6 @@ export default function GenerateLetterPage() {
 
   // Form state
   const [letterId, setLetterId] = useState<number | null>(id ? Number(id) : null);
-  const [meetingCode, setMeetingCode] = useState('');
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -74,18 +92,11 @@ export default function GenerateLetterPage() {
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSendingApproval, setIsSendingApproval] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [currentStep] = useState(1); // draft = step 1, changes after send-for-approval
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('unsaved');
-
-  const getErrorMessage = (err: any, fallback: string) => {
-    const message = err?.response?.data?.message;
-    const errors = err?.response?.data?.errors;
-    const firstError = errors ? Object.values(errors).flat()[0] : null;
-
-    return String(firstError || message || fallback);
-  };
 
   // Load data
   useEffect(() => {
@@ -98,7 +109,6 @@ export default function GenerateLetterPage() {
     if (!id) return;
     letterService.getById(Number(id)).then((letter) => {
       setLetterId(letter.letter_id);
-      setMeetingCode(letter.meeting_code ?? '');
       setSubjectId(letter.subject_id);
       setTitle(letter.title);
       setContent(letter.content);
@@ -114,18 +124,8 @@ export default function GenerateLetterPage() {
     });
   }, [id]);
 
-  // Auto-save draft every 30 seconds if there's content
-  useEffect(() => {
-    if (!content && !title) return;
-    const timer = setTimeout(() => {
-      handleSaveDraft(true);
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [content, title, recipients]);
-
-  const buildPayload = () => ({
+  const buildPayload = useCallback(() => ({
     letter_id: letterId ?? undefined,
-    meeting_code: meetingCode || undefined,
     subject_id: subjectId ?? undefined,
     title,
     content,
@@ -137,9 +137,9 @@ export default function GenerateLetterPage() {
       user_id: r.user_id,
       recipient_label: r.recipient_label,
     })),
-  });
+  }), [content, designation, letterId, recipients, signatoryName, signatureDate, subjectId, title]);
 
-  const handleSaveDraft = async (silent = false) => {
+  const handleSaveDraft = useCallback(async (silent = false) => {
     if (!silent) setIsSaving(true);
     setSaveStatus('saving');
     try {
@@ -149,7 +149,7 @@ export default function GenerateLetterPage() {
       if (!silent) {
         navigate(`/letters/${saved.letter_id}`, { replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setSaveStatus('unsaved');
       if (!silent) {
@@ -158,7 +158,16 @@ export default function GenerateLetterPage() {
     } finally {
       if (!silent) setIsSaving(false);
     }
-  };
+  }, [buildPayload, navigate]);
+
+  // Auto-save draft every 30 seconds if there's content
+  useEffect(() => {
+    if (!content && !title) return;
+    const timer = setTimeout(() => {
+      handleSaveDraft(true);
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [content, handleSaveDraft, title]);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -170,7 +179,7 @@ export default function GenerateLetterPage() {
       const result = await letterService.generate(idToGenerate);
       setPreviewHtml(result.generated_html);
       setShowPreview(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setSaveStatus('unsaved');
       alert(getErrorMessage(err, 'Failed to generate letter'));
@@ -185,11 +194,12 @@ export default function GenerateLetterPage() {
       return;
     }
     try {
-      await letterService.saveDraft(buildPayload());
-      const result = await letterService.preview(letterId);
+      const saved = await letterService.saveDraft(buildPayload());
+      setLetterId(saved.letter_id);
+      const result = await letterService.preview(saved.letter_id);
       setPreviewHtml(result.preview_html);
       setShowPreview(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       alert(getErrorMessage(err, 'Failed to preview letter'));
     }
@@ -202,7 +212,20 @@ export default function GenerateLetterPage() {
     }
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<html><head><title>Print Letter</title></head><body>${previewHtml}</body></html>`);
+    win.document.write(`
+      <html>
+        <head>
+          <title>Print Letter</title>
+          <style>
+            @page { size: A4 portrait; margin: 30mm 20mm 25mm 30mm; }
+            html, body { margin: 0; padding: 0; }
+            body { font-family: 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            .letter-page { width: 100%; box-sizing: border-box; }
+          </style>
+        </head>
+        <body>${previewHtml}</body>
+      </html>
+    `);
     win.document.close();
     win.print();
   };
@@ -210,11 +233,53 @@ export default function GenerateLetterPage() {
   const handleDownloadPdf = async () => {
     if (!letterId) { alert('Save the draft first'); return; }
     try {
-      await letterService.saveDraft(buildPayload());
-      await letterService.downloadPdf(letterId);
-    } catch (err: any) {
+      const saved = await letterService.saveDraft(buildPayload());
+      setLetterId(saved.letter_id);
+      await letterService.downloadPdf(saved.letter_id);
+    } catch (err: unknown) {
       console.error(err);
       alert(getErrorMessage(err, 'Failed to download PDF'));
+    }
+  };
+
+  const handleDownloadDocx = async () => {
+    if (!letterId) { alert('Save the draft first'); return; }
+    try {
+      const saved = await letterService.saveDraft(buildPayload());
+      setLetterId(saved.letter_id);
+      await letterService.downloadDocx(saved.letter_id);
+    } catch (err: unknown) {
+      console.error(err);
+      alert(getErrorMessage(err, 'Failed to download DOCX'));
+    }
+  };
+
+  const handleSendForApproval = async () => {
+    setIsSendingApproval(true);
+    try {
+      const saved = await letterService.saveDraft(buildPayload());
+      setLetterId(saved.letter_id);
+
+      const result = await letterService.generate(saved.letter_id);
+      const selectedSubject = subjects.find((subject) => subject.id === subjectId);
+      const approvalSubject = stripHtml(title) || selectedSubject?.title || selectedSubject?.code || `Letter ${saved.letter_id}`;
+      const description = stripHtml(content).slice(0, 300);
+
+      await approvalService.submit({
+        document_type: 'letter',
+        source_id: saved.letter_id,
+        subject: approvalSubject,
+        description,
+        full_content: result.generated_html,
+      });
+
+      alert('Letter sent for approval successfully');
+      navigate('/approvals');
+    } catch (err: unknown) {
+      console.error(err);
+      alert(getErrorMessage(err, 'Failed to send letter for approval'));
+    } finally {
+      setIsSendingApproval(false);
     }
   };
 
@@ -274,35 +339,25 @@ export default function GenerateLetterPage() {
               <h2 className="text-sm font-semibold text-slate-700">Letter Details</h2>
             </div>
 
-            {/* Row 1: Meeting Code + Recipient Details */}
+            {/* Row 1: Subject Code + Recipient Details */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Meeting Code
+                  Subject Code
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={meetingCode}
-                    onChange={(e) => setMeetingCode(e.target.value)}
-                    placeholder="E.g. SPC/DEV/2024/08"
-                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                  {/* Subject selector */}
-                  <select
-                    value={subjectId ?? ''}
-                    onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
-                    className="rounded-lg border border-slate-300 bg-slate-50 px-2 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
-                    title="Select Subject/Project"
-                  >
-                    <option value="">Subject</option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.code} - {s.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={subjectId ?? ''}
+                  onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  title="Select Subject Code"
+                >
+                  <option value="">Select subject code</option>
+                  {subjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.code}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -428,12 +483,12 @@ export default function GenerateLetterPage() {
                   {isGenerating ? 'Generating...' : 'Generate Letter'}
                 </button>
                 <button
-                  disabled
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-400 cursor-not-allowed"
-                  title="Approval workflow - coming soon"
+                  onClick={handleSendForApproval}
+                  disabled={isSendingApproval}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-60"
                 >
                   <Send className="h-4 w-4" />
-                  Send for Approval
+                  {isSendingApproval ? 'Sending...' : 'Send for Approval'}
                 </button>
               
                 <button
@@ -441,6 +496,12 @@ export default function GenerateLetterPage() {
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-200 py-2.5 text-sm font-medium text-teal hover:bg-teal-500"
                 >
                   <Download className="h-4 w-4" /> Download PDF
+                </button>
+                <button
+                  onClick={handleDownloadDocx}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-100 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-200"
+                >
+                  <FileText className="h-4 w-4" /> Download DOCX
                 </button>
                 <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate- hover:opacity-90 disabled:opacity-50"
                   title="Revision history - coming soon"

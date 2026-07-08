@@ -51,12 +51,13 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['officer', 'admin']} />}>
             <Route path="/meetings" element={<MeetingsPage />} />
             <Route path="/letters/new" element={<GenerateLetterPage />} />
+            <Route path="/letters/:id" element={<GenerateLetterPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/minutes" element={<CreateMinutesPage />} />
             
           
           </Route>
-          // Approvals visible to ALL roles that participate in workflow
+          {/* Approvals visible to ALL roles that participate in workflow */}
           <Route element={<ProtectedRoute allowedRoles={['admin', 'officer', 'dept_head', 'deputy', 'chief_secretary']} />}>
             <Route path="/approvals" element={<ApprovalsPage />} />
           </Route>
@@ -66,4 +67,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-

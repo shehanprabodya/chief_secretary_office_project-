@@ -1,4 +1,4 @@
-import { Check, Pencil } from 'lucide-react';
+import { Check, Pencil, Send } from 'lucide-react';
 import type { ApprovalStep } from '../../types/approval';
 
 interface WorkflowTrackerProps {
@@ -13,10 +13,20 @@ export default function WorkflowTracker({ steps }: WorkflowTrackerProps) {
       </p>
       <div className="flex items-center">
         {steps.map((step, idx) => {
+          const isSubmitterStep = step.step_order === 1 && step.required_role === 'officer';
           const isApproved = step.status === 'approved';
           const isPending = step.status === 'pending';
           const isRejected = step.status === 'rejected';
           const isLast = idx === steps.length - 1;
+          const statusLabel = isSubmitterStep && isApproved
+            ? 'Submitted'
+            : isApproved
+            ? 'Approved'
+            : isPending
+            ? 'Pending'
+            : isRejected
+            ? 'Rejected'
+            : 'Waiting';
 
           return (
             <div key={step.step_id} className="flex flex-1 items-center">
@@ -32,14 +42,20 @@ export default function WorkflowTracker({ steps }: WorkflowTrackerProps) {
                       : 'bg-slate-200 text-slate-400'
                   }`}
                 >
-                  {isApproved ? <Check className="h-5 w-5" /> : isPending ? <Pencil className="h-4 w-4" /> : <span className="text-sm">●</span>}
+                  {isSubmitterStep && isApproved
+                    ? <Send className="h-5 w-5" />
+                    : isApproved
+                    ? <Check className="h-5 w-5" />
+                    : isPending
+                    ? <Pencil className="h-4 w-4" />
+                    : <span className="text-sm">●</span>}
                 </div>
                 <div className="text-center">
                   <p className={`text-sm font-semibold ${isApproved || isPending ? 'text-slate-900' : 'text-slate-400'}`}>
                     {step.step_label}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {isApproved ? 'Approved' : isPending ? 'Pending' : isRejected ? 'Rejected' : 'Waiting'}
+                    {statusLabel}
                   </p>
                 </div>
               </div>

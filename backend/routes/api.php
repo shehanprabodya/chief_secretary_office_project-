@@ -24,6 +24,14 @@ Route::middleware('auth:sanctum')->group(function () {
         });
     });
 
+    // Approvals - accessible to all authenticated workflow participants.
+    Route::get('/approvals', [ApprovalController::class, 'index']);
+    Route::get('/approvals/{id}', [ApprovalController::class, 'show']);
+    Route::post('/approvals', [ApprovalController::class, 'store']);
+    Route::post('/approvals/{id}/approve', [ApprovalController::class, 'approve']);
+    Route::post('/approvals/{id}/reject', [ApprovalController::class, 'reject']);
+    Route::post('/approvals/{id}/comments', [ApprovalController::class, 'addComment']);
+
     Route::middleware(['role:admin'])->prefix('admin')->group(function () {
         // Dashboard
         Route::get('/stats', [AdminDashboardController::class, 'stats']);
@@ -69,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/letters/{id}/generate',     [LetterController::class, 'generate']);
         Route::get('/letters/{id}/preview',      [LetterController::class, 'preview']);
         Route::get('/letters/{id}/download/pdf', [LetterController::class, 'downloadPdf']);
+        Route::get('/letters/{id}/download/docx', [LetterController::class, 'downloadDocx']);
         Route::get('/letter-recipients/orgs',    [LetterController::class, 'getOrganizations']);
         Route::get('/subjects',                  [LetterController::class, 'getSubjects']);
         
@@ -77,14 +86,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/meetings/{meetingId}/attendance/draft', [AttendanceController::class, 'saveDraft']);
         Route::post('/meetings/{meetingId}/attendance/submit', [AttendanceController::class, 'submit']);
         Route::get('/meetings/{meetingId}/attendance/search', [AttendanceController::class, 'search']);
-
-        // Approvals
-        Route::get('/approvals', [ApprovalController::class, 'index']);
-        Route::get('/approvals/{id}', [ApprovalController::class, 'show']);
-        Route::post('/approvals', [ApprovalController::class, 'store']);
-        Route::post('/approvals/{id}/approve', [ApprovalController::class, 'approve']);
-        Route::post('/approvals/{id}/reject', [ApprovalController::class, 'reject']);
-        Route::post('/approvals/{id}/comments', [ApprovalController::class, 'addComment']);
 
         //minutes
         Route::get('/minutes', [MinuteController::class, 'index']);

@@ -4,6 +4,7 @@ import TopNavbar from './TopNavbar';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  pageTitle?: string;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {

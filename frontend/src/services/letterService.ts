@@ -3,7 +3,6 @@ import type { Letter, Organization, Subject } from '../types/letter';
 
 export interface DraftPayload {
   letter_id?: number;
-  meeting_code?: string;
   subject_id?: number;
   title?: string;
   content?: string;
@@ -16,6 +15,20 @@ export interface DraftPayload {
     recipient_label?: string;
   }>;
 }
+
+const getDownloadFilename = (contentDisposition: string | undefined, fallback: string) => {
+  const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
+  return match?.[1] ?? fallback;
+};
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+};
 
 export const letterService = {
   async getMyLetters(): Promise<Letter[]> {
@@ -45,12 +58,19 @@ export const letterService = {
 
   async downloadPdf(id: number): Promise<void> {
     const response = await api.get(`/officer/letters/${id}/download/pdf`, { responseType: 'blob' });
-    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `letter-${id}.pdf`;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    const filename = getDownloadFilename(response.headers['content-disposition'], `letter-${id}.pdf`);
+    downloadBlob(new Blob([response.data], { type: 'application/pdf' }), filename);
+  },
+
+  async downloadDocx(id: number): Promise<void> {
+    const response = await api.get(`/officer/letters/${id}/download/docx`, { responseType: 'blob' });
+    const filename = getDownloadFilename(response.headers['content-disposition'], `letter-${id}.docx`);
+    downloadBlob(
+      new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      }),
+      filename
+    );
   },
 
   async getOrganizations(): Promise<Organization[]> {
