@@ -21,6 +21,7 @@ export interface ApprovalComment {
 export interface ApprovableDocument {
   document_id: number;
   reference_id: string;
+  subject_code?: string | null;
   document_type: string;
   subject: string;
   description: string | null;

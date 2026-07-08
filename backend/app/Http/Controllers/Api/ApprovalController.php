@@ -17,13 +17,16 @@ class ApprovalController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user');
+        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject');
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('reference_id', 'like', "%{$search}%")
-                  ->orWhere('subject', 'like', "%{$search}%");
+                  ->orWhere('subject', 'like', "%{$search}%")
+                  ->orWhereHas('sourceLetter.subject', function ($subjectQuery) use ($search) {
+                      $subjectQuery->where('code', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -31,17 +34,18 @@ class ApprovalController extends Controller
             $query->where('status', $request->status);
         }
 
-        $documents = $query->orderBy('created_at', 'desc')->get();
+        $documents = $query->orderBy('created_at', 'desc')->get()
+            ->map(fn (ApprovableDocument $document) => $this->withSubjectCode($document));
 
         return response()->json(['documents' => $documents]);
     }
 
     public function show(int $id): JsonResponse
     {
-        $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user')
+        $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
             ->findOrFail($id);
 
-        return response()->json(['document' => $document]);
+        return response()->json(['document' => $this->withSubjectCode($document)]);
     }
 
     /**
@@ -68,13 +72,13 @@ class ApprovalController extends Controller
             $existingDocument = ApprovableDocument::where('document_type', $validated['document_type'])
                 ->where('source_id', $validated['source_id'])
                 ->whereIn('status', ['pending', 'approved'])
-                ->with('submitter', 'steps.actionedBy', 'comments.user')
+                ->with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
                 ->first();
 
             if ($existingDocument) {
                 return response()->json([
                     'message' => 'Document is already in the approval workflow',
-                    'document' => $existingDocument,
+                    'document' => $this->withSubjectCode($existingDocument),
                 ]);
             }
         }
@@ -95,7 +99,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Document submitted for approval',
-            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
         ], 201);
     }
 
@@ -139,7 +143,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Approved',
-            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
         ]);
     }
 
@@ -169,8 +173,18 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Rejected',
-            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
         ]);
+    }
+
+    private function withSubjectCode(ApprovableDocument $document): ApprovableDocument
+    {
+        $document->setAttribute(
+            'subject_code',
+            $document->document_type === 'letter' ? $document->sourceLetter?->subject?->code : null
+        );
+
+        return $document;
     }
 
     public function addComment(Request $request, int $id): JsonResponse

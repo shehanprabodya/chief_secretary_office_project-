@@ -20,6 +20,11 @@ class ApprovableDocument extends Model
         return $this->belongsTo(User::class, 'submitted_by', 'user_id');
     }
 
+    public function sourceLetter(): BelongsTo
+    {
+        return $this->belongsTo(Letter::class, 'source_id', 'letter_id');
+    }
+
     public function steps(): HasMany
     {
         return $this->hasMany(ApprovalWorkflowStep::class, 'document_id', 'document_id')->orderBy('step_order');
