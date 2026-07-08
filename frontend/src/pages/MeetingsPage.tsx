@@ -238,7 +238,13 @@ export default function MeetingsPage() {
                     className="hover:bg-blue-50/60"
                   >
                     <td className="px-6 py-4">
-                      <p className="font-semibold text-blue-700 hover:underline">{formatLetterTitle(letter.title)}</p>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/letters/${letter.letter_id}`)}
+                        className="text-left font-semibold text-blue-700 hover:underline"
+                      >
+                        {formatLetterTitle(letter.title)}
+                      </button>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {letter.subject?.code || letter.meeting_code || '—'}
