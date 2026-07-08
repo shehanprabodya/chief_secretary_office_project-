@@ -57,7 +57,6 @@ export default function GenerateLetterPage() {
 
   // Form state
   const [letterId, setLetterId] = useState<number | null>(id ? Number(id) : null);
-  const [meetingCode, setMeetingCode] = useState('');
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -98,7 +97,6 @@ export default function GenerateLetterPage() {
     if (!id) return;
     letterService.getById(Number(id)).then((letter) => {
       setLetterId(letter.letter_id);
-      setMeetingCode(letter.meeting_code ?? '');
       setSubjectId(letter.subject_id);
       setTitle(letter.title);
       setContent(letter.content);
@@ -125,7 +123,6 @@ export default function GenerateLetterPage() {
 
   const buildPayload = () => ({
     letter_id: letterId ?? undefined,
-    meeting_code: meetingCode || undefined,
     subject_id: subjectId ?? undefined,
     title,
     content,
@@ -274,35 +271,25 @@ export default function GenerateLetterPage() {
               <h2 className="text-sm font-semibold text-slate-700">Letter Details</h2>
             </div>
 
-            {/* Row 1: Meeting Code + Recipient Details */}
+            {/* Row 1: Subject Code + Recipient Details */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label className="mb-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Meeting Code
+                  Subject Code
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={meetingCode}
-                    onChange={(e) => setMeetingCode(e.target.value)}
-                    placeholder="E.g. SPC/DEV/2024/08"
-                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                  {/* Subject selector */}
-                  <select
-                    value={subjectId ?? ''}
-                    onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
-                    className="rounded-lg border border-slate-300 bg-slate-50 px-2 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
-                    title="Select Subject/Project"
-                  >
-                    <option value="">Subject</option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.code} - {s.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={subjectId ?? ''}
+                  onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  title="Select Subject Code"
+                >
+                  <option value="">Select subject code</option>
+                  {subjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.code}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
