@@ -205,86 +205,152 @@ class LetterController extends Controller
     private function buildLetterHtml(Letter $letter, bool $standalone = false): string
     {
         $date = $letter->signature_date
-            ? \Carbon\Carbon::parse($letter->signature_date)->format('d/m/Y')
-            : now()->format('d/m/Y');
+            ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
+            : now()->format('Y.m.d');
 
-        $recipients = $letter->recipients->map(function ($r) {
-            if ($r->recipient_label) return $r->recipient_label;
-            if ($r->organization) return $r->organization->organization_name;
-            if ($r->user) return "{$r->user->designation}, {$r->user->organization?->organization_name}";
-            return '';
-        })->filter()->implode("\n");
+        $reference = $letter->subject?->code
+            ?? $letter->meeting_code
+            ?? 'CSS/4/3/77';
 
-        $subjectCode = $letter->subject?->code ?? $letter->meeting_code ?? '';
-        $subjectTitle = $letter->subject?->title ?? '';
+        $recipientsHtml = $letter->recipients->map(function ($r) {
+            if ($r->recipient_label) {
+                return e($r->recipient_label);
+            }
 
-        $css = $standalone ? '
+            if ($r->user) {
+                return e(trim(($r->user->designation ?? '') . ', ' . ($r->user->organization?->organization_name ?? '')));
+            }
+
+            if ($r->organization) {
+                return e($r->organization->organization_name);
+            }
+
+            return null;
+        })->filter()->map(fn ($line) => "<div>{$line}</div>")->implode('');
+
+        $title = $letter->title ?? $letter->subject?->title ?? '';
+        $titleHtml = $title !== strip_tags($title) ? $title : e($title);
+
+        $content = $letter->content ?? '';
+        $hasHtml = $content !== strip_tags($content);
+
+        $bodyHtml = $hasHtml
+            ? $content
+            : collect(preg_split("/\r\n|\n|\r/", trim($content)))
+                ->filter()
+                ->values()
+                ->map(function ($paragraph, $index) {
+                    $number = $index === 0 ? '' : str_pad($index + 1, 2, '0', STR_PAD_LEFT) . '. ';
+                    return '<p>' . $number . e($paragraph) . '</p>';
+                })
+                ->implode('');
+
+        $signatoryName = e($letter->signatory_name ?? 'නදීකා සී. මුහන්දිරම්ගේ');
+        $designation = e($letter->designation ?? 'ප්‍රධාන ලේකම්');
+        $office = 'දකුණු පළාත';
+
+        $css = '
             <style>
-                body { font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.8; color: #000; margin: 0; padding: 0; }
-                .letter-page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 25mm 20mm 20mm 30mm; box-sizing: border-box; background: white; }
-                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-                .header h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4px 0; }
-                .header p { font-size: 10pt; margin: 0; }
-                .meta-row { display: flex; justify-content: space-between; margin-bottom: 16px; }
-                .to-block { margin-bottom: 20px; }
-                .to-block p { margin: 0; }
-                .subject-line { font-weight: bold; margin-bottom: 20px; text-decoration: underline; }
-                .content { text-align: justify; margin-bottom: 40px; }
-                .signature-block { margin-top: 60px; }
-                .signature-line { border-top: 1px solid #000; width: 200px; margin-bottom: 4px; }
-                .footer-bar { border-top: 1px solid #000; margin-top: 40px; padding-top: 6px; font-size: 9pt; text-align: center; }
-            </style>' : '';
+                @page {
+                    size: A4;
+                    /* Keep clear space for printer-supplied headers and footers. */
+                    margin: 30mm 20mm 25mm 30mm;
+                }
 
-        $wrap = $standalone ? "<html><head><meta charset='UTF-8'>{$css}</head><body>" : '';
+                .letter-page {
+                    font-family: "DejaVu Sans", sans-serif;
+                    font-size: 12pt;
+                    line-height: 1.75;
+                    color: #000;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .letterhead-meta {
+                    width: 100%;
+                    margin-bottom: 22px;
+                    border-collapse: collapse;
+                }
+
+                .letterhead-meta td {
+                    width: 50%;
+                    padding: 0;
+                    vertical-align: top;
+                }
+
+                .letterhead-date {
+                    text-align: right;
+                }
+
+                .recipients {
+                    margin-bottom: 22px;
+                }
+
+                .subject {
+                    font-weight: bold;
+                    text-align: center;
+                    text-decoration: underline;
+                    margin: 22px 0;
+                }
+
+                .subject p {
+                    margin: 0;
+                }
+
+                .body {
+                    text-align: justify;
+                }
+
+                .body p {
+                    margin: 0 0 14px 0;
+                }
+
+                .signature {
+                    margin-top: 42px;
+                }
+
+                .signature p {
+                    margin: 0;
+                }
+            </style>
+        ';
+
+        $wrapStart = $standalone
+            ? "<!DOCTYPE html><html><head><meta charset='UTF-8'>{$css}</head><body>"
+            : $css;
+
         $wrapEnd = $standalone ? '</body></html>' : '';
 
         return <<<HTML
-{$wrap}
-<div class="letter-page">
-    <div class="header">
-        <h1>දකුණු පළාත් ප්‍රධාන ලේකම් කාර්යාලය</h1>
-        <h1>OFFICE OF THE CHIEF SECRETARY — SOUTHERN PROVINCIAL COUNCIL</h1>
-        <p>Development Division &nbsp;|&nbsp; Administrative Portal</p>
-    </div>
+    {$wrapStart}
+    <div class="letter-page">
+        <table class="letterhead-meta" role="presentation">
+            <tr>
+                <td class="letterhead-reference">{$reference}</td>
+                <td class="letterhead-date">{$date}</td>
+            </tr>
+        </table>
 
-    <div class="meta-row">
-        <div>
-            <strong>කේතය / Reference:</strong> {$subjectCode}
+        <div class="recipients">
+            {$recipientsHtml}
         </div>
-        <div>
-            <strong>දිනය / Date:</strong> {$date}
+
+        <div class="subject">
+            {$titleHtml}
+        </div>
+
+        <div class="body">
+            {$bodyHtml}
+        </div>
+
+        <div class="signature">
+            <p>{$signatoryName}</p>
+            <p>{$designation}</p>
+            <p>{$office}</p>
         </div>
     </div>
-
-    <div class="to-block">
-        <p><strong>වෙත / To:</strong></p>
-        <p style="white-space: pre-line;">{$recipients}</p>
-    </div>
-
-    <div class="subject-line">
-        විෂය / Subject: {$letter->title}
-        {$subjectTitle}
-    </div>
-
-    <div class="content">
-        {$letter->content}
-    </div>
-
-    <div class="signature-block">
-        <p>ඔබගේ විශ්වාසී,<br>Yours faithfully,</p>
-        <br><br><br>
-        <div class="signature-line"></div>
-        <p><strong>{$letter->signatory_name}</strong></p>
-        <p>{$letter->designation}</p>
-        <p>දකුණු පළාත් ප්‍රධාන ලේකම් කාර්යාලය</p>
-    </div>
-
-    <div class="footer-bar">
-        © 2024 OFFICE OF THE CHIEF SECRETARY — SOUTHERN PROVINCIAL COUNCIL
-    </div>
-</div>
-{$wrapEnd}
-HTML;
+    {$wrapEnd}
+    HTML;
     }
 
     /**
@@ -319,4 +385,3 @@ HTML;
         return response()->json(['subjects' => $subjects]);
     }
 }
-

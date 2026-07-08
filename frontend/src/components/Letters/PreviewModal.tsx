@@ -20,16 +20,10 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
         <head>
           <title>Letter</title>
           <style>
-            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.8; }
-            .letter-page { width: 210mm; margin: 0 auto; padding: 25mm 20mm 20mm 30mm; }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-            .header h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4px 0; }
-            .meta-row { display: flex; justify-content: space-between; margin-bottom: 16px; }
-            .subject-line { font-weight: bold; text-decoration: underline; margin-bottom: 20px; }
-            .content { text-align: justify; margin-bottom: 40px; }
-            .signature-block { margin-top: 60px; }
-            .signature-line { border-top: 1px solid #000; width: 200px; margin-bottom: 4px; }
-            @media print { body { margin: 0; } }
+            @page { size: A4 portrait; margin: 30mm 20mm 25mm 30mm; }
+            html, body { margin: 0; padding: 0; }
+            body { font-family: 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            .letter-page { width: 100%; box-sizing: border-box; }
           </style>
         </head>
         <body>${html}</body>
@@ -70,8 +64,8 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
         {/* Preview Content */}
         <div className="flex-1 overflow-auto bg-slate-200 p-8">
           <div
-            className="mx-auto min-h-[297mm] w-[210mm] bg-white p-[25mm] shadow-xl"
-            style={{ paddingLeft: '30mm', paddingRight: '20mm', fontFamily: "'Times New Roman', serif", fontSize: '12pt', lineHeight: '1.8' }}
+            className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
+            style={{ fontFamily: "'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
             dangerouslySetInnerHTML={{ __html: html }}
           />
         </div>
