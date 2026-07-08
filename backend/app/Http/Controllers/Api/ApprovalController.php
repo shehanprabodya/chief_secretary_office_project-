@@ -124,6 +124,10 @@ class ApprovalController extends Controller
             $document->update(['current_step_order' => $nextStep->step_order]);
         } else {
             $document->update(['status' => 'approved']);
+
+            if ($document->document_type === 'letter' && $document->source_id) {
+                Letter::where('letter_id', $document->source_id)->update(['status' => 'approved']);
+            }
         }
 
         if ($request->filled('notes')) {
@@ -135,7 +139,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Approved',
-            'document' => $document->load('steps.actionedBy', 'comments.user'),
+            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
         ]);
     }
 
@@ -152,6 +156,10 @@ class ApprovalController extends Controller
 
         $document->update(['status' => 'rejected']);
 
+        if ($document->document_type === 'letter' && $document->source_id) {
+            Letter::where('letter_id', $document->source_id)->update(['status' => 'rejected']);
+        }
+
         if ($request->filled('notes')) {
             $document->comments()->create([
                 'user_id' => $request->user()->user_id,
@@ -161,7 +169,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Rejected',
-            'document' => $document->load('steps.actionedBy', 'comments.user'),
+            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
         ]);
     }
 
