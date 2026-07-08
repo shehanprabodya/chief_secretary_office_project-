@@ -22,6 +22,10 @@ function timeAgo(dateStr: string) {
   return `${days} days ago`;
 }
 
+function hasHtml(value?: string | null) {
+  return Boolean(value && /<\/?[a-z][\s\S]*>/i.test(value));
+}
+
 export default function ApprovalsPage() {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<ApprovableDocument[]>([]);
@@ -235,46 +239,56 @@ export default function ApprovalsPage() {
                 ))}
               </div>
 
-              {/* Document Preview - letterhead style */}
+              {/* Document Preview */}
               {activeTab === 'preview' && (
-                <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-8">
-                  <div className="border-b-2 border-slate-800 pb-4 text-center">
-                    <h3 className="text-xl font-bold text-blue-900">SOUTHERN PROVINCIAL COUNCIL</h3>
-                    <p className="mt-1 text-sm text-slate-500">Department of Development & Infrastructure</p>
-                  </div>
+                <div className="mt-6 rounded-lg border border-slate-200 bg-slate-200 p-6">
+                  {hasHtml(selectedDoc.full_content) ? (
+                    <div
+                      className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
+                      style={{ fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
+                      dangerouslySetInnerHTML={{ __html: selectedDoc.full_content ?? '' }}
+                    />
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-8">
+                      <div className="border-b-2 border-slate-800 pb-4 text-center">
+                        <h3 className="text-xl font-bold text-blue-900">SOUTHERN PROVINCIAL COUNCIL</h3>
+                        <p className="mt-1 text-sm text-slate-500">Department of Development & Infrastructure</p>
+                      </div>
 
-                  <div className="mt-4 flex justify-between text-sm">
-                    <div>
-                      <p className="text-slate-400">DATE</p>
-                      <p className="font-semibold text-slate-900">
-                        {new Date(selectedDoc.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      <div className="mt-4 flex justify-between text-sm">
+                        <div>
+                          <p className="text-slate-400">DATE</p>
+                          <p className="font-semibold text-slate-900">
+                            {new Date(selectedDoc.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-slate-400">DOCUMENT NO</p>
+                          <p className="font-semibold text-slate-900">{selectedDoc.reference_id}</p>
+                        </div>
+                      </div>
+
+                      <p className="mt-6 font-bold text-slate-900">Subject: {selectedDoc.subject}</p>
+
+                      <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">
+                        {selectedDoc.full_content ?? selectedDoc.description}
                       </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-slate-400">DOCUMENT NO</p>
-                      <p className="font-semibold text-slate-900">{selectedDoc.reference_id}</p>
-                    </div>
-                  </div>
 
-                  <p className="mt-6 font-bold text-slate-900">Subject: {selectedDoc.subject}</p>
-
-                  <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">
-                    {selectedDoc.full_content ?? selectedDoc.description}
-                  </p>
-
-                  <div className="mt-10 flex justify-between text-sm">
-                    <div>
-                      <p className="border-t border-slate-400 pt-1 text-slate-500">Prepared By</p>
-                      <p className="font-semibold text-slate-900">{selectedDoc.submitter?.full_name ?? 'Unknown submitter'}</p>
+                      <div className="mt-10 flex justify-between text-sm">
+                        <div>
+                          <p className="border-t border-slate-400 pt-1 text-slate-500">Prepared By</p>
+                          <p className="font-semibold text-slate-900">{selectedDoc.submitter?.full_name ?? 'Unknown submitter'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-blue-900">SIGNED</p>
+                          <p className="text-slate-400">Authorized By</p>
+                          <p className="font-semibold text-slate-500">
+                            {selectedDoc.status === 'approved' ? 'Approved' : 'Pending Approval'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-blue-900">SIGNED</p>
-                      <p className="text-slate-400">Authorized By</p>
-                      <p className="font-semibold text-slate-500">
-                        {selectedDoc.status === 'approved' ? 'Approved' : 'Pending Approval'}
-                      </p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 
