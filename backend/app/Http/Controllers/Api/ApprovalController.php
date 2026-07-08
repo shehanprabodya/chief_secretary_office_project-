@@ -35,6 +35,8 @@ class ApprovalController extends Controller
         }
 
         $documents = $query->orderBy('created_at', 'desc')->get()
+            ->unique(fn (ApprovableDocument $document) => $document->document_type . ':' . ($document->source_id ?? 'document-' . $document->document_id))
+            ->values()
             ->map(fn (ApprovableDocument $document) => $this->withSubjectCode($document));
 
         return response()->json(['documents' => $documents]);
@@ -71,11 +73,35 @@ class ApprovalController extends Controller
         if (!empty($validated['source_id'])) {
             $existingDocument = ApprovableDocument::where('document_type', $validated['document_type'])
                 ->where('source_id', $validated['source_id'])
-                ->whereIn('status', ['pending', 'approved'])
                 ->with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
                 ->first();
 
             if ($existingDocument) {
+                if ($existingDocument->status === 'rejected') {
+                    $existingDocument->update([
+                        'subject' => $validated['subject'],
+                        'description' => $validated['description'] ?? null,
+                        'full_content' => $validated['full_content'] ?? null,
+                        'amount' => $validated['amount'] ?? null,
+                        'submitted_by' => $request->user()->user_id,
+                        'status' => 'pending',
+                        'current_step_order' => 2,
+                    ]);
+
+                    $this->resetWorkflowForResubmission($existingDocument, $request->user()->user_id);
+
+                    if ($existingDocument->document_type === 'letter' && $existingDocument->source_id) {
+                        Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
+                    }
+
+                    return response()->json([
+                        'message' => 'Rejected document resubmitted for approval',
+                        'document' => $this->withSubjectCode(
+                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
+                        ),
+                    ]);
+                }
+
                 return response()->json([
                     'message' => 'Document is already in the approval workflow',
                     'document' => $this->withSubjectCode($existingDocument),
@@ -101,6 +127,27 @@ class ApprovalController extends Controller
             'message' => 'Document submitted for approval',
             'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
         ], 201);
+    }
+
+    private function resetWorkflowForResubmission(ApprovableDocument $document, int $submittedBy): void
+    {
+        $document->steps()->where('step_order', 1)->update([
+            'status' => 'approved',
+            'actioned_by' => $submittedBy,
+            'actioned_at' => now(),
+        ]);
+
+        $document->steps()->where('step_order', 2)->update([
+            'status' => 'pending',
+            'actioned_by' => null,
+            'actioned_at' => null,
+        ]);
+
+        $document->steps()->whereIn('step_order', [3, 4])->update([
+            'status' => 'waiting',
+            'actioned_by' => null,
+            'actioned_at' => null,
+        ]);
     }
 
     /**
