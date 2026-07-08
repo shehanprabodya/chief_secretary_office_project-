@@ -10,6 +10,9 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\Process\Process;
+use Throwable;
+use ZipArchive;
 
 class LetterController extends Controller
 {
@@ -171,7 +174,7 @@ class LetterController extends Controller
      * Download as PDF — returns base64 encoded PDF
      * (Uses a simple HTML-to-PDF approach; swap with wkhtmltopdf/Dompdf if needed)
      */
-    public function downloadPdf(int $id): \Illuminate\Http\Response
+    public function downloadPdf(int $id): \Symfony\Component\HttpFoundation\Response
     {
         $letter = Letter::with(
             'recipients.organization',
@@ -181,21 +184,374 @@ class LetterController extends Controller
         )->findOrFail($id);
 
         $html = $this->buildLetterHtml($letter, true); // true = include full page CSS
+        $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
 
-        // Using Dompdf (composer require dompdf/dompdf)
-        $dompdf = new \Dompdf\Dompdf();
-        $dompdf->set_option('isHtml5ParserEnabled', true);
-        $dompdf->set_option('isRemoteEnabled', true);
+        try {
+            $path = $this->convertHtmlWithLibreOffice($html, 'pdf');
+
+            return response()->download($path, $filename, [
+                'Content-Type' => 'application/pdf',
+            ])->deleteFileAfterSend(true);
+        } catch (Throwable) {
+            // Fallback for environments without a working LibreOffice service.
+        }
+
+        // Fallback: Dompdf (composer require dompdf/dompdf)
+        $options = new \Dompdf\Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'Noto Sans Sinhala');
+        $options->setChroot(['/usr/share/fonts', base_path()]);
+
+        $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html);
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
-
-        $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
 
         return response($dompdf->output(), 200, [
             'Content-Type'        => 'application/pdf',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
+    }
+
+    /**
+     * Download as Microsoft Word DOCX.
+     */
+    public function downloadDocx(int $id): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $letter = Letter::with(
+            'recipients.organization',
+            'recipients.user.organization',
+            'subject',
+            'creator'
+        )->findOrFail($id);
+
+        $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.docx';
+        $html = $this->buildLetterHtml($letter, true);
+
+        try {
+            $path = $this->convertHtmlWithLibreOffice($html, 'docx');
+        } catch (Throwable) {
+            // Fallback for environments without a working LibreOffice service.
+            $path = $this->buildHtmlDocxFile($html);
+        }
+
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ])->deleteFileAfterSend(true);
+    }
+
+    private function convertHtmlWithLibreOffice(string $html, string $format): string
+    {
+        $binary = $this->libreOfficeBinary();
+
+        if (!$binary) {
+            throw new \RuntimeException('LibreOffice is not installed.');
+        }
+
+        $workDir = sys_get_temp_dir() . '/letter-export-' . uniqid('', true);
+        mkdir($workDir, 0775, true);
+
+        $htmlPath = $workDir . '/letter.html';
+        $profileDir = $workDir . '/lo-profile';
+        mkdir($profileDir, 0775, true);
+        file_put_contents($htmlPath, $html);
+
+        $process = new Process([
+            $binary,
+            '--headless',
+            '-env:UserInstallation=file://' . $profileDir,
+            '--convert-to',
+            $format,
+            '--outdir',
+            $workDir,
+            $htmlPath,
+        ]);
+        $process->setEnv([
+            'HOME' => $workDir,
+            'XDG_RUNTIME_DIR' => $workDir,
+        ]);
+        $process->setTimeout(60);
+        $process->run();
+
+        $matches = glob($workDir . '/*.' . $format) ?: [];
+        $outputPath = $matches[0] ?? $workDir . '/letter.' . $format;
+
+        if (!file_exists($outputPath)) {
+            throw new \RuntimeException(trim($process->getErrorOutput() . "\n" . $process->getOutput()));
+        }
+
+        return $outputPath;
+    }
+
+    private function libreOfficeBinary(): ?string
+    {
+        foreach (['/usr/bin/libreoffice', '/usr/bin/soffice'] as $binary) {
+            if (is_executable($binary)) {
+                return $binary;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildHtmlDocxFile(string $html): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'letter-html-docx-');
+        $docxPath = $path . '.docx';
+        rename($path, $docxPath);
+
+        $zip = new ZipArchive();
+        $zip->open($docxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        $zip->addFromString('[Content_Types].xml', <<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Default Extension="html" ContentType="text/html"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+XML);
+
+        $zip->addFromString('_rels/.rels', <<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+XML);
+
+        $zip->addFromString('word/_rels/document.xml.rels', <<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="htmlChunk" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk" Target="letter.html"/>
+</Relationships>
+XML);
+
+        $zip->addFromString('word/document.xml', <<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    <w:body>
+        <w:altChunk r:id="htmlChunk"/>
+        <w:sectPr>
+            <w:pgSz w:w="11906" w:h="16838"/>
+            <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
+        </w:sectPr>
+    </w:body>
+</w:document>
+XML);
+
+        $zip->addFromString('word/letter.html', $html);
+        $zip->close();
+
+        return $docxPath;
+    }
+
+    private function buildDocxFile(Letter $letter): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'letter-docx-');
+        $docxPath = $path . '.docx';
+        rename($path, $docxPath);
+
+        $date = $letter->signature_date
+            ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
+            : now()->format('Y.m.d');
+
+        $reference = $letter->subject?->code
+            ?? $letter->meeting_code
+            ?? 'CSS/4/3/77';
+
+        $recipientLines = $letter->recipients->map(function ($r) {
+            if ($r->recipient_label) {
+                return $r->recipient_label;
+            }
+
+            if ($r->user) {
+                return trim(($r->user->designation ?? '') . ', ' . ($r->user->organization?->organization_name ?? ''));
+            }
+
+            if ($r->organization) {
+                return $r->organization->organization_name;
+            }
+
+            return null;
+        })->filter()->values()->all();
+
+        $title = $this->htmlToText($letter->title ?: ($letter->subject?->title ?? ''));
+        $bodyLines = $this->htmlToParagraphs($letter->content ?? '');
+        $signatoryName = $letter->signatory_name ?? 'නදීකා සී. මුහන්දිරම්ගේ';
+        $designation = $letter->designation ?? 'ප්‍රධාන ලේකම්';
+
+        $documentXml = $this->buildDocxDocumentXml(
+            $reference,
+            $date,
+            $recipientLines,
+            $title,
+            $bodyLines,
+            $signatoryName,
+            $designation,
+            'දකුණු පළාත'
+        );
+
+        $zip = new ZipArchive();
+        $zip->open($docxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        $zip->addFromString('[Content_Types].xml', <<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+XML);
+
+        $zip->addFromString('_rels/.rels', <<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+XML);
+
+        $zip->addFromString('word/_rels/document.xml.rels', <<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>
+XML);
+
+        $zip->addFromString('word/document.xml', $documentXml);
+        $zip->close();
+
+        return $docxPath;
+    }
+
+    private function buildDocxDocumentXml(
+        string $reference,
+        string $date,
+        array $recipientLines,
+        string $title,
+        array $bodyLines,
+        string $signatoryName,
+        string $designation,
+        string $office
+    ): string {
+        $paragraphs = [];
+
+        $paragraphs[] = $this->docxTwoColumnParagraph($reference, $date);
+        $paragraphs[] = $this->docxEmptyParagraph();
+
+        foreach ($recipientLines as $line) {
+            $paragraphs[] = $this->docxParagraph($line);
+        }
+
+        $paragraphs[] = $this->docxEmptyParagraph();
+        $paragraphs[] = $this->docxParagraph($title, [
+            'bold' => true,
+            'underline' => true,
+            'alignment' => 'center',
+        ]);
+        $paragraphs[] = $this->docxEmptyParagraph();
+
+        foreach ($bodyLines as $index => $line) {
+            $text = $index === 0 ? $line : str_pad($index + 1, 2, '0', STR_PAD_LEFT) . '. ' . $line;
+            $paragraphs[] = $this->docxParagraph($text, ['alignment' => 'both']);
+        }
+
+        $paragraphs[] = $this->docxEmptyParagraph();
+        $paragraphs[] = $this->docxEmptyParagraph();
+        $paragraphs[] = $this->docxParagraph($signatoryName);
+        $paragraphs[] = $this->docxParagraph($designation);
+        $paragraphs[] = $this->docxParagraph($office);
+
+        $body = implode('', $paragraphs);
+
+        return <<<XML
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        {$body}
+        <w:sectPr>
+            <w:pgSz w:w="11906" w:h="16838"/>
+            <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
+        </w:sectPr>
+    </w:body>
+</w:document>
+XML;
+    }
+
+    private function docxTwoColumnParagraph(string $left, string $right): string
+    {
+        $left = $this->escapeXml($left);
+        $right = $this->escapeXml($right);
+
+        return <<<XML
+<w:p>
+    <w:pPr>
+        <w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>
+        <w:spacing w:after="0" w:line="420" w:lineRule="auto"/>
+    </w:pPr>
+    <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
+    <w:r><w:tab/></w:r>
+    <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$right}</w:t></w:r>
+</w:p>
+XML;
+    }
+
+    private function docxParagraph(string $text, array $options = []): string
+    {
+        $text = $this->escapeXml($text);
+        $alignment = $options['alignment'] ?? 'left';
+        $bold = !empty($options['bold']) ? '<w:b/>' : '';
+        $underline = !empty($options['underline']) ? '<w:u w:val="single"/>' : '';
+
+        return <<<XML
+<w:p>
+    <w:pPr>
+        <w:jc w:val="{$alignment}"/>
+        <w:spacing w:after="160" w:line="420" w:lineRule="auto"/>
+    </w:pPr>
+    <w:r>
+        <w:rPr>
+            <w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/>
+            <w:sz w:val="24"/>
+            {$bold}
+            {$underline}
+        </w:rPr>
+        <w:t xml:space="preserve">{$text}</w:t>
+    </w:r>
+</w:p>
+XML;
+    }
+
+    private function docxEmptyParagraph(): string
+    {
+        return '<w:p><w:r><w:t></w:t></w:r></w:p>';
+    }
+
+    private function escapeXml(string $value): string
+    {
+        return htmlspecialchars($value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+    }
+
+    private function htmlToText(string $html): string
+    {
+        return html_entity_decode(trim(strip_tags($html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    private function htmlToParagraphs(string $html): array
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return [];
+        }
+
+        $normalized = preg_replace('/<\/(p|div|h[1-6]|li|tr)>/i', "</$1>\n", $html) ?? $html;
+        $text = $this->htmlToText($normalized);
+
+        return collect(preg_split("/\r\n|\n|\r/", $text))
+            ->map(fn ($line) => trim($line))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
@@ -249,8 +605,19 @@ class LetterController extends Controller
         $designation = e($letter->designation ?? 'ප්‍රධාන ලේකම්');
         $office = 'දකුණු පළාත';
 
+        $fontFace = file_exists('/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf')
+            ? '@font-face {
+                    font-family: "Noto Sans Sinhala";
+                    font-style: normal;
+                    font-weight: normal;
+                    src: url("file:///usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf") format("truetype");
+                }'
+            : '';
+
         $css = '
             <style>
+                ' . $fontFace . '
+
                 @page {
                     size: A4;
                     /* Keep clear space for printer-supplied headers and footers. */
@@ -258,7 +625,7 @@ class LetterController extends Controller
                 }
 
                 .letter-page {
-                    font-family: "DejaVu Sans", sans-serif;
+                    font-family: "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
                     font-size: 12pt;
                     line-height: 1.75;
                     color: #000;

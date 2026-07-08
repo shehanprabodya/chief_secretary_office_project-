@@ -1,4 +1,4 @@
-import { X, Download, Printer } from 'lucide-react';
+import { X, Download, Printer, FileText } from 'lucide-react';
 import { letterService } from '../../services/letterService';
 
 interface PreviewModalProps {
@@ -12,6 +12,10 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
     await letterService.downloadPdf(letterId);
   };
 
+  const handleDownloadDocx = async () => {
+    await letterService.downloadDocx(letterId);
+  };
+
   const handlePrint = () => {
     const win = window.open('', '_blank');
     if (!win) return;
@@ -22,7 +26,7 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
           <style>
             @page { size: A4 portrait; margin: 30mm 20mm 25mm 30mm; }
             html, body { margin: 0; padding: 0; }
-            body { font-family: 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            body { font-family: 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
             .letter-page { width: 100%; box-sizing: border-box; }
           </style>
         </head>
@@ -50,6 +54,12 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
               <Download className="h-4 w-4" /> Download PDF
             </button>
             <button
+              onClick={handleDownloadDocx}
+              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <FileText className="h-4 w-4" /> Download DOCX
+            </button>
+            <button
               onClick={handlePrint}
               className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
@@ -65,7 +75,7 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
         <div className="flex-1 overflow-auto bg-slate-200 p-8">
           <div
             className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
-            style={{ fontFamily: "'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
+            style={{ fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
             dangerouslySetInnerHTML={{ __html: html }}
           />
         </div>

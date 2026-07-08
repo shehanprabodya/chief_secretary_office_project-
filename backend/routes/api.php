@@ -69,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/letters/{id}/generate',     [LetterController::class, 'generate']);
         Route::get('/letters/{id}/preview',      [LetterController::class, 'preview']);
         Route::get('/letters/{id}/download/pdf', [LetterController::class, 'downloadPdf']);
+        Route::get('/letters/{id}/download/docx', [LetterController::class, 'downloadDocx']);
         Route::get('/letter-recipients/orgs',    [LetterController::class, 'getOrganizations']);
         Route::get('/subjects',                  [LetterController::class, 'getSubjects']);
         
