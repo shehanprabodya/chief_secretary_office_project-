@@ -15,7 +15,7 @@ const STATUS_BADGE: Record<string, { label: string; className: string; dotClassN
     dotClassName: 'bg-slate-400',
   },
   pending_approval: {
-    label: 'Pending Approval',
+    label: 'Pending',
     className: 'bg-orange-50 text-orange-700',
     dotClassName: 'bg-orange-500',
   },

@@ -283,7 +283,7 @@ export default function ApprovalsPage() {
                           <p className="font-bold text-blue-900">SIGNED</p>
                           <p className="text-slate-400">Authorized By</p>
                           <p className="font-semibold text-slate-500">
-                            {selectedDoc.status === 'approved' ? 'Approved' : 'Pending Approval'}
+                            {selectedDoc.status === 'approved' ? 'Approved' : 'Pending'}
                           </p>
                         </div>
                       </div>
