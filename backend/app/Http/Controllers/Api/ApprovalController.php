@@ -102,6 +102,15 @@ class ApprovalController extends Controller
                     ]);
                 }
 
+                if ($existingDocument->document_type === 'letter' && $existingDocument->source_id) {
+                    $letterStatus = match ($existingDocument->status) {
+                        'pending' => 'pending_approval',
+                        'approved' => 'approved',
+                        'rejected' => 'rejected',
+                    };
+                    Letter::where('letter_id', $existingDocument->source_id)->update(['status' => $letterStatus]);
+                }
+
                 return response()->json([
                     'message' => 'Document is already in the approval workflow',
                     'document' => $this->withSubjectCode($existingDocument),

@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApprovableDocument;
 use App\Models\Letter;
 use App\Models\Meeting;
 use App\Models\Organization;
@@ -26,6 +27,23 @@ class LetterController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Repair legacy status mismatches caused by draft saves after submission.
+        $approvalStatuses = ApprovableDocument::where('document_type', 'letter')
+            ->whereIn('source_id', $letters->pluck('letter_id'))
+            ->orderByDesc('document_id')
+            ->get(['source_id', 'status'])
+            ->unique('source_id')
+            ->keyBy('source_id');
+
+        foreach ($letters as $letter) {
+            $approvalStatus = $approvalStatuses->get($letter->letter_id)?->status;
+            $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+
+            if ($workflowStatus && $letter->status !== $workflowStatus) {
+                $letter->updateQuietly(['status' => $workflowStatus]);
+            }
+        }
+
         return response()->json(['letters' => $letters]);
     }
 
@@ -41,6 +59,16 @@ class LetterController extends Controller
             'meeting',
             'creator'
         )->findOrFail($id);
+
+        $approvalStatus = ApprovableDocument::where('document_type', 'letter')
+            ->where('source_id', $letter->letter_id)
+            ->latest('document_id')
+            ->value('status');
+        $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+
+        if ($workflowStatus && $letter->status !== $workflowStatus) {
+            $letter->updateQuietly(['status' => $workflowStatus]);
+        }
 
         return response()->json(['letter' => $letter]);
     }
@@ -92,7 +120,6 @@ class LetterController extends Controller
             'designation'    => $request->designation ?? 'ප්‍රධාන ලේකම්',
             'signatory_name' => $request->signatory_name,
             'signature_date' => $request->signature_date,
-            'status'         => 'draft',
             'created_by'     => $user->user_id,
         ];
 
@@ -100,9 +127,22 @@ class LetterController extends Controller
             $letter = Letter::where('letter_id', $request->letter_id)
                 ->where('created_by', $user->user_id)
                 ->firstOrFail();
+
+            $approvalStatus = ApprovableDocument::where('document_type', 'letter')
+                ->where('source_id', $letter->letter_id)
+                ->latest('document_id')
+                ->value('status');
+            $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+            if ($workflowStatus) {
+                $data['status'] = $workflowStatus;
+            }
+
             $letter->update($data);
         } else {
-            $letter = Letter::create($data);
+            $letter = Letter::create([
+                ...$data,
+                'status' => 'draft',
+            ]);
         }
 
         // Sync recipients
@@ -121,6 +161,16 @@ class LetterController extends Controller
             'message' => 'Draft saved',
             'letter'  => $letter->load('recipients.organization', 'recipients.user.organization', 'subject'),
         ]);
+    }
+
+    private function letterStatusFromApproval(?string $approvalStatus): ?string
+    {
+        return match ($approvalStatus) {
+            'pending' => 'pending_approval',
+            'approved' => 'approved',
+            'rejected' => 'rejected',
+            default => null,
+        };
     }
 
     /**
