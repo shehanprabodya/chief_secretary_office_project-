@@ -31,9 +31,11 @@ export default function AttendancePage() {
   const [attendanceError, setAttendanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
+  const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
 
   const fetchSheet = useCallback(async () => {
-    if (!selectedMeetingId) {
+    if (!selectedMeetingId && !selectedLetterId) {
       setSheet(null);
       setParticipants([]);
       return;
@@ -43,7 +45,9 @@ export default function AttendancePage() {
     setAttendanceError('');
 
     try {
-      const result = await attendanceService.getSheet(selectedMeetingId, selectedLetterId ?? undefined);
+      const result = selectedMeetingId
+        ? await attendanceService.getSheet(selectedMeetingId, selectedLetterId ?? undefined)
+        : await attendanceService.getSheetByLetter(selectedLetterId);
       setSheet(result);
       setParticipants(result.participants);
     } catch (err) {
@@ -68,11 +72,11 @@ export default function AttendancePage() {
   };
 
   const handleSaveDraft = async () => {
-    if (!selectedMeetingId) return;
+    if (!activeMeetingId) return;
     setIsSaving(true);
     try {
       await attendanceService.saveDraft(
-        selectedMeetingId,
+        activeMeetingId,
         participants.map((p) => ({ user_id: p.user_id, status: p.status }))
       );
     } finally {
@@ -81,14 +85,14 @@ export default function AttendancePage() {
   };
 
   const handleSubmitAttendance = async () => {
-    if (!selectedMeetingId) return;
+    if (!activeMeetingId) return;
     setIsSubmitting(true);
     try {
       await attendanceService.saveDraft(
-        selectedMeetingId,
+        activeMeetingId,
         participants.map((p) => ({ user_id: p.user_id, status: p.status }))
       );
-      await attendanceService.submit(selectedMeetingId);
+      await attendanceService.submit(activeMeetingId);
       await fetchSheet();
     } finally {
       setIsSubmitting(false);
@@ -148,7 +152,7 @@ export default function AttendancePage() {
           </div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5">
-          {!selectedMeetingId ? (
+          {!canLoadAttendance ? (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">Open attendance from Meeting Management</h2>
@@ -234,7 +238,7 @@ export default function AttendancePage() {
               ) : filteredParticipants.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-sm text-slate-400">
-                    {selectedMeetingId ? 'No participants found for this meeting.' : 'Open an attendance table from Meeting Management search results.'}
+                    {canLoadAttendance ? 'No participants found for this meeting letter.' : 'Open an attendance table from Meeting Management search results.'}
                   </td>
                 </tr>
               ) : filteredParticipants.map((p) => (
@@ -290,14 +294,14 @@ export default function AttendancePage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleSaveDraft}
-                disabled={isSaving || !selectedMeetingId || participants.length === 0}
+                disabled={isSaving || !activeMeetingId || participants.length === 0}
                 className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 {isSaving ? 'Saving...' : 'Save Draft'}
               </button>
               <button
                 onClick={handleSubmitAttendance}
-                disabled={isSubmitting || !selectedMeetingId || participants.length === 0}
+                disabled={isSubmitting || !activeMeetingId || participants.length === 0}
                 className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Attendance'}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   List, Grid3x3, Plus,
-  Eye, Funnel, Users
+  Eye, Funnel, ClipboardCheck
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import PreviewModal from '../components/Letters/PreviewModal';
@@ -282,21 +282,22 @@ export default function MeetingsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {letter.status === 'approved' && letter.meeting_id ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            navigate(`/attendance?meeting_id=${letter.meeting_id}&letter_id=${letter.letter_id}`);
-                          }}
-                          className="rounded p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800"
-                          title="Open attendance table"
-                        >
-                          <Users className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <span className="text-sm text-slate-300">—</span>
-                      )}
+                      <button
+                        type="button"
+                        disabled={letter.status !== 'approved'}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/attendance?letter_id=${letter.letter_id}`);
+                        }}
+                        className="rounded p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                        title={
+                          letter.status === 'approved'
+                            ? 'Open participant attendance table'
+                            : 'Attendance opens after this meeting letter is approved'
+                        }
+                      >
+                        <ClipboardCheck className="h-4 w-4" />
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">

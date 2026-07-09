@@ -81,6 +81,29 @@ class AttendanceController extends Controller
      * Get attendance sheet from the approved meeting letter recipients.
      * New recipient rows default to absent until the officer marks them otherwise.
      */
+    public function showByLetter(Request $request, int $letterId): JsonResponse
+    {
+        $approvedDocument = ApprovableDocument::where('document_type', 'letter')
+            ->where('status', 'approved')
+            ->whereHas('sourceLetter', function ($letterQuery) use ($letterId) {
+                $letterQuery->where('letter_id', $letterId)
+                    ->whereNotNull('meeting_id');
+            })
+            ->with('sourceLetter')
+            ->latest('document_id')
+            ->first();
+
+        if (!$approvedDocument?->sourceLetter?->meeting_id) {
+            return response()->json([
+                'message' => 'Attendance can be opened only after the meeting letter is fully approved.',
+            ], 422);
+        }
+
+        $request->merge(['letter_id' => $letterId]);
+
+        return $this->show($request, $approvedDocument->sourceLetter->meeting_id);
+    }
+
     public function show(Request $request, int $meetingId): JsonResponse
     {
         $meeting = Meeting::findOrFail($meetingId);

@@ -16,6 +16,11 @@ export const attendanceService = {
     return data;
   },
 
+  async getSheetByLetter(letterId: number): Promise<AttendanceSheet> {
+    const { data } = await api.get<AttendanceSheet>(`/officer/letters/${letterId}/attendance`);
+    return data;
+  },
+
   async saveDraft(meetingId: number, records: { user_id: number; status: AttendanceStatus }[]): Promise<void> {
     await api.post(`/officer/meetings/${meetingId}/attendance/draft`, { records });
   },
