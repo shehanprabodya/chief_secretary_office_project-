@@ -249,7 +249,7 @@ class LetterController extends Controller
         $options = new \Dompdf\Options();
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
-        $options->set('defaultFont', 'Noto Sans Sinhala');
+        $options->set('defaultFont', 'Iskoola Pota');
         $options->setChroot(['/usr/share/fonts', base_path()]);
 
         $dompdf = new \Dompdf\Dompdf($options);
@@ -496,6 +496,7 @@ class LetterController extends Controller
             'bold' => true,
             'underline' => true,
             'alignment' => 'center',
+            'size' => '26',
         ]);
         $paragraphs[] = $this->docxEmptyParagraph();
 
@@ -537,9 +538,9 @@ class LetterController extends Controller
                 <w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>
                 <w:spacing w:after="0" w:line="420" w:lineRule="auto"/>
             </w:pPr>
-            <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
+            <w:r><w:rPr><w:rFonts w:ascii="Iskoola Pota" w:hAnsi="Iskoola Pota" w:cs="Iskoola Pota"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
             <w:r><w:tab/></w:r>
-            <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$right}</w:t></w:r>
+            <w:r><w:rPr><w:rFonts w:ascii="Iskoola Pota" w:hAnsi="Iskoola Pota" w:cs="Iskoola Pota"/><w:sz w:val="24"/></w:rPr><w:t>{$right}</w:t></w:r>
         </w:p>
         XML;
     }
@@ -550,6 +551,7 @@ class LetterController extends Controller
         $alignment = $options['alignment'] ?? 'left';
         $bold = !empty($options['bold']) ? '<w:b/>' : '';
         $underline = !empty($options['underline']) ? '<w:u w:val="single"/>' : '';
+        $size = $options['size'] ?? '24';
 
         return <<<XML
         <w:p>
@@ -559,8 +561,8 @@ class LetterController extends Controller
             </w:pPr>
             <w:r>
                 <w:rPr>
-                    <w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/>
-                    <w:sz w:val="24"/>
+                    <w:rFonts w:ascii="Iskoola Pota" w:hAnsi="Iskoola Pota" w:cs="Iskoola Pota"/>
+                    <w:sz w:val="{$size}"/>
                     {$bold}
                     {$underline}
                 </w:rPr>
@@ -674,12 +676,17 @@ class LetterController extends Controller
                 }
 
                 .letter-page {
-                    font-family: "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
+                    font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
                     font-size: 12pt;
                     line-height: 1.75;
                     color: #000;
                     width: 100%;
                     box-sizing: border-box;
+                }
+
+                .letter-page * {
+                    font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
+                    font-size: 12pt;
                 }
 
                 .letterhead-meta {
@@ -703,10 +710,15 @@ class LetterController extends Controller
                 }
 
                 .subject {
+                    font-size: 13pt;
                     font-weight: bold;
                     text-align: center;
                     text-decoration: underline;
                     margin: 22px 0;
+                }
+
+                .subject * {
+                    font-size: 13pt;
                 }
 
                 .subject p {

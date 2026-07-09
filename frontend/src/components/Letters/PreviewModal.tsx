@@ -26,8 +26,10 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
           <style>
             @page { size: A4 portrait; margin: 30mm 20mm 25mm 30mm; }
             html, body { margin: 0; padding: 0; }
-            body { font-family: 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
             .letter-page { width: 100%; box-sizing: border-box; }
+            .letter-page, .letter-page * { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
+            .letter-page .subject, .letter-page .subject * { font-size: 13pt; }
           </style>
         </head>
         <body>${html}</body>
@@ -75,7 +77,7 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
         <div className="flex-1 overflow-auto bg-slate-200 p-8">
           <div
             className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
-            style={{ fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
+            style={{ fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
             dangerouslySetInnerHTML={{ __html: html }}
           />
         </div>
