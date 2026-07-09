@@ -18,12 +18,11 @@ use ZipArchive;
 class LetterController extends Controller
 {
     /**
-     * List all letters created by the logged-in officer (for draft resuming)
+     * List letters visible to officer-role users.
      */
     public function index(Request $request): JsonResponse
     {
         $letters = Letter::with('recipients.organization', 'recipients.user', 'subject')
-            ->where('created_by', $request->user()->user_id)
             ->orderBy('created_at', 'desc')
             ->get();
 
