@@ -18,14 +18,14 @@ class AttendanceController extends Controller
      */
     public function show(int $meetingId): JsonResponse
     {
-        $meeting = Meeting::with('department')->findOrFail($meetingId);
+        $meeting = Meeting::findOrFail($meetingId);
 
         $existingRecords = AttendanceRecord::where('meeting_id', $meetingId)
-            ->with('user.department', 'user.role')
+            ->with('user.organization', 'user.role')
             ->get()
             ->keyBy('user_id');
 
-        $attendees = $meeting->attendees()->with('department', 'role')->get();
+        $attendees = $meeting->attendees()->with('organization', 'role')->get();
 
         $participants = $attendees->map(function ($user) use ($existingRecords) {
             $record = $existingRecords->get($user->user_id);
@@ -34,7 +34,7 @@ class AttendanceController extends Controller
                 'user_id' => $user->user_id,
                 'full_name' => $user->full_name,
                 'email' => $user->email,
-                'department' => $user->department->department_name ?? null,
+                'department' => $user->organization->organization_name ?? null,
                 'role' => $user->role->role_name ?? null,
                 'status' => $record?->status ?? 'present',
             ];
@@ -105,12 +105,15 @@ class AttendanceController extends Controller
 
         $meeting = Meeting::findOrFail($meetingId);
         $attendees = $meeting->attendees()
-            ->with('department', 'role')
+            ->with('organization', 'role')
             ->where(function ($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%");
-            })
-            ->orWhereHas('department', function ($q) use ($search) {
-                $q->where('department_name', 'like', "%{$search}%");
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhereHas('organization', function ($orgQuery) use ($search) {
+                        $orgQuery->where('organization_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('role', function ($roleQuery) use ($search) {
+                        $roleQuery->where('role_name', 'like', "%{$search}%");
+                    });
             })
             ->get();
 
