@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   List, Grid3x3, Plus,
-  Eye, Funnel
+  Eye, Funnel, ClipboardCheck
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import PreviewModal from '../components/Letters/PreviewModal';
@@ -237,19 +237,20 @@ export default function MeetingsPage() {
                 <th className="px-6 py-3">Subject Title</th>
                 <th className="px-6 py-3">Letter Date</th>
                 <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3 text-center">Attendance</th>
                 <th className="px-6 py-3 text-right">View</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
                     Loading letters...
                   </td>
                 </tr>
               ) : filteredLetters.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
                     No letters found for the selected filters.
                   </td>
                 </tr>
@@ -279,6 +280,24 @@ export default function MeetingsPage() {
                         <span className={`h-1.5 w-1.5 rounded-full ${STATUS_BADGE[letter.status]?.dotClassName ?? 'bg-slate-400'}`} />
                         {STATUS_BADGE[letter.status]?.label ?? letter.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        type="button"
+                        disabled={letter.status !== 'approved'}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/attendance?letter_id=${letter.letter_id}`);
+                        }}
+                        className="rounded p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                        title={
+                          letter.status === 'approved'
+                            ? 'Open participant attendance table'
+                            : 'Attendance opens after this meeting letter is approved'
+                        }
+                      >
+                        <ClipboardCheck className="h-4 w-4" />
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">

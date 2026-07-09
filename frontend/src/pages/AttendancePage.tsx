@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Download, BarChart3, Info } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Search, Filter, Download, BarChart3, Info, ArrowLeft } from 'lucide-react';
+import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { attendanceService } from '../services/attendanceService';
-import { meetingService } from '../services/meetingService';
-import type { AttendanceSheet, AttendanceStatus, AttendanceParticipant } from '../types/attendance';
-import type { Meeting } from '../types/meeting';
+import type {
+  AttendanceSheet,
+  AttendanceStatus,
+  AttendanceParticipant,
+} from '../types/attendance';
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string; icon: string }> = {
   present: { label: 'Present', activeClasses: 'bg-white text-slate-900 border-slate-900 shadow-sm', icon: '✓' },
@@ -17,30 +21,51 @@ function getInitials(name: string) {
 }
 
 export default function AttendancePage() {
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [selectedMeetingId, setSelectedMeetingId] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedMeetingId = Number(searchParams.get('meeting_id')) || null;
+  const selectedLetterId = Number(searchParams.get('letter_id')) || null;
   const [sheet, setSheet] = useState<AttendanceSheet | null>(null);
   const [participants, setParticipants] = useState<AttendanceParticipant[]>([]);
   const [search, setSearch] = useState('');
+  const [isLoadingSheet, setIsLoadingSheet] = useState(false);
+  const [attendanceError, setAttendanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Load meeting list for the "Select Meeting" dropdown
-  useEffect(() => {
-    meetingService.list({ page: 1 }).then((res) => {
-      setMeetings(res.data);
-      if (res.data.length > 0) setSelectedMeetingId(res.data[0].meeting_id);
-    });
-  }, []);
+  const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
+  const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
 
   const fetchSheet = useCallback(async () => {
-    if (!selectedMeetingId) return;
-    const result = await attendanceService.getSheet(selectedMeetingId);
-    setSheet(result);
-    setParticipants(result.participants);
-  }, [selectedMeetingId]);
+    if (!selectedMeetingId && !selectedLetterId) {
+      setSheet(null);
+      setParticipants([]);
+      return;
+    }
+
+    setIsLoadingSheet(true);
+    setAttendanceError('');
+
+    try {
+      const result = selectedMeetingId
+        ? await attendanceService.getSheet(selectedMeetingId, selectedLetterId ?? undefined)
+        : await attendanceService.getSheetByLetter(selectedLetterId);
+      setSheet(result);
+      setParticipants(result.participants);
+    } catch (err) {
+      console.error('Failed to fetch attendance sheet:', err);
+      setSheet(null);
+      setParticipants([]);
+      const message = axios.isAxiosError<{ message?: string }>(err)
+        ? err.response?.data?.message
+        : null;
+      setAttendanceError(message ?? 'Failed to load attendance records for the selected meeting letter.');
+    } finally {
+      setIsLoadingSheet(false);
+    }
+  }, [selectedLetterId, selectedMeetingId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSheet();
   }, [fetchSheet]);
 
@@ -50,31 +75,28 @@ export default function AttendancePage() {
     );
   };
 
-  // Auto-save draft on every toggle (debounced-ish via direct call, matches "automatically saved as draft" UI text)
-  useEffect(() => {
-    if (!selectedMeetingId || participants.length === 0) return;
-    const timeout = setTimeout(() => {
-      setIsSaving(true);
-      attendanceService
-        .saveDraft(
-          selectedMeetingId,
-          participants.map((p) => ({ user_id: p.user_id, status: p.status }))
-        )
-        .finally(() => setIsSaving(false));
-    }, 600);
-
-    return () => clearTimeout(timeout);
-  }, [participants, selectedMeetingId]);
+  const handleSaveDraft = async () => {
+    if (!activeMeetingId) return;
+    setIsSaving(true);
+    try {
+      await attendanceService.saveDraft(
+        activeMeetingId,
+        participants.map((p) => ({ user_id: p.user_id, status: p.status }))
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleSubmitAttendance = async () => {
-    if (!selectedMeetingId) return;
+    if (!activeMeetingId) return;
     setIsSubmitting(true);
     try {
       await attendanceService.saveDraft(
-        selectedMeetingId,
+        activeMeetingId,
         participants.map((p) => ({ user_id: p.user_id, status: p.status }))
       );
-      await attendanceService.submit(selectedMeetingId);
+      await attendanceService.submit(activeMeetingId);
       await fetchSheet();
     } finally {
       setIsSubmitting(false);
@@ -133,41 +155,47 @@ export default function AttendancePage() {
             </div>
           </div>
         </div>
-         {/* Select Meeting Card */}
         <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                📅 Select Meeting
-              </label>
-              <select
-                value={selectedMeetingId ?? ''}
-                onChange={(e) => setSelectedMeetingId(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                {meetings.map((m) => (
-                  <option key={m.meeting_id} value={m.meeting_id}>
-                    {m.title} - {new Date(m.meeting_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {sheet && (
-              <div className="flex divide-x divide-slate-200 rounded-lg bg-slate-50 px-4 py-2.5">
-                <div className="flex-1 px-3">
-                  <p className="text-xs text-slate-500">Time</p>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {sheet.meeting.start_time?.slice(0, 5)} - {sheet.meeting.end_time?.slice(0, 5)}
-                  </p>
-                </div>
-                <div className="flex-1 px-3">
-                  <p className="text-xs text-slate-500">Venue</p>
-                  <p className="text-sm font-semibold text-slate-900">{sheet.meeting.location ?? 'Not assigned'}</p>
-                </div>
+          {!canLoadAttendance ? (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Open attendance from Meeting Management</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Search the approved meeting letter, then click the attendance icon to load that meeting's attendance table.
+                </p>
               </div>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => navigate('/meetings')}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Meeting Search
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meeting</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{sheet?.meeting.title ?? 'Loading meeting...'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Time</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {sheet?.meeting.start_time?.slice(0, 5) || '--:--'} - {sheet?.meeting.end_time?.slice(0, 5) || '--:--'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Venue</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{sheet?.meeting.location ?? 'Not assigned'}</p>
+              </div>
+            </div>
+          )}
+          {attendanceError && (
+            <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {attendanceError}
+            </p>
+          )}
         </div>
 
         {/* Participant Table */}
@@ -199,13 +227,25 @@ export default function AttendancePage() {
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-6 py-3">Participant Details</th>
-                <th className="px-6 py-3">Department</th>
-                <th className="px-6 py-3">Role / Position</th>
-                <th className="px-6 py-3 text-center">Status Toggle</th>
+                <th className="px-6 py-3">Organization</th>
+                <th className="px-6 py-3">Designation</th>
+                <th className="px-6 py-3 text-center">Attendance Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredParticipants.map((p) => (
+              {isLoadingSheet ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center text-sm text-slate-400">
+                    Loading attendance records...
+                  </td>
+                </tr>
+              ) : filteredParticipants.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center text-sm text-slate-400">
+                    {canLoadAttendance ? 'No participants found for this meeting letter.' : 'Open an attendance table from Meeting Management search results.'}
+                  </td>
+                </tr>
+              ) : filteredParticipants.map((p) => (
                 <tr key={p.user_id}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -253,15 +293,19 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between border-t border-slate-200 p-4">
             <p className="flex items-center gap-1.5 text-xs text-slate-400">
               <Info className="h-3.5 w-3.5" />
-              {isSaving ? 'Saving draft...' : 'All changes are automatically saved as draft. Finalize to sync with the central server.'}
+              {isSaving ? 'Saving draft...' : 'Statuses are saved when you click Save Draft or Submit Attendance.'}
             </p>
             <div className="flex items-center gap-3">
-              <button className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                Save Draft
+              <button
+                onClick={handleSaveDraft}
+                disabled={isSaving || !activeMeetingId || participants.length === 0}
+                className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {isSaving ? 'Saving...' : 'Save Draft'}
               </button>
               <button
                 onClick={handleSubmitAttendance}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !activeMeetingId || participants.length === 0}
                 className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Attendance'}

@@ -4,6 +4,7 @@ import DashboardLayout from '../components/layouts/DashboardLayout';
 import WorkflowTracker from '../components/Approvals/WorkflowTracker';
 import { approvalService } from '../services/approvalService';
 import { useAuth } from '../context/AuthContext';
+import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
 import type { ApprovableDocument } from '../types/approval';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -246,7 +247,7 @@ export default function ApprovalsPage() {
                     <div
                       className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
                       style={{ fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
-                      dangerouslySetInnerHTML={{ __html: selectedDoc.full_content ?? '' }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeDocumentHtml(selectedDoc.full_content ?? '') }}
                     />
                   ) : (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-8">

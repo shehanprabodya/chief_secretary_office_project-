@@ -82,6 +82,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/subjects',                  [LetterController::class, 'getSubjects']);
         
         // Attendance
+        Route::get('/attendance/approved-meeting-letters', [AttendanceController::class, 'approvedMeetingLetters']);
+        Route::get('/letters/{letterId}/attendance', [AttendanceController::class, 'showByLetter']);
         Route::get('/meetings/{meetingId}/attendance', [AttendanceController::class, 'show']);
         Route::post('/meetings/{meetingId}/attendance/draft', [AttendanceController::class, 'saveDraft']);
         Route::post('/meetings/{meetingId}/attendance/submit', [AttendanceController::class, 'submit']);

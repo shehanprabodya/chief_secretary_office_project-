@@ -9,6 +9,20 @@ export interface AttendanceParticipant {
   status: AttendanceStatus;
 }
 
+export interface ApprovedMeetingLetter {
+  letter_id: number;
+  meeting_id: number;
+  meeting_title: string;
+  letter_title: string;
+  subject_code: string | null;
+  subject_title: string | null;
+  meeting_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  recipient_count: number;
+}
+
 export interface AttendanceStatistics {
   attendance_percentage: number;
   present: number;

@@ -46,7 +46,10 @@ const Divider = () => <div className="mx-1 h-5 w-px bg-slate-300" />;
 export default function RichTextEditor({ value, onChange, placeholder = 'Write here...', minHeight = '300px', readOnly = false }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: false,
+        underline: false,
+      }),
       Underline,
       Link.configure({ openOnClick: false }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),

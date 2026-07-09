@@ -30,6 +30,10 @@ export const authService = {
     try {
       await api.post('/auth/logout');
     } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 401) {
+        return;
+      }
+
       console.error('Logout request failed:', err);
     }
   },

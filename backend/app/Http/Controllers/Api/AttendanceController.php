@@ -2,9 +2,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApprovableDocument;
 use App\Models\AttendanceRecord;
+use App\Models\Letter;
 use App\Models\Meeting;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -12,33 +13,194 @@ use Illuminate\Support\Facades\Validator;
 class AttendanceController extends Controller
 {
     /**
-     * Get attendance sheet for a meeting.
-     * If no records exist yet, auto-builds the list from meeting_attendees
-     * with default status = 'present' (matches your "all present by default" UI pattern).
+     * Search fully approved meeting letters that can open attendance.
      */
-    public function show(int $meetingId): JsonResponse
+    public function approvedMeetingLetters(Request $request): JsonResponse
     {
-        $meeting = Meeting::with('department')->findOrFail($meetingId);
+        $search = trim((string) $request->get('search', ''));
+
+        $documents = ApprovableDocument::where('document_type', 'letter')
+            ->where('status', 'approved')
+            ->with([
+                'sourceLetter.meeting',
+                'sourceLetter.subject',
+                'sourceLetter.recipients.user.organization',
+                'sourceLetter.recipients.organization',
+            ])
+            ->whereHas('sourceLetter', function ($letterQuery) use ($search) {
+                $letterQuery->whereNotNull('meeting_id');
+
+                if ($search !== '') {
+                    $letterQuery->where(function ($q) use ($search) {
+                        $q->where('title', 'like', "%{$search}%")
+                            ->orWhere('meeting_code', 'like', "%{$search}%")
+                            ->orWhereHas('meeting', function ($meetingQuery) use ($search) {
+                                $meetingQuery->where('title', 'like', "%{$search}%")
+                                    ->orWhere('meeting_code', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('subject', function ($subjectQuery) use ($search) {
+                                $subjectQuery->where('title', 'like', "%{$search}%")
+                                    ->orWhere('code', 'like', "%{$search}%");
+                            });
+                    });
+                }
+            })
+            ->latest('document_id')
+            ->limit(100)
+            ->get();
+
+        $letters = $documents
+            ->map(function ($document) {
+                $letter = $document->sourceLetter;
+                $meeting = $letter?->meeting;
+
+                if (!$letter || !$meeting) {
+                    return null;
+                }
+
+                return [
+                    'letter_id' => $letter->letter_id,
+                    'meeting_id' => $meeting->meeting_id,
+                    'meeting_title' => $meeting->title,
+                    'letter_title' => strip_tags($letter->title ?: ($letter->subject?->title ?? '')),
+                    'subject_code' => $letter->subject?->code ?? $letter->meeting_code,
+                    'subject_title' => $letter->subject?->title,
+                    'meeting_date' => optional($meeting->meeting_date)->toDateString(),
+                    'start_time' => $meeting->start_time,
+                    'end_time' => $meeting->end_time,
+                    'location' => $meeting->location,
+                    'recipient_count' => $letter->recipients->whereNotNull('user_id')->count(),
+                ];
+            })
+            ->filter()
+            ->values();
+
+        return response()->json(['letters' => $letters]);
+    }
+
+    /**
+     * Get attendance sheet from the approved meeting letter recipients.
+     * New recipient rows default to absent until the officer marks them otherwise.
+     */
+    public function showByLetter(Request $request, int $letterId): JsonResponse
+    {
+        $letter = Letter::with('subject')
+            ->where('letter_id', $letterId)
+            ->where('status', 'approved')
+            ->first();
+
+        $meeting = null;
+
+        if ($letter?->meeting_id) {
+            $meeting = Meeting::find($letter->meeting_id);
+        } elseif ($letter?->meeting_code) {
+            $meeting = Meeting::where('meeting_code', $letter->meeting_code)->first();
+        }
+
+        if (!$letter) {
+            return response()->json([
+                'message' => 'Attendance can be opened only after the meeting letter is fully approved.',
+            ], 422);
+        }
+
+        if (!$meeting && !$letter->meeting_code && !$letter->subject?->code) {
+            return response()->json([
+                'message' => 'Attendance can be opened only after the approved letter is linked to a subject or meeting.',
+            ], 422);
+        }
+
+        if (!$meeting) {
+            $meeting = $this->createAttendanceMeetingForLetter($letter);
+        }
+
+        if ((int) $letter->meeting_id !== (int) $meeting->meeting_id || $letter->meeting_code !== $meeting->meeting_code) {
+            $letter->update([
+                'meeting_id' => $meeting->meeting_id,
+                'meeting_code' => $meeting->meeting_code,
+            ]);
+        }
+
+        $request->merge(['letter_id' => $letterId]);
+
+        return $this->show($request, $meeting->meeting_id);
+    }
+
+    private function createAttendanceMeetingForLetter(Letter $letter): Meeting
+    {
+        $meetingCode = $letter->meeting_code ?: $letter->subject?->code;
+        $title = trim(strip_tags($letter->title ?: '')) ?: ($letter->subject?->title ?? 'Approved letter attendance');
+        $meetingDate = $letter->signature_date
+            ?: optional($letter->created_at)->toDateString()
+            ?: now()->toDateString();
+
+        return Meeting::firstOrCreate(
+            ['meeting_code' => $meetingCode],
+            [
+                'title' => $title,
+                'meeting_date' => $meetingDate,
+                'start_time' => null,
+                'end_time' => null,
+                'location' => null,
+                'location_type' => 'not_assigned',
+                'status' => 'scheduled',
+                'description' => 'Attendance record created from approved letter #' . $letter->letter_id,
+                'created_by' => $letter->created_by,
+            ]
+        );
+    }
+
+    public function show(Request $request, int $meetingId): JsonResponse
+    {
+        $meeting = Meeting::findOrFail($meetingId);
+        $letterId = $request->integer('letter_id');
+        $approvedLetterQuery = Letter::where('status', 'approved')
+            ->with([
+                'recipients.user.organization',
+                'recipients.organization',
+            ])
+            ->latest('letter_id');
+
+        if ($letterId) {
+            $approvedLetterQuery
+                ->where('letter_id', $letterId)
+                ->where(function ($query) use ($meeting) {
+                    $query->where('meeting_id', $meeting->meeting_id)
+                        ->orWhere('meeting_code', $meeting->meeting_code);
+                });
+        } else {
+            $approvedLetterQuery->where('meeting_id', $meetingId);
+        }
+
+        $approvedLetter = $approvedLetterQuery->first();
+
+        if (!$approvedLetter) {
+            return response()->json([
+                'message' => 'Attendance can be opened only after the meeting letter is fully approved.',
+            ], 422);
+        }
 
         $existingRecords = AttendanceRecord::where('meeting_id', $meetingId)
-            ->with('user.department', 'user.role')
+            ->with('user.organization', 'user.role')
             ->get()
             ->keyBy('user_id');
 
-        $attendees = $meeting->attendees()->with('department', 'role')->get();
+        $participants = $approvedLetter->recipients
+            ->filter(fn ($recipient) => $recipient->user_id && $recipient->user)
+            ->unique('user_id')
+            ->map(function ($recipient) use ($existingRecords) {
+                $user = $recipient->user;
+                $record = $existingRecords->get($user->user_id);
 
-        $participants = $attendees->map(function ($user) use ($existingRecords) {
-            $record = $existingRecords->get($user->user_id);
-
-            return [
-                'user_id' => $user->user_id,
-                'full_name' => $user->full_name,
-                'email' => $user->email,
-                'department' => $user->department->department_name ?? null,
-                'role' => $user->role->role_name ?? null,
-                'status' => $record?->status ?? 'present',
-            ];
-        });
+                return [
+                    'user_id' => $user->user_id,
+                    'full_name' => $user->full_name,
+                    'email' => $user->email,
+                    'department' => $user->organization->organization_name
+                        ?? $recipient->organization?->organization_name,
+                    'role' => $user->designation ?? $recipient->recipient_label,
+                    'status' => $record?->status ?? 'absent',
+                ];
+            });
 
         $present = $participants->where('status', 'present')->count();
         $absent = $participants->where('status', 'absent')->count();
@@ -58,7 +220,7 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Save draft (called automatically as the officer toggles statuses)
+     * Save draft.
      */
     public function saveDraft(Request $request, int $meetingId): JsonResponse
     {
@@ -105,12 +267,15 @@ class AttendanceController extends Controller
 
         $meeting = Meeting::findOrFail($meetingId);
         $attendees = $meeting->attendees()
-            ->with('department', 'role')
+            ->with('organization', 'role')
             ->where(function ($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%");
-            })
-            ->orWhereHas('department', function ($q) use ($search) {
-                $q->where('department_name', 'like', "%{$search}%");
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhereHas('organization', function ($orgQuery) use ($search) {
+                        $orgQuery->where('organization_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('role', function ($roleQuery) use ($search) {
+                        $roleQuery->where('role_name', 'like', "%{$search}%");
+                    });
             })
             ->get();
 

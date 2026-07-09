@@ -32,6 +32,7 @@ export interface RecipientTag {
 export interface Letter {
   letter_id: number;
   created_by: number;
+  meeting_id: number | null;
   meeting_code: string | null;
   subject_id: number | null;
   subject?: Subject;
