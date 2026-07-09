@@ -671,19 +671,8 @@ class LetterController extends Controller
         $designation = e($letter->designation ?? 'ප්‍රධාන ලේකම්');
         $office = 'දකුණු පළාත';
 
-        $fontFace = file_exists('/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf')
-            ? '@font-face {
-                    font-family: "Noto Sans Sinhala";
-                    font-style: normal;
-                    font-weight: normal;
-                    src: url("file:///usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf") format("truetype");
-                }'
-            : '';
-
         $css = '
             <style>
-                ' . $fontFace . '
-
                 @page {
                     size: A4;
                     /* Keep clear space for printer-supplied headers and footers. */

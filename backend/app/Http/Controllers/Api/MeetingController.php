@@ -20,7 +20,6 @@ class MeetingController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('reference_id', 'like', "%{$search}%")
                   ->orWhere('meeting_code', 'like', "%{$search}%")
                   ->orWhereHas('subject', function ($subjectQuery) use ($search) {
                       $subjectQuery->where('title', 'like', "%{$search}%")

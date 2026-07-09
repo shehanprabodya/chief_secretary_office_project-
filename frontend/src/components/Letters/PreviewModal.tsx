@@ -1,5 +1,6 @@
 import { X, Download, Printer, FileText } from 'lucide-react';
 import { letterService } from '../../services/letterService';
+import { sanitizeDocumentHtml } from '../../utils/sanitizeHtml';
 
 interface PreviewModalProps {
   html: string;
@@ -9,6 +10,8 @@ interface PreviewModalProps {
 }
 
 export default function PreviewModal({ html, letterId, onClose, allowExports = true }: PreviewModalProps) {
+  const safeHtml = sanitizeDocumentHtml(html);
+
   const handleDownloadPdf = async () => {
     await letterService.downloadPdf(letterId);
   };
@@ -33,7 +36,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
             .letter-page .subject, .letter-page .subject * { font-size: 13pt; }
           </style>
         </head>
-        <body>${html}</body>
+        <body>${safeHtml}</body>
       </html>
     `);
     win.document.close();
@@ -83,7 +86,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
           <div
             className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
             style={{ fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
-            dangerouslySetInnerHTML={{ __html: html }}
+            dangerouslySetInnerHTML={{ __html: safeHtml }}
           />
         </div>
       </div>

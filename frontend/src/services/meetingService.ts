@@ -8,6 +8,7 @@ export interface MeetingFilters {
   start_date?: string;
   end_date?: string;
   page?: number;
+  per_page?: number;
 }
 
 export const meetingService = {
