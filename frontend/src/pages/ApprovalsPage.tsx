@@ -136,7 +136,7 @@ export default function ApprovalsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && fetchList()}
-                placeholder="Search by document ID or subject..."
+                placeholder="Search by subject code or subject..."
                 className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
@@ -170,7 +170,7 @@ export default function ApprovalsPage() {
                 }`}
               >
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-400">REF: {doc.reference_id}</span>
+                  <span className="text-xs font-medium text-slate-400">Subject Code: {doc.subject_code ?? '—'}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${STATUS_BADGE[doc.status]}`}>
                     {doc.status}
                   </span>

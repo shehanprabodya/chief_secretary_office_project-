@@ -5,6 +5,7 @@ import {
   Eye, Funnel
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import PreviewModal from '../components/Letters/PreviewModal';
 import { letterService } from '../services/letterService';
 import type { Letter, Subject } from '../types/letter';
 
@@ -36,6 +37,8 @@ const STATUS_BADGE: Record<string, { label: string; className: string; dotClassN
   },
 };
 
+const LETTERS_PER_PAGE = 10;
+
 export default function MeetingsPage() {
   const navigate = useNavigate();
   const [letters, setLetters] = useState<Letter[]>([]);
@@ -45,6 +48,9 @@ export default function MeetingsPage() {
   const [subjectTitle, setSubjectTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadLetters = useCallback(async () => {
     setIsLoading(true);
@@ -86,6 +92,11 @@ export default function MeetingsPage() {
     });
   }, [letters, subjectCode, subjectTitle, startDate, endDate]);
 
+  const pageCount = Math.max(1, Math.ceil(filteredLetters.length / LETTERS_PER_PAGE));
+  const activePage = Math.min(currentPage, pageCount);
+  const pageStart = (activePage - 1) * LETTERS_PER_PAGE;
+  const paginatedLetters = filteredLetters.slice(pageStart, pageStart + LETTERS_PER_PAGE);
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
   };
@@ -95,6 +106,17 @@ export default function MeetingsPage() {
 
     const document = new DOMParser().parseFromString(title, 'text/html');
     return document.body.textContent?.trim() || 'Untitled draft letter';
+  };
+
+  const handleViewLetter = async (letterId: number) => {
+    try {
+      const result = await letterService.preview(letterId);
+      setPreviewHtml(result.preview_html);
+      setPreviewLetterId(letterId);
+    } catch (err) {
+      console.error('Failed to preview letter:', err);
+      alert('Failed to preview letter');
+    }
   };
 
   return (
@@ -131,7 +153,10 @@ export default function MeetingsPage() {
               <label className="mb-1.5 block text-xs font-medium text-slate-600">Subject Code</label>
               <select
                 value={subjectCode}
-                onChange={(e) => setSubjectCode(e.target.value)}
+                onChange={(e) => {
+                  setSubjectCode(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="">All Subject Codes</option>
@@ -147,7 +172,10 @@ export default function MeetingsPage() {
               <label className="mb-1.5 block text-xs font-medium text-slate-600">Subject Title</label>
               <select
                 value={subjectTitle}
-                onChange={(e) => setSubjectTitle(e.target.value)}
+                onChange={(e) => {
+                  setSubjectTitle(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="">All Subject Titles</option>
@@ -165,14 +193,20 @@ export default function MeetingsPage() {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
                 <span className="text-slate-400">/</span>
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </div>
@@ -181,7 +215,10 @@ export default function MeetingsPage() {
             <div className="flex items-end">
               <button
                 type="button"
-                onClick={loadLetters}
+                onClick={() => {
+                  setCurrentPage(1);
+                  loadLetters();
+                }}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-500 text-sm font-medium text-white hover:bg-blue-800"
               >
                <Funnel className='h-4 w-4 shrink-0' />
@@ -197,41 +234,39 @@ export default function MeetingsPage() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-6 py-3">Letter Title</th>
-                <th className="px-6 py-3">Subject Code</th>
                 <th className="px-6 py-3">Subject Title</th>
                 <th className="px-6 py-3">Letter Date</th>
                 <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+                <th className="px-6 py-3 text-right">View</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400">
                     Loading letters...
                   </td>
                 </tr>
               ) : filteredLetters.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400">
                     No letters found for the selected filters.
                   </td>
                 </tr>
               ) : (
-                filteredLetters.map((letter) => (
+                paginatedLetters.map((letter) => (
                   <tr
                     key={letter.letter_id}
-                    onClick={() => navigate(`/letters/${letter.letter_id}`)}
-                    className="cursor-pointer hover:bg-blue-50/60"
+                    className="hover:bg-blue-50/60"
                   >
                     <td className="px-6 py-4">
-                      <p className="font-semibold text-blue-700 hover:underline">{formatLetterTitle(letter.title)}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        {letter.signatory_name || 'No signatory'} · {letter.designation || 'No designation'}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {letter.subject?.code || letter.meeting_code || '—'}
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/letters/${letter.letter_id}`)}
+                        className="text-left font-semibold text-blue-700 hover:underline"
+                      >
+                        {formatLetterTitle(letter.title)}
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <p className="max-w-72 truncate text-sm text-slate-700">{letter.subject?.title || '—'}</p>
@@ -250,10 +285,10 @@ export default function MeetingsPage() {
                         <button
                           onClick={(event) => {
                             event.stopPropagation();
-                            navigate(`/letters/${letter.letter_id}`);
+                            handleViewLetter(letter.letter_id);
                           }}
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                          title="Open letter"
+                          className="rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                          title="View letter preview"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
@@ -267,12 +302,54 @@ export default function MeetingsPage() {
 
           <div className="flex items-center justify-between bg-slate-100 border-t border-slate-200 px-6 py-3">
             <p className="text-sm text-slate-500">
-              Showing {filteredLetters.length} letters
+              Showing {filteredLetters.length === 0 ? 0 : pageStart + 1}
+              -{Math.min(pageStart + paginatedLetters.length, filteredLetters.length)} of {filteredLetters.length} letters
             </p>
-            <p className="text-xs text-slate-400">Click a row to open the letter.</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={activePage === 1}
+                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
+              >
+                Previous
+              </button>
+              {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  className={`h-8 min-w-8 rounded border px-2 text-xs font-semibold ${
+                    page === activePage
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+                disabled={activePage === pageCount}
+                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>
+      {previewLetterId && (
+        <PreviewModal
+          html={previewHtml}
+          letterId={previewLetterId}
+          onClose={() => {
+            setPreviewLetterId(null);
+            setPreviewHtml('');
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }

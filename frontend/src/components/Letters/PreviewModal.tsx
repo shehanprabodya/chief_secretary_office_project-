@@ -5,9 +5,10 @@ interface PreviewModalProps {
   html: string;
   letterId: number;
   onClose: () => void;
+  allowExports?: boolean;
 }
 
-export default function PreviewModal({ html, letterId, onClose }: PreviewModalProps) {
+export default function PreviewModal({ html, letterId, onClose, allowExports = true }: PreviewModalProps) {
   const handleDownloadPdf = async () => {
     await letterService.downloadPdf(letterId);
   };
@@ -26,8 +27,10 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
           <style>
             @page { size: A4 portrait; margin: 30mm 20mm 25mm 30mm; }
             html, body { margin: 0; padding: 0; }
-            body { font-family: 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
             .letter-page { width: 100%; box-sizing: border-box; }
+            .letter-page, .letter-page * { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
+            .letter-page .subject, .letter-page .subject * { font-size: 13pt; }
           </style>
         </head>
         <body>${html}</body>
@@ -47,24 +50,28 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 className="text-lg font-bold text-slate-900">Letter Preview</h2>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleDownloadPdf}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Download className="h-4 w-4" /> Download PDF
-            </button>
-            <button
-              onClick={handleDownloadDocx}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <FileText className="h-4 w-4" /> Download DOCX
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Printer className="h-4 w-4" /> Print
-            </button>
+            {allowExports && (
+              <>
+                <button
+                  onClick={handleDownloadPdf}
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Download className="h-4 w-4" /> Download PDF
+                </button>
+                <button
+                  onClick={handleDownloadDocx}
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <FileText className="h-4 w-4" /> Download DOCX
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Printer className="h-4 w-4" /> Print
+                </button>
+              </>
+            )}
             <button onClick={onClose} className="rounded-full p-1.5 hover:bg-slate-100">
               <X className="h-5 w-5 text-slate-500" />
             </button>
@@ -75,7 +82,7 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
         <div className="flex-1 overflow-auto bg-slate-200 p-8">
           <div
             className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
-            style={{ fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
+            style={{ fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
             dangerouslySetInnerHTML={{ __html: html }}
           />
         </div>

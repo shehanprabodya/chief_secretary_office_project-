@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApprovableDocument;
 use App\Models\Letter;
 use App\Models\Meeting;
 use App\Models\Organization;
@@ -17,14 +18,30 @@ use ZipArchive;
 class LetterController extends Controller
 {
     /**
-     * List all letters created by the logged-in officer (for draft resuming)
+     * List letters visible to officer-role users.
      */
     public function index(Request $request): JsonResponse
     {
         $letters = Letter::with('recipients.organization', 'recipients.user', 'subject')
-            ->where('created_by', $request->user()->user_id)
             ->orderBy('created_at', 'desc')
             ->get();
+
+        // Repair legacy status mismatches caused by draft saves after submission.
+        $approvalStatuses = ApprovableDocument::where('document_type', 'letter')
+            ->whereIn('source_id', $letters->pluck('letter_id'))
+            ->orderByDesc('document_id')
+            ->get(['source_id', 'status'])
+            ->unique('source_id')
+            ->keyBy('source_id');
+
+        foreach ($letters as $letter) {
+            $approvalStatus = $approvalStatuses->get($letter->letter_id)?->status;
+            $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+
+            if ($workflowStatus && $letter->status !== $workflowStatus) {
+                $letter->updateQuietly(['status' => $workflowStatus]);
+            }
+        }
 
         return response()->json(['letters' => $letters]);
     }
@@ -41,6 +58,16 @@ class LetterController extends Controller
             'meeting',
             'creator'
         )->findOrFail($id);
+
+        $approvalStatus = ApprovableDocument::where('document_type', 'letter')
+            ->where('source_id', $letter->letter_id)
+            ->latest('document_id')
+            ->value('status');
+        $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+
+        if ($workflowStatus && $letter->status !== $workflowStatus) {
+            $letter->updateQuietly(['status' => $workflowStatus]);
+        }
 
         return response()->json(['letter' => $letter]);
     }
@@ -92,7 +119,6 @@ class LetterController extends Controller
             'designation'    => $request->designation ?? 'ප්‍රධාන ලේකම්',
             'signatory_name' => $request->signatory_name,
             'signature_date' => $request->signature_date,
-            'status'         => 'draft',
             'created_by'     => $user->user_id,
         ];
 
@@ -100,9 +126,22 @@ class LetterController extends Controller
             $letter = Letter::where('letter_id', $request->letter_id)
                 ->where('created_by', $user->user_id)
                 ->firstOrFail();
+
+            $approvalStatus = ApprovableDocument::where('document_type', 'letter')
+                ->where('source_id', $letter->letter_id)
+                ->latest('document_id')
+                ->value('status');
+            $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+            if ($workflowStatus) {
+                $data['status'] = $workflowStatus;
+            }
+
             $letter->update($data);
         } else {
-            $letter = Letter::create($data);
+            $letter = Letter::create([
+                ...$data,
+                'status' => 'draft',
+            ]);
         }
 
         // Sync recipients
@@ -123,12 +162,27 @@ class LetterController extends Controller
         ]);
     }
 
+    private function letterStatusFromApproval(?string $approvalStatus): ?string
+    {
+        return match ($approvalStatus) {
+            'pending' => 'pending_approval',
+            'approved' => 'approved',
+            'rejected' => 'rejected',
+            default => null,
+        };
+    }
+
+    private function canModifyLetter(Request $request, Letter $letter): bool
+    {
+        return (int) $letter->created_by === (int) $request->user()->user_id;
+    }
+
     /**
      * Generate the letter — builds the formatted letter HTML from stored data.
      * This is what "Generate Letter" button calls.
      * Returns structured letter content ready for preview/PDF/DOCX.
      */
-    public function generate(int $id): JsonResponse
+    public function generate(Request $request, int $id): JsonResponse
     {
         $letter = Letter::with(
             'recipients.organization',
@@ -137,6 +191,10 @@ class LetterController extends Controller
             'meeting',
             'creator'
         )->findOrFail($id);
+
+        if (!$this->canModifyLetter($request, $letter)) {
+            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        }
 
         if (empty($letter->content)) {
             return response()->json(['message' => 'Letter content is empty. Please write the letter body first.'], 422);
@@ -174,7 +232,7 @@ class LetterController extends Controller
      * Download as PDF — returns base64 encoded PDF
      * (Uses a simple HTML-to-PDF approach; swap with wkhtmltopdf/Dompdf if needed)
      */
-    public function downloadPdf(int $id): \Symfony\Component\HttpFoundation\Response
+    public function downloadPdf(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $letter = Letter::with(
             'recipients.organization',
@@ -182,6 +240,10 @@ class LetterController extends Controller
             'subject',
             'creator'
         )->findOrFail($id);
+
+        if (!$this->canModifyLetter($request, $letter)) {
+            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        }
 
         $html = $this->buildLetterHtml($letter, true); // true = include full page CSS
         $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
@@ -200,7 +262,7 @@ class LetterController extends Controller
         $options = new \Dompdf\Options();
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
-        $options->set('defaultFont', 'Noto Sans Sinhala');
+        $options->set('defaultFont', 'Iskoola Pota');
         $options->setChroot(['/usr/share/fonts', base_path()]);
 
         $dompdf = new \Dompdf\Dompdf($options);
@@ -217,7 +279,7 @@ class LetterController extends Controller
     /**
      * Download as Microsoft Word DOCX.
      */
-    public function downloadDocx(int $id): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function downloadDocx(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $letter = Letter::with(
             'recipients.organization',
@@ -225,6 +287,10 @@ class LetterController extends Controller
             'subject',
             'creator'
         )->findOrFail($id);
+
+        if (!$this->canModifyLetter($request, $letter)) {
+            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        }
 
         $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.docx';
         $html = $this->buildLetterHtml($letter, true);
@@ -447,6 +513,7 @@ class LetterController extends Controller
             'bold' => true,
             'underline' => true,
             'alignment' => 'center',
+            'size' => '26',
         ]);
         $paragraphs[] = $this->docxEmptyParagraph();
 
@@ -488,9 +555,9 @@ class LetterController extends Controller
                 <w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>
                 <w:spacing w:after="0" w:line="420" w:lineRule="auto"/>
             </w:pPr>
-            <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
+            <w:r><w:rPr><w:rFonts w:ascii="Iskoola Pota" w:hAnsi="Iskoola Pota" w:cs="Iskoola Pota"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
             <w:r><w:tab/></w:r>
-            <w:r><w:rPr><w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/><w:sz w:val="24"/></w:rPr><w:t>{$right}</w:t></w:r>
+            <w:r><w:rPr><w:rFonts w:ascii="Iskoola Pota" w:hAnsi="Iskoola Pota" w:cs="Iskoola Pota"/><w:sz w:val="24"/></w:rPr><w:t>{$right}</w:t></w:r>
         </w:p>
         XML;
     }
@@ -501,6 +568,7 @@ class LetterController extends Controller
         $alignment = $options['alignment'] ?? 'left';
         $bold = !empty($options['bold']) ? '<w:b/>' : '';
         $underline = !empty($options['underline']) ? '<w:u w:val="single"/>' : '';
+        $size = $options['size'] ?? '24';
 
         return <<<XML
         <w:p>
@@ -510,8 +578,8 @@ class LetterController extends Controller
             </w:pPr>
             <w:r>
                 <w:rPr>
-                    <w:rFonts w:ascii="Noto Sans Sinhala" w:hAnsi="Noto Sans Sinhala" w:cs="Noto Sans Sinhala"/>
-                    <w:sz w:val="24"/>
+                    <w:rFonts w:ascii="Iskoola Pota" w:hAnsi="Iskoola Pota" w:cs="Iskoola Pota"/>
+                    <w:sz w:val="{$size}"/>
                     {$bold}
                     {$underline}
                 </w:rPr>
@@ -564,9 +632,7 @@ class LetterController extends Controller
             ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
             : now()->format('Y.m.d');
 
-        $reference = $letter->subject?->code
-            ?? $letter->meeting_code
-            ?? 'CSS/4/3/77';
+        $subjectCode = e($letter->subject?->code ?? $letter->meeting_code ?? '');
 
         $recipientsHtml = $letter->recipients->map(function ($r) {
             if ($r->recipient_label) {
@@ -625,12 +691,17 @@ class LetterController extends Controller
                 }
 
                 .letter-page {
-                    font-family: "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
+                    font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
                     font-size: 12pt;
                     line-height: 1.75;
                     color: #000;
                     width: 100%;
                     box-sizing: border-box;
+                }
+
+                .letter-page * {
+                    font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
+                    font-size: 12pt;
                 }
 
                 .letterhead-meta {
@@ -654,10 +725,15 @@ class LetterController extends Controller
                 }
 
                 .subject {
+                    font-size: 13pt;
                     font-weight: bold;
                     text-align: center;
                     text-decoration: underline;
                     margin: 22px 0;
+                }
+
+                .subject * {
+                    font-size: 13pt;
                 }
 
                 .subject p {
@@ -693,7 +769,7 @@ class LetterController extends Controller
     <div class="letter-page">
         <table class="letterhead-meta" role="presentation">
             <tr>
-                <td class="letterhead-reference">{$reference}</td>
+                <td class="letterhead-subject">{$subjectCode}</td>
                 <td class="letterhead-date">{$date}</td>
             </tr>
         </table>

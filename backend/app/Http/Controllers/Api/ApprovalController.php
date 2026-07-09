@@ -17,13 +17,16 @@ class ApprovalController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user');
+        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject');
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('reference_id', 'like', "%{$search}%")
-                  ->orWhere('subject', 'like', "%{$search}%");
+                  ->orWhere('subject', 'like', "%{$search}%")
+                  ->orWhereHas('sourceLetter.subject', function ($subjectQuery) use ($search) {
+                      $subjectQuery->where('code', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -31,17 +34,20 @@ class ApprovalController extends Controller
             $query->where('status', $request->status);
         }
 
-        $documents = $query->orderBy('created_at', 'desc')->get();
+        $documents = $query->orderBy('created_at', 'desc')->get()
+            ->unique(fn (ApprovableDocument $document) => $document->document_type . ':' . ($document->source_id ?? 'document-' . $document->document_id))
+            ->values()
+            ->map(fn (ApprovableDocument $document) => $this->withSubjectCode($document));
 
         return response()->json(['documents' => $documents]);
     }
 
     public function show(int $id): JsonResponse
     {
-        $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user')
+        $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
             ->findOrFail($id);
 
-        return response()->json(['document' => $document]);
+        return response()->json(['document' => $this->withSubjectCode($document)]);
     }
 
     /**
@@ -67,14 +73,47 @@ class ApprovalController extends Controller
         if (!empty($validated['source_id'])) {
             $existingDocument = ApprovableDocument::where('document_type', $validated['document_type'])
                 ->where('source_id', $validated['source_id'])
-                ->whereIn('status', ['pending', 'approved'])
-                ->with('submitter', 'steps.actionedBy', 'comments.user')
+                ->with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
                 ->first();
 
             if ($existingDocument) {
+                if ($existingDocument->status === 'rejected') {
+                    $existingDocument->update([
+                        'subject' => $validated['subject'],
+                        'description' => $validated['description'] ?? null,
+                        'full_content' => $validated['full_content'] ?? null,
+                        'amount' => $validated['amount'] ?? null,
+                        'submitted_by' => $request->user()->user_id,
+                        'status' => 'pending',
+                        'current_step_order' => 2,
+                    ]);
+
+                    $this->resetWorkflowForResubmission($existingDocument, $request->user()->user_id);
+
+                    if ($existingDocument->document_type === 'letter' && $existingDocument->source_id) {
+                        Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
+                    }
+
+                    return response()->json([
+                        'message' => 'Rejected document resubmitted for approval',
+                        'document' => $this->withSubjectCode(
+                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
+                        ),
+                    ]);
+                }
+
+                if ($existingDocument->document_type === 'letter' && $existingDocument->source_id) {
+                    $letterStatus = match ($existingDocument->status) {
+                        'pending' => 'pending_approval',
+                        'approved' => 'approved',
+                        'rejected' => 'rejected',
+                    };
+                    Letter::where('letter_id', $existingDocument->source_id)->update(['status' => $letterStatus]);
+                }
+
                 return response()->json([
                     'message' => 'Document is already in the approval workflow',
-                    'document' => $existingDocument,
+                    'document' => $this->withSubjectCode($existingDocument),
                 ]);
             }
         }
@@ -95,8 +134,29 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Document submitted for approval',
-            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
         ], 201);
+    }
+
+    private function resetWorkflowForResubmission(ApprovableDocument $document, int $submittedBy): void
+    {
+        $document->steps()->where('step_order', 1)->update([
+            'status' => 'approved',
+            'actioned_by' => $submittedBy,
+            'actioned_at' => now(),
+        ]);
+
+        $document->steps()->where('step_order', 2)->update([
+            'status' => 'pending',
+            'actioned_by' => null,
+            'actioned_at' => null,
+        ]);
+
+        $document->steps()->whereIn('step_order', [3, 4])->update([
+            'status' => 'waiting',
+            'actioned_by' => null,
+            'actioned_at' => null,
+        ]);
     }
 
     /**
@@ -139,7 +199,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Approved',
-            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
         ]);
     }
 
@@ -169,8 +229,18 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Rejected',
-            'document' => $document->load('submitter', 'steps.actionedBy', 'comments.user'),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
         ]);
+    }
+
+    private function withSubjectCode(ApprovableDocument $document): ApprovableDocument
+    {
+        $document->setAttribute(
+            'subject_code',
+            $document->document_type === 'letter' ? $document->sourceLetter?->subject?->code : null
+        );
+
+        return $document;
     }
 
     public function addComment(Request $request, int $id): JsonResponse
