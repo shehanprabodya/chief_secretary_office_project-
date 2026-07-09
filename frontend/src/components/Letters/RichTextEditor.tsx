@@ -16,11 +16,14 @@ import {
 } from 'lucide-react';
 import { useEffect } from 'react';
 
+type HeadingLevel = 1 | 2 | 3;
+
 interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: string;
+  readOnly?: boolean;
 }
 
 const ToolbarButton = ({
@@ -40,7 +43,7 @@ const ToolbarButton = ({
 
 const Divider = () => <div className="mx-1 h-5 w-px bg-slate-300" />;
 
-export default function RichTextEditor({ value, onChange, placeholder = 'Write here...', minHeight = '300px' }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = 'Write here...', minHeight = '300px', readOnly = false }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -54,6 +57,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write h
       Placeholder.configure({ placeholder }),
     ],
     content: value,
+    editable: !readOnly,
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
     editorProps: {
       attributes: {
@@ -68,7 +72,11 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write h
     if (editor && value !== editor.getHTML()) {
       editor.commands.setContent(value);
     }
-  }, [value]);
+  }, [editor, value]);
+
+  useEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
   if (!editor) return null;
 
@@ -82,9 +90,9 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write h
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+    <div className={`overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 ${readOnly ? 'bg-slate-50' : ''}`}>
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-slate-50 px-2 py-1.5">
+      {!readOnly && <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-slate-50 px-2 py-1.5">
         {/* Text format */}
         <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold">
           <Bold className="h-4 w-4" />
@@ -150,7 +158,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write h
             onChange={(e) => {
               const val = e.target.value;
               if (val === 'normal') editor.chain().focus().setParagraph().run();
-              else editor.chain().focus().setHeading({ level: parseInt(val) as any }).run();
+              else editor.chain().focus().setHeading({ level: Number(val) as HeadingLevel }).run();
             }}
             className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:outline-none"
           >
@@ -160,7 +168,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write h
             <option value="3">Heading 3</option>
           </select>
         </div>
-      </div>
+      </div>}
 
       {/* Editor Area */}
       <EditorContent editor={editor} />

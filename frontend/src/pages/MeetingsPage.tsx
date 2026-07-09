@@ -234,7 +234,6 @@ export default function MeetingsPage() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-6 py-3">Letter Title</th>
-                <th className="px-6 py-3">Subject Code</th>
                 <th className="px-6 py-3">Subject Title</th>
                 <th className="px-6 py-3">Letter Date</th>
                 <th className="px-6 py-3">Status</th>
@@ -244,13 +243,13 @@ export default function MeetingsPage() {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400">
                     Loading letters...
                   </td>
                 </tr>
               ) : filteredLetters.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400">
                     No letters found for the selected filters.
                   </td>
                 </tr>
@@ -268,9 +267,6 @@ export default function MeetingsPage() {
                       >
                         {formatLetterTitle(letter.title)}
                       </button>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      {letter.subject?.code || letter.meeting_code || '—'}
                     </td>
                     <td className="px-6 py-4">
                       <p className="max-w-72 truncate text-sm text-slate-700">{letter.subject?.title || '—'}</p>

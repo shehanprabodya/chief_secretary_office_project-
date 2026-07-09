@@ -5,9 +5,10 @@ interface PreviewModalProps {
   html: string;
   letterId: number;
   onClose: () => void;
+  allowExports?: boolean;
 }
 
-export default function PreviewModal({ html, letterId, onClose }: PreviewModalProps) {
+export default function PreviewModal({ html, letterId, onClose, allowExports = true }: PreviewModalProps) {
   const handleDownloadPdf = async () => {
     await letterService.downloadPdf(letterId);
   };
@@ -49,24 +50,28 @@ export default function PreviewModal({ html, letterId, onClose }: PreviewModalPr
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 className="text-lg font-bold text-slate-900">Letter Preview</h2>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleDownloadPdf}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Download className="h-4 w-4" /> Download PDF
-            </button>
-            <button
-              onClick={handleDownloadDocx}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <FileText className="h-4 w-4" /> Download DOCX
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Printer className="h-4 w-4" /> Print
-            </button>
+            {allowExports && (
+              <>
+                <button
+                  onClick={handleDownloadPdf}
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Download className="h-4 w-4" /> Download PDF
+                </button>
+                <button
+                  onClick={handleDownloadDocx}
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <FileText className="h-4 w-4" /> Download DOCX
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Printer className="h-4 w-4" /> Print
+                </button>
+              </>
+            )}
             <button onClick={onClose} className="rounded-full p-1.5 hover:bg-slate-100">
               <X className="h-5 w-5 text-slate-500" />
             </button>

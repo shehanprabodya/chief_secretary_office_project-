@@ -11,6 +11,7 @@ import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import PreviewModal from '../components/Letters/PreviewModal';
 import { letterService } from '../services/letterService';
 import { approvalService } from '../services/approvalService';
+import { useAuth } from '../context/AuthContext';
 import type {  Organization, Subject, RecipientTag, LetterStatus } from '../types/letter';
 import type { ApprovableDocument, ApprovalStep } from '../types/approval';
 
@@ -106,6 +107,7 @@ function StatusStep({ item, index, isLast }: {
 export default function GenerateLetterPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Form state
   const [letterId, setLetterId] = useState<number | null>(id ? Number(id) : null);
@@ -117,6 +119,7 @@ export default function GenerateLetterPage() {
   const [signatoryName, setSignatoryName] = useState('');
   const [signatureDate, setSignatureDate] = useState('');
   const [recipients, setRecipients] = useState<RecipientTag[]>([]);
+  const [letterOwnerId, setLetterOwnerId] = useState<number | null>(id ? null : Number(user?.id ?? 0));
 
   // Data
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -132,6 +135,9 @@ export default function GenerateLetterPage() {
   const [approvalDocument, setApprovalDocument] = useState<ApprovableDocument | null>(null);
   const [isStatusLoading, setIsStatusLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('unsaved');
+  const isExistingLetter = Boolean(id);
+  const canEditLetter = !isExistingLetter || (letterOwnerId !== null && String(letterOwnerId) === user?.id);
+  const isReadOnly = !canEditLetter;
 
   const refreshStatus = useCallback(async (idToRefresh: number, silent = false) => {
     if (!silent) setIsStatusLoading(true);
@@ -164,6 +170,7 @@ export default function GenerateLetterPage() {
     if (!id) return;
     letterService.getById(Number(id)).then((letter) => {
       setLetterId(letter.letter_id);
+      setLetterOwnerId(letter.created_by);
       setLetterStatus(letter.status);
       setSubjectId(letter.subject_id);
       setTitle(letter.title);
@@ -233,6 +240,7 @@ export default function GenerateLetterPage() {
   }), [content, designation, letterId, recipients, signatoryName, signatureDate, subjectId, title]);
 
   const handleSaveDraft = useCallback(async (silent = false) => {
+    if (!canEditLetter) return;
     if (!silent) setIsSaving(true);
     setSaveStatus('saving');
     try {
@@ -252,18 +260,20 @@ export default function GenerateLetterPage() {
     } finally {
       if (!silent) setIsSaving(false);
     }
-  }, [buildPayload, navigate]);
+  }, [buildPayload, canEditLetter, navigate]);
 
   // Auto-save draft every 30 seconds if there's content
   useEffect(() => {
+    if (!canEditLetter) return;
     if (!content && !title) return;
     const timer = setTimeout(() => {
       handleSaveDraft(true);
     }, 30000);
     return () => clearTimeout(timer);
-  }, [content, handleSaveDraft, title]);
+  }, [canEditLetter, content, handleSaveDraft, title]);
 
   const handleGenerate = async () => {
+    if (!canEditLetter) return;
     setIsGenerating(true);
     try {
       const saved = await letterService.saveDraft(buildPayload());
@@ -289,6 +299,13 @@ export default function GenerateLetterPage() {
       return;
     }
     try {
+      if (!canEditLetter) {
+        const result = await letterService.preview(letterId);
+        setPreviewHtml(result.preview_html);
+        setShowPreview(true);
+        return;
+      }
+
       const saved = await letterService.saveDraft(buildPayload());
       setLetterId(saved.letter_id);
       setLetterStatus(saved.status);
@@ -327,6 +344,7 @@ export default function GenerateLetterPage() {
   };
 
   const handleDownloadPdf = async () => {
+    if (!canEditLetter) return;
     if (!letterId) { alert('Save the draft first'); return; }
     try {
       const saved = await letterService.saveDraft(buildPayload());
@@ -340,6 +358,7 @@ export default function GenerateLetterPage() {
   };
 
   const handleDownloadDocx = async () => {
+    if (!canEditLetter) return;
     if (!letterId) { alert('Save the draft first'); return; }
     try {
       const saved = await letterService.saveDraft(buildPayload());
@@ -353,6 +372,7 @@ export default function GenerateLetterPage() {
   };
 
   const handleSendForApproval = async () => {
+    if (!canEditLetter) return;
     setIsSendingApproval(true);
     try {
       const saved = await letterService.saveDraft(buildPayload());
@@ -385,6 +405,7 @@ export default function GenerateLetterPage() {
   };
 
   const handleDiscard = async () => {
+    if (!canEditLetter) return;
     if (!confirm('Discard this draft? This cannot be undone.')) return;
     navigate('/meetings');
   };
@@ -404,33 +425,43 @@ export default function GenerateLetterPage() {
 
           {/* Top Action Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleSaveDraft()}
-              disabled={isSaving}
-              className="flex w-36 items-center gap-2  border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Save Draft'}
-            </button>
+            {canEditLetter && (
+              <button
+                onClick={() => handleSaveDraft()}
+                disabled={isSaving}
+                className="flex w-36 items-center gap-2  border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {isSaving ? 'Saving...' : 'Save Draft'}
+              </button>
+            )}
             <button
               onClick={handlePreview}
               className="flex w-36 items-center gap-2  border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
             >
               <Eye className="h-4 w-4" /> Preview
             </button>
-            <button
-              onClick={handlePrint}
-              className="flex-1 flex items-center gap-2 border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
-            >
-              <Printer className="h-4 w-4" /> Print
-            </button>
+            {canEditLetter && (
+              <button
+                onClick={handlePrint}
+                className="flex-1 flex items-center gap-2 border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+              >
+                <Printer className="h-4 w-4" /> Print
+              </button>
+            )}
           </div>
         </div>
 
         {/* Auto-save indicator */}
-        <p className="text-xs text-slate-400">
-          {saveStatus === 'saving' ? '⏳ Saving...' : saveStatus === 'saved' ? '✓ Draft saved' : '● Unsaved changes'}
-        </p>
+        {canEditLetter ? (
+          <p className="text-xs text-slate-400">
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Draft saved' : 'Unsaved changes'}
+          </p>
+        ) : (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            Preview only. This letter was created by another officer and cannot be edited from your account.
+          </p>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
           {/* Main Form  */}
@@ -449,6 +480,7 @@ export default function GenerateLetterPage() {
                 <select
                   value={subjectId ?? ''}
                   onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
+                  disabled={isReadOnly}
                   className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   title="Select Subject Code"
                 >
@@ -469,6 +501,7 @@ export default function GenerateLetterPage() {
                   organizations={organizations}
                   recipients={recipients}
                   onChange={setRecipients}
+                  readOnly={isReadOnly}
                 />
               </div>
             </div>
@@ -483,6 +516,7 @@ export default function GenerateLetterPage() {
                 onChange={setTitle}
                 placeholder="Enter letter title here..."
                 minHeight="80px"
+                readOnly={isReadOnly}
               />
             </div>
 
@@ -496,6 +530,7 @@ export default function GenerateLetterPage() {
                 onChange={setContent}
                 placeholder="Write the main body of the letter here..."
                 minHeight="350px"
+                readOnly={isReadOnly}
               />
             </div>
 
@@ -510,6 +545,7 @@ export default function GenerateLetterPage() {
                     type="text"
                     value={designation}
                     onChange={(e) => setDesignation(e.target.value)}
+                    readOnly={isReadOnly}
                     placeholder="Chief Secretary"
                     className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none"
                   />
@@ -533,6 +569,7 @@ export default function GenerateLetterPage() {
                     type="text"
                     value={actingAuthority}
                     onChange={(e) => setActingAuthority(e.target.value)}
+                    readOnly={isReadOnly}
                     placeholder="e.g. Acting Director, Head of Division"
                     className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none"
                   />
@@ -547,6 +584,7 @@ export default function GenerateLetterPage() {
                       type="text"
                       value={signatoryName}
                       onChange={(e) => setSignatoryName(e.target.value)}
+                      readOnly={isReadOnly}
                       placeholder="Enter full name"
                       className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none"
                     />
@@ -559,6 +597,7 @@ export default function GenerateLetterPage() {
                       type="date"
                       value={signatureDate}
                       onChange={(e) => setSignatureDate(e.target.value)}
+                      disabled={isReadOnly}
                       className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:border-blue-500 focus:bg-white focus:outline-none"
                     />
                   </div>
@@ -575,46 +614,57 @@ export default function GenerateLetterPage() {
                 <span className="text-slate-400">⚡</span> Execution
               </h3>
               <div className="flex flex-col gap-3">
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  <Play className="h-4 w-4" />
-                  {isGenerating ? 'Generating...' : 'Generate Letter'}
-                </button>
-                <button
-                  onClick={handleSendForApproval}
-                  disabled={isSendingApproval}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-60"
-                >
-                  <Send className="h-4 w-4" />
-                  {isSendingApproval ? 'Sending...' : 'Send for Approval'}
-                </button>
-              
-                <button
-                  onClick={handleDownloadPdf}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-200 py-2.5 text-sm font-medium text-teal hover:bg-teal-500"
-                >
-                  <Download className="h-4 w-4" /> Download PDF
-                </button>
-                <button
-                  onClick={handleDownloadDocx}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-100 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-200"
-                >
-                  <FileText className="h-4 w-4" /> Download DOCX
-                </button>
-                <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate- hover:opacity-90 disabled:opacity-50"
-                  title="Revision history - coming soon"
-                >
-                  <History className="h-4 w-4" /> Revision History
-                </button>
-                <button
-                  onClick={handleDiscard}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400 bg-red-50 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100"
-                >
-                  <Trash2 className="h-4 w-4" /> Discard Draft
-                </button>
+                {canEditLetter ? (
+                  <>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={isGenerating}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      <Play className="h-4 w-4" />
+                      {isGenerating ? 'Generating...' : 'Generate Letter'}
+                    </button>
+                    <button
+                      onClick={handleSendForApproval}
+                      disabled={isSendingApproval}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-60"
+                    >
+                      <Send className="h-4 w-4" />
+                      {isSendingApproval ? 'Sending...' : 'Send for Approval'}
+                    </button>
+                  
+                    <button
+                      onClick={handleDownloadPdf}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-200 py-2.5 text-sm font-medium text-teal hover:bg-teal-500"
+                    >
+                      <Download className="h-4 w-4" /> Download PDF
+                    </button>
+                    <button
+                      onClick={handleDownloadDocx}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-100 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-200"
+                    >
+                      <FileText className="h-4 w-4" /> Download DOCX
+                    </button>
+                    <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate- hover:opacity-90 disabled:opacity-50"
+                      title="Revision history - coming soon"
+                    >
+                      <History className="h-4 w-4" /> Revision History
+                    </button>
+                    <button
+                      onClick={handleDiscard}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400 bg-red-50 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100"
+                    >
+                      <Trash2 className="h-4 w-4" /> Discard Draft
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handlePreview}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white hover:opacity-90"
+                  >
+                    <Eye className="h-4 w-4" /> Preview Letter
+                  </button>
+                )}
               </div>
             </div>
 
@@ -636,11 +686,6 @@ export default function GenerateLetterPage() {
                   />
                 ))}
               </div>
-              {approvalDocument?.reference_id && (
-                <p className="mt-4 rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-500">
-                  Approval ref: <span className="font-semibold text-slate-700">{approvalDocument.reference_id}</span>
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -651,6 +696,7 @@ export default function GenerateLetterPage() {
         <PreviewModal
           html={previewHtml}
           letterId={letterId!}
+          allowExports={canEditLetter}
           onClose={() => setShowPreview(false)}
         />
       )}

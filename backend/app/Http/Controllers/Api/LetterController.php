@@ -172,12 +172,17 @@ class LetterController extends Controller
         };
     }
 
+    private function canModifyLetter(Request $request, Letter $letter): bool
+    {
+        return (int) $letter->created_by === (int) $request->user()->user_id;
+    }
+
     /**
      * Generate the letter — builds the formatted letter HTML from stored data.
      * This is what "Generate Letter" button calls.
      * Returns structured letter content ready for preview/PDF/DOCX.
      */
-    public function generate(int $id): JsonResponse
+    public function generate(Request $request, int $id): JsonResponse
     {
         $letter = Letter::with(
             'recipients.organization',
@@ -186,6 +191,10 @@ class LetterController extends Controller
             'meeting',
             'creator'
         )->findOrFail($id);
+
+        if (!$this->canModifyLetter($request, $letter)) {
+            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        }
 
         if (empty($letter->content)) {
             return response()->json(['message' => 'Letter content is empty. Please write the letter body first.'], 422);
@@ -223,7 +232,7 @@ class LetterController extends Controller
      * Download as PDF — returns base64 encoded PDF
      * (Uses a simple HTML-to-PDF approach; swap with wkhtmltopdf/Dompdf if needed)
      */
-    public function downloadPdf(int $id): \Symfony\Component\HttpFoundation\Response
+    public function downloadPdf(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $letter = Letter::with(
             'recipients.organization',
@@ -231,6 +240,10 @@ class LetterController extends Controller
             'subject',
             'creator'
         )->findOrFail($id);
+
+        if (!$this->canModifyLetter($request, $letter)) {
+            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        }
 
         $html = $this->buildLetterHtml($letter, true); // true = include full page CSS
         $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
@@ -266,7 +279,7 @@ class LetterController extends Controller
     /**
      * Download as Microsoft Word DOCX.
      */
-    public function downloadDocx(int $id): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function downloadDocx(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $letter = Letter::with(
             'recipients.organization',
@@ -274,6 +287,10 @@ class LetterController extends Controller
             'subject',
             'creator'
         )->findOrFail($id);
+
+        if (!$this->canModifyLetter($request, $letter)) {
+            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        }
 
         $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.docx';
         $html = $this->buildLetterHtml($letter, true);
@@ -615,10 +632,6 @@ class LetterController extends Controller
             ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
             : now()->format('Y.m.d');
 
-        $reference = $letter->subject?->code
-            ?? $letter->meeting_code
-            ?? 'CSS/4/3/77';
-
         $recipientsHtml = $letter->recipients->map(function ($r) {
             if ($r->recipient_label) {
                 return e($r->recipient_label);
@@ -696,7 +709,7 @@ class LetterController extends Controller
                 }
 
                 .letterhead-meta td {
-                    width: 50%;
+                    width: 100%;
                     padding: 0;
                     vertical-align: top;
                 }
@@ -754,7 +767,6 @@ class LetterController extends Controller
     <div class="letter-page">
         <table class="letterhead-meta" role="presentation">
             <tr>
-                <td class="letterhead-reference">{$reference}</td>
                 <td class="letterhead-date">{$date}</td>
             </tr>
         </table>
