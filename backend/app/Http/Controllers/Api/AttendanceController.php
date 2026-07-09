@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ApprovableDocument;
 use App\Models\AttendanceRecord;
+use App\Models\Letter;
 use App\Models\Meeting;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -83,55 +84,100 @@ class AttendanceController extends Controller
      */
     public function showByLetter(Request $request, int $letterId): JsonResponse
     {
-        $approvedDocument = ApprovableDocument::where('document_type', 'letter')
+        $letter = Letter::with('subject')
+            ->where('letter_id', $letterId)
             ->where('status', 'approved')
-            ->whereHas('sourceLetter', function ($letterQuery) use ($letterId) {
-                $letterQuery->where('letter_id', $letterId)
-                    ->whereNotNull('meeting_id');
-            })
-            ->with('sourceLetter')
-            ->latest('document_id')
             ->first();
 
-        if (!$approvedDocument?->sourceLetter?->meeting_id) {
+        $meeting = null;
+
+        if ($letter?->meeting_id) {
+            $meeting = Meeting::find($letter->meeting_id);
+        } elseif ($letter?->meeting_code) {
+            $meeting = Meeting::where('meeting_code', $letter->meeting_code)->first();
+        }
+
+        if (!$letter) {
             return response()->json([
                 'message' => 'Attendance can be opened only after the meeting letter is fully approved.',
             ], 422);
         }
 
+        if (!$meeting && !$letter->meeting_code && !$letter->subject?->code) {
+            return response()->json([
+                'message' => 'Attendance can be opened only after the approved letter is linked to a subject or meeting.',
+            ], 422);
+        }
+
+        if (!$meeting) {
+            $meeting = $this->createAttendanceMeetingForLetter($letter);
+        }
+
+        if ((int) $letter->meeting_id !== (int) $meeting->meeting_id || $letter->meeting_code !== $meeting->meeting_code) {
+            $letter->update([
+                'meeting_id' => $meeting->meeting_id,
+                'meeting_code' => $meeting->meeting_code,
+            ]);
+        }
+
         $request->merge(['letter_id' => $letterId]);
 
-        return $this->show($request, $approvedDocument->sourceLetter->meeting_id);
+        return $this->show($request, $meeting->meeting_id);
+    }
+
+    private function createAttendanceMeetingForLetter(Letter $letter): Meeting
+    {
+        $meetingCode = $letter->meeting_code ?: $letter->subject?->code;
+        $title = trim(strip_tags($letter->title ?: '')) ?: ($letter->subject?->title ?? 'Approved letter attendance');
+        $meetingDate = $letter->signature_date
+            ?: optional($letter->created_at)->toDateString()
+            ?: now()->toDateString();
+
+        return Meeting::firstOrCreate(
+            ['meeting_code' => $meetingCode],
+            [
+                'title' => $title,
+                'meeting_date' => $meetingDate,
+                'start_time' => null,
+                'end_time' => null,
+                'location' => null,
+                'location_type' => 'not_assigned',
+                'status' => 'scheduled',
+                'description' => 'Attendance record created from approved letter #' . $letter->letter_id,
+                'created_by' => $letter->created_by,
+            ]
+        );
     }
 
     public function show(Request $request, int $meetingId): JsonResponse
     {
         $meeting = Meeting::findOrFail($meetingId);
         $letterId = $request->integer('letter_id');
-        $approvedDocumentQuery = ApprovableDocument::where('document_type', 'letter')
-            ->where('status', 'approved')
-            ->whereHas('sourceLetter', function ($letterQuery) use ($meetingId, $letterId) {
-                $letterQuery->where('meeting_id', $meetingId);
-
-                if ($letterId) {
-                    $letterQuery->where('letter_id', $letterId);
-                }
-            })
+        $approvedLetterQuery = Letter::where('status', 'approved')
             ->with([
-                'sourceLetter.recipients.user.organization',
-                'sourceLetter.recipients.organization',
+                'recipients.user.organization',
+                'recipients.organization',
             ])
-            ->latest('document_id');
+            ->latest('letter_id');
 
-        $approvedDocument = $approvedDocumentQuery->first();
+        if ($letterId) {
+            $approvedLetterQuery
+                ->where('letter_id', $letterId)
+                ->where(function ($query) use ($meeting) {
+                    $query->where('meeting_id', $meeting->meeting_id)
+                        ->orWhere('meeting_code', $meeting->meeting_code);
+                });
+        } else {
+            $approvedLetterQuery->where('meeting_id', $meetingId);
+        }
 
-        if (!$approvedDocument?->sourceLetter) {
+        $approvedLetter = $approvedLetterQuery->first();
+
+        if (!$approvedLetter) {
             return response()->json([
                 'message' => 'Attendance can be opened only after the meeting letter is fully approved.',
             ], 422);
         }
-
-        $approvedLetter = $approvedDocument->sourceLetter;
 
         $existingRecords = AttendanceRecord::where('meeting_id', $meetingId)
             ->with('user.organization', 'user.role')

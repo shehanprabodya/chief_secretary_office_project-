@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Filter, Download, BarChart3, Info, ArrowLeft } from 'lucide-react';
+import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { attendanceService } from '../services/attendanceService';
 import type {
@@ -54,7 +55,10 @@ export default function AttendancePage() {
       console.error('Failed to fetch attendance sheet:', err);
       setSheet(null);
       setParticipants([]);
-      setAttendanceError('Failed to load attendance records for the selected meeting.');
+      const message = axios.isAxiosError<{ message?: string }>(err)
+        ? err.response?.data?.message
+        : null;
+      setAttendanceError(message ?? 'Failed to load attendance records for the selected meeting letter.');
     } finally {
       setIsLoadingSheet(false);
     }
