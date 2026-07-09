@@ -37,6 +37,8 @@ const STATUS_BADGE: Record<string, { label: string; className: string; dotClassN
   },
 };
 
+const LETTERS_PER_PAGE = 10;
+
 export default function MeetingsPage() {
   const navigate = useNavigate();
   const [letters, setLetters] = useState<Letter[]>([]);
@@ -48,6 +50,7 @@ export default function MeetingsPage() {
   const [endDate, setEndDate] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadLetters = useCallback(async () => {
     setIsLoading(true);
@@ -88,6 +91,11 @@ export default function MeetingsPage() {
       return matchesCode && matchesTitle && matchesStart && matchesEnd;
     });
   }, [letters, subjectCode, subjectTitle, startDate, endDate]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredLetters.length / LETTERS_PER_PAGE));
+  const activePage = Math.min(currentPage, pageCount);
+  const pageStart = (activePage - 1) * LETTERS_PER_PAGE;
+  const paginatedLetters = filteredLetters.slice(pageStart, pageStart + LETTERS_PER_PAGE);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
@@ -145,7 +153,10 @@ export default function MeetingsPage() {
               <label className="mb-1.5 block text-xs font-medium text-slate-600">Subject Code</label>
               <select
                 value={subjectCode}
-                onChange={(e) => setSubjectCode(e.target.value)}
+                onChange={(e) => {
+                  setSubjectCode(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="">All Subject Codes</option>
@@ -161,7 +172,10 @@ export default function MeetingsPage() {
               <label className="mb-1.5 block text-xs font-medium text-slate-600">Subject Title</label>
               <select
                 value={subjectTitle}
-                onChange={(e) => setSubjectTitle(e.target.value)}
+                onChange={(e) => {
+                  setSubjectTitle(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="">All Subject Titles</option>
@@ -179,14 +193,20 @@ export default function MeetingsPage() {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
                 <span className="text-slate-400">/</span>
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </div>
@@ -195,7 +215,10 @@ export default function MeetingsPage() {
             <div className="flex items-end">
               <button
                 type="button"
-                onClick={loadLetters}
+                onClick={() => {
+                  setCurrentPage(1);
+                  loadLetters();
+                }}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-500 text-sm font-medium text-white hover:bg-blue-800"
               >
                <Funnel className='h-4 w-4 shrink-0' />
@@ -232,7 +255,7 @@ export default function MeetingsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredLetters.map((letter) => (
+                paginatedLetters.map((letter) => (
                   <tr
                     key={letter.letter_id}
                     className="hover:bg-blue-50/60"
@@ -283,9 +306,41 @@ export default function MeetingsPage() {
 
           <div className="flex items-center justify-between bg-slate-100 border-t border-slate-200 px-6 py-3">
             <p className="text-sm text-slate-500">
-              Showing {filteredLetters.length} letters
+              Showing {filteredLetters.length === 0 ? 0 : pageStart + 1}
+              -{Math.min(pageStart + paginatedLetters.length, filteredLetters.length)} of {filteredLetters.length} letters
             </p>
-            <p className="text-xs text-slate-400">Click a row to open the letter.</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={activePage === 1}
+                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
+              >
+                Previous
+              </button>
+              {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  className={`h-8 min-w-8 rounded border px-2 text-xs font-semibold ${
+                    page === activePage
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+                disabled={activePage === pageCount}
+                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>
