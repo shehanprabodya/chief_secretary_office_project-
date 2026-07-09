@@ -632,6 +632,8 @@ class LetterController extends Controller
             ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
             : now()->format('Y.m.d');
 
+        $subjectCode = e($letter->subject?->code ?? $letter->meeting_code ?? '');
+
         $recipientsHtml = $letter->recipients->map(function ($r) {
             if ($r->recipient_label) {
                 return e($r->recipient_label);
@@ -709,7 +711,7 @@ class LetterController extends Controller
                 }
 
                 .letterhead-meta td {
-                    width: 100%;
+                    width: 50%;
                     padding: 0;
                     vertical-align: top;
                 }
@@ -767,6 +769,7 @@ class LetterController extends Controller
     <div class="letter-page">
         <table class="letterhead-meta" role="presentation">
             <tr>
+                <td class="letterhead-subject">{$subjectCode}</td>
                 <td class="letterhead-date">{$date}</td>
             </tr>
         </table>
