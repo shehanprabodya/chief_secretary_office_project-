@@ -33,6 +33,7 @@ export default function AttendancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
   const isViewOnly = searchParams.get('mode') === 'view';
+  const showLetterSelector = !canLoadAttendance || isViewOnly;
   const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
 
   const loadLetters = useCallback(async (term = '') => {
@@ -175,35 +176,39 @@ export default function AttendancePage() {
           </div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <label htmlFor="meeting-letter" className="mb-2 block text-sm font-semibold text-slate-700">
-            Select Meeting Letter
-          </label>
-          <select
-            id="meeting-letter"
-            value={isViewOnly && selectedLetterId ? selectedLetterId : ''}
-            onChange={(event) => {
-              const letterId = Number(event.target.value);
-              if (letterId) navigate(`/attendance?letter_id=${letterId}&mode=view`);
-            }}
-            disabled={isLoadingLetters}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
-          >
-            <option value="">{isLoadingLetters ? 'Loading meeting letters...' : 'Choose an approved meeting letter'}</option>
-            {letters.map((letter) => (
-              <option key={letter.letter_id} value={letter.letter_id}>
-                {letter.letter_title} — {letter.subject_code ?? letter.subject_title ?? letter.meeting_title}
-              </option>
-            ))}
-          </select>
+          {showLetterSelector && (
+            <>
+              <label htmlFor="meeting-letter" className="mb-2 block text-sm font-semibold text-slate-700">
+                Select Meeting Letter
+              </label>
+              <select
+                id="meeting-letter"
+                value={isViewOnly && selectedLetterId ? selectedLetterId : ''}
+                onChange={(event) => {
+                  const letterId = Number(event.target.value);
+                  if (letterId) navigate(`/attendance?letter_id=${letterId}&mode=view`);
+                }}
+                disabled={isLoadingLetters}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
+              >
+                <option value="">{isLoadingLetters ? 'Loading meeting letters...' : 'Choose an approved meeting letter'}</option>
+                {letters.map((letter) => (
+                  <option key={letter.letter_id} value={letter.letter_id}>
+                    {letter.letter_title} — {letter.subject_code ?? letter.subject_title ?? letter.meeting_title}
+                  </option>
+                ))}
+              </select>
 
-          {letterError && <p className="mt-3 text-sm text-red-600">{letterError}</p>}
+              {letterError && <p className="mt-3 text-sm text-red-600">{letterError}</p>}
 
-          {!isLoadingLetters && letters.length === 0 && (
-            <p className="mt-3 text-sm text-slate-400">No approved meeting letters found.</p>
+              {!isLoadingLetters && letters.length === 0 && (
+                <p className="mt-3 text-sm text-slate-400">No approved meeting letters found.</p>
+              )}
+            </>
           )}
 
           {canLoadAttendance && (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className={`grid gap-4 sm:grid-cols-3 ${showLetterSelector ? 'mt-5' : ''}`}>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meeting</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{sheet?.meeting.title ?? 'Loading meeting...'}</p>
