@@ -1,19 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Download, BarChart3, Info, ArrowLeft } from 'lucide-react';
+import { Search, Download, BarChart3, Info, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { attendanceService } from '../services/attendanceService';
-import type {
-  AttendanceSheet,
-  AttendanceStatus,
-  AttendanceParticipant,
-} from '../types/attendance';
+import type { AttendanceSheet, AttendanceStatus, AttendanceParticipant, ApprovedMeetingLetter } from '../types/attendance';
 
-const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string; icon: string }> = {
-  present: { label: 'Present', activeClasses: 'bg-white text-slate-900 border-slate-900 shadow-sm', icon: '✓' },
-  absent: { label: 'Absent', activeClasses: 'bg-red-600 text-white border-red-600', icon: '✕' },
-  excused: { label: 'Excused', activeClasses: 'bg-orange-500 text-white border-orange-500', icon: 'i' },
+const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string;}> = {
+  present: { label: 'Present', activeClasses: 'bg-green-500 text-white border-green-500 ' },
+  absent: { label: 'Absent', activeClasses: 'bg-red-600 text-white border-red-600'},
+  excused: { label: 'Excused', activeClasses: 'bg-orange-500 text-white border-orange-500' },
 };
 
 function getInitials(name: string) {
@@ -28,12 +24,39 @@ export default function AttendancePage() {
   const [sheet, setSheet] = useState<AttendanceSheet | null>(null);
   const [participants, setParticipants] = useState<AttendanceParticipant[]>([]);
   const [search, setSearch] = useState('');
+  const [letterSearch, setLetterSearch] = useState('');
+  const [isLetterDropdownOpen, setIsLetterDropdownOpen] = useState(false);
+  const [letters, setLetters] = useState<ApprovedMeetingLetter[]>([]);
+  const [isLoadingLetters, setIsLoadingLetters] = useState(false);
+  const [letterError, setLetterError] = useState('');
   const [isLoadingSheet, setIsLoadingSheet] = useState(false);
   const [attendanceError, setAttendanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
+  const isViewOnly = searchParams.get('mode') === 'view';
+  const showLetterSelector = !canLoadAttendance || isViewOnly;
   const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
+  const matchingLetters = letters.filter((letter) => {
+    const term = letterSearch.trim().toLowerCase();
+    if (!term) return true;
+    return [letter.letter_title, letter.meeting_title, letter.subject_code, letter.subject_title]
+      .some((value) => value?.toLowerCase().includes(term));
+  });
+
+  const loadLetters = useCallback(async (term = '') => {
+    setIsLoadingLetters(true);
+    setLetterError('');
+    try {
+      setLetters(await attendanceService.getApprovedMeetingLetters(term));
+    } catch (err) {
+      console.error('Failed to fetch approved meeting letters:', err);
+      setLetters([]);
+      setLetterError('Failed to load approved meeting letters.');
+    } finally {
+      setIsLoadingLetters(false);
+    }
+  }, []);
 
   const fetchSheet = useCallback(async () => {
     if (!selectedMeetingId && !selectedLetterId) {
@@ -48,7 +71,7 @@ export default function AttendancePage() {
     try {
       const result = selectedMeetingId
         ? await attendanceService.getSheet(selectedMeetingId, selectedLetterId ?? undefined)
-        : await attendanceService.getSheetByLetter(selectedLetterId);
+        : await attendanceService.getSheetByLetter(selectedLetterId!);
       setSheet(result);
       setParticipants(result.participants);
     } catch (err) {
@@ -69,19 +92,32 @@ export default function AttendancePage() {
     fetchSheet();
   }, [fetchSheet]);
 
+  useEffect(() => {
+    loadLetters();
+  }, [loadLetters]);
+
+  useEffect(() => {
+    if (!isViewOnly || !selectedLetterId) return;
+    const selectedLetter = letters.find((letter) => letter.letter_id === selectedLetterId);
+    if (selectedLetter) setLetterSearch(selectedLetter.letter_title);
+  }, [isViewOnly, letters, selectedLetterId]);
+
   const handleStatusChange = (userId: number, status: AttendanceStatus) => {
-    setParticipants((prev) =>
-      prev.map((p) => (p.user_id === userId ? { ...p, status } : p))
+    if (isViewOnly) return;
+    setParticipants((previous) =>
+      previous.map((participant) =>
+        participant.user_id === userId ? { ...participant, status } : participant
+      )
     );
   };
 
   const handleSaveDraft = async () => {
-    if (!activeMeetingId) return;
+    if (!activeMeetingId || isViewOnly) return;
     setIsSaving(true);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((p) => ({ user_id: p.user_id, status: p.status }))
+        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
       );
     } finally {
       setIsSaving(false);
@@ -89,12 +125,12 @@ export default function AttendancePage() {
   };
 
   const handleSubmitAttendance = async () => {
-    if (!activeMeetingId) return;
+    if (!activeMeetingId || isViewOnly) return;
     setIsSubmitting(true);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((p) => ({ user_id: p.user_id, status: p.status }))
+        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
       );
       await attendanceService.submit(activeMeetingId);
       await fetchSheet();
@@ -124,56 +160,108 @@ export default function AttendancePage() {
       <div className="flex flex-col gap-6">
         {/* Header + Live Stats */}
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+          <div className="w-full max-w-2xl flex-1">
             <h1 className="text-2xl font-bold text-slate-900">Attendance Tracking</h1>
-            <p className="mt-1 max-w-xl text-sm text-slate-500">
-              Real-time attendance management for official ministerial and departmental meetings.
-            </p>
+
+            {showLetterSelector && (
+              <div className="mt-5">
+                <label htmlFor="meeting-letter" className="mb-2 block text-sm font-semibold text-slate-700">
+                  Select Meeting Letter
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    id="meeting-letter"
+                    type="text"
+                    value={letterSearch}
+                    onChange={(event) => {
+                      setLetterSearch(event.target.value);
+                      setIsLetterDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsLetterDropdownOpen(true)}
+                    onBlur={() => window.setTimeout(() => setIsLetterDropdownOpen(false), 150)}
+                    placeholder={isLoadingLetters ? 'Loading meeting letters...' : 'Type to search meeting letters...'}
+                    disabled={isLoadingLetters}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-expanded={isLetterDropdownOpen}
+                    aria-controls="meeting-letter-options"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setIsLetterDropdownOpen((open) => !open)}
+                    className="absolute right-2 top-1.5 rounded p-1.5 text-slate-400 hover:bg-slate-100"
+                    aria-label="Toggle meeting letter options"
+                  >
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isLetterDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isLetterDropdownOpen && !isLoadingLetters && (
+                    <div id="meeting-letter-options" role="listbox" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                      {matchingLetters.length === 0 ? (
+                        <p className="px-4 py-3 text-sm text-slate-400">No matching meeting letters found.</p>
+                      ) : matchingLetters.map((letter) => (
+                        <button
+                          key={letter.letter_id}
+                          type="button"
+                          role="option"
+                          aria-selected={selectedLetterId === letter.letter_id}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setLetterSearch(letter.letter_title);
+                            setIsLetterDropdownOpen(false);
+                            navigate(`/attendance?letter_id=${letter.letter_id}&mode=view`);
+                          }}
+                          className={`block w-full px-4 py-2.5 text-left hover:bg-blue-50 ${selectedLetterId === letter.letter_id ? 'bg-blue-50' : ''}`}
+                        >
+                          <span className="block truncate text-sm font-semibold text-slate-900">{letter.letter_title}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {letter.subject_code ? `${letter.subject_code} · ` : ''}{letter.subject_title ?? letter.meeting_title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {letterError && <p className="mt-3 text-sm text-red-600">{letterError}</p>}
+
+                {!isLoadingLetters && letters.length === 0 && (
+                  <p className="mt-3 text-sm text-slate-400">No approved meeting letters found.</p>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className=" flex flex-col gap-6 w-full max-w-xs rounded-xl bg-[var(--color-primary)] p-5 text-white">
+          <div className=" flex flex-col gap-6 w-full max-w-xs rounded-xl bg-slate-800 p-5 text-black">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Live Statistics</p>
-              <BarChart3 className="h-5 w-5 text-white/40" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-white">Live Statistics</p>
+              <BarChart3 className="h-5 w-5 text-white" />
             </div>
-            <p className="text-4xl font-bold">
+            <p className="text-4xl font-bold text-white">
               {percentage}%
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-white/10 px-2 py-2 text-center">
-                <p className="text-[11px] text-white/60">Present</p>
+              <div className="rounded-lg bg-white px-2 py-2 text-center">
+                <p className="text-[11px] text-slate-500">Present</p>
                 <p className="text-lg font-bold">{present}</p>
               </div>
-              <div className="rounded-lg bg-white/10 px-2 py-2 text-center">
-                <p className="text-[11px] text-white/60">Absent</p>
+              <div className="rounded-lg bg-white px-2 py-2 text-center">
+                <p className="text-[11px] text-slate-500">Absent</p>
                 <p className="text-lg font-bold">{absent}</p>
               </div>
-              <div className="rounded-lg bg-white/10 px-2 py-2 text-center">
-                <p className="text-[11px] text-white/60">Excused</p>
+              <div className="rounded-lg bg-white px-2 py-2 text-center">
+                <p className="text-[11px] text-slate-500">Excused</p>
                 <p className="text-lg font-bold">{excused}</p>
               </div>
             </div>
           </div>
         </div>
+        {(canLoadAttendance || attendanceError) && (
         <div className="rounded-lg border border-slate-200 bg-white p-5">
-          {!canLoadAttendance ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">Open attendance from Meeting Management</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Search the approved meeting letter, then click the attendance icon to load that meeting's attendance table.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/meetings')}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Meeting Search
-              </button>
-            </div>
-          ) : (
+          {canLoadAttendance && (
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meeting</p>
@@ -197,6 +285,7 @@ export default function AttendancePage() {
             </p>
           )}
         </div>
+        )}
 
         {/* Participant Table */}
         <div className="rounded-lg border border-slate-200 bg-white">
@@ -212,10 +301,6 @@ export default function AttendancePage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <button className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                <Filter className="h-4 w-4" />
-                Filter
-              </button>
               <button className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 <Download className="h-4 w-4" />
                 Export
@@ -242,7 +327,7 @@ export default function AttendancePage() {
               ) : filteredParticipants.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-sm text-slate-400">
-                    {canLoadAttendance ? 'No participants found for this meeting letter.' : 'Open an attendance table from Meeting Management search results.'}
+                    {canLoadAttendance ? 'No attendance records found for this meeting letter.' : 'Search for a meeting letter above to view its attendance.'}
                   </td>
                 </tr>
               ) : filteredParticipants.map((p) => (
@@ -265,54 +350,69 @@ export default function AttendancePage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                      {(['present', 'absent', 'excused'] as AttendanceStatus[]).map((status) => {
-                        const isActive = p.status === status;
-                        const config = STATUS_CONFIG[status];
-                        return (
-                          <button
-                            key={status}
-                            onClick={() => handleStatusChange(p.user_id, status)}
-                            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                              isActive ? config.activeClasses : 'border-transparent text-slate-500 hover:bg-white'
-                            }`}
-                          >
-                            {isActive && <span>{config.icon}</span>}
-                            {config.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {isViewOnly ? (
+                      <div className="flex justify-center">
+                        <span className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${STATUS_CONFIG[p.status].activeClasses}`}>
+                          {STATUS_CONFIG[p.status].label}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                        {(['present', 'absent', 'excused'] as AttendanceStatus[]).map((status) => {
+                          const isActive = p.status === status;
+                          const config = STATUS_CONFIG[status];
+                          return (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => handleStatusChange(p.user_id, status)}
+                              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                isActive ? config.activeClasses : 'border-transparent text-slate-500 hover:bg-white'
+                              }`}
+                            >
+                              {config.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-         {/* Footer */}
-          <div className="flex items-center justify-between border-t border-slate-200 p-4">
-            <p className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Info className="h-3.5 w-3.5" />
-              {isSaving ? 'Saving draft...' : 'Statuses are saved when you click Save Draft or Submit Attendance.'}
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSaveDraft}
-                disabled={isSaving || !activeMeetingId || participants.length === 0}
-                className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {isSaving ? 'Saving...' : 'Save Draft'}
-              </button>
-              <button
-                onClick={handleSubmitAttendance}
-                disabled={isSubmitting || !activeMeetingId || participants.length === 0}
-                className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
-                <span>▶</span>
-              </button>
+          {isViewOnly ? (
+            <div className="border-t border-slate-200 p-4 text-xs text-slate-400">
+              Attendance records are view-only in this mode.
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between border-t border-slate-200 p-4">
+              <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                <Info className="h-3.5 w-3.5" />
+                {isSaving ? 'Saving draft...' : 'Update the statuses, then save a draft or submit attendance.'}
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  disabled={isSaving || !activeMeetingId || participants.length === 0}
+                  className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save Draft'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitAttendance}
+                  disabled={isSubmitting || !activeMeetingId || participants.length === 0}
+                  className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
+                  <span>▶</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
