@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Download, BarChart3, Info, ArrowLeft } from 'lucide-react';
+import { Search, Download, BarChart3, Info } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { attendanceService } from '../services/attendanceService';
-import type {AttendanceSheet,AttendanceStatus,AttendanceParticipant,} from '../types/attendance';
+import type { AttendanceSheet, AttendanceStatus, AttendanceParticipant, ApprovedMeetingLetter } from '../types/attendance';
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string;}> = {
   present: { label: 'Present', activeClasses: 'bg-green-500 text-white border-green-500 ' },
@@ -24,12 +24,30 @@ export default function AttendancePage() {
   const [sheet, setSheet] = useState<AttendanceSheet | null>(null);
   const [participants, setParticipants] = useState<AttendanceParticipant[]>([]);
   const [search, setSearch] = useState('');
+  const [letters, setLetters] = useState<ApprovedMeetingLetter[]>([]);
+  const [isLoadingLetters, setIsLoadingLetters] = useState(false);
+  const [letterError, setLetterError] = useState('');
   const [isLoadingSheet, setIsLoadingSheet] = useState(false);
   const [attendanceError, setAttendanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
+  const isViewOnly = searchParams.get('mode') === 'view';
   const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
+
+  const loadLetters = useCallback(async (term = '') => {
+    setIsLoadingLetters(true);
+    setLetterError('');
+    try {
+      setLetters(await attendanceService.getApprovedMeetingLetters(term));
+    } catch (err) {
+      console.error('Failed to fetch approved meeting letters:', err);
+      setLetters([]);
+      setLetterError('Failed to load approved meeting letters.');
+    } finally {
+      setIsLoadingLetters(false);
+    }
+  }, []);
 
   const fetchSheet = useCallback(async () => {
     if (!selectedMeetingId && !selectedLetterId) {
@@ -44,7 +62,7 @@ export default function AttendancePage() {
     try {
       const result = selectedMeetingId
         ? await attendanceService.getSheet(selectedMeetingId, selectedLetterId ?? undefined)
-        : await attendanceService.getSheetByLetter(selectedLetterId);
+        : await attendanceService.getSheetByLetter(selectedLetterId!);
       setSheet(result);
       setParticipants(result.participants);
     } catch (err) {
@@ -65,19 +83,26 @@ export default function AttendancePage() {
     fetchSheet();
   }, [fetchSheet]);
 
+  useEffect(() => {
+    loadLetters();
+  }, [loadLetters]);
+
   const handleStatusChange = (userId: number, status: AttendanceStatus) => {
-    setParticipants((prev) =>
-      prev.map((p) => (p.user_id === userId ? { ...p, status } : p))
+    if (isViewOnly) return;
+    setParticipants((previous) =>
+      previous.map((participant) =>
+        participant.user_id === userId ? { ...participant, status } : participant
+      )
     );
   };
 
   const handleSaveDraft = async () => {
-    if (!activeMeetingId) return;
+    if (!activeMeetingId || isViewOnly) return;
     setIsSaving(true);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((p) => ({ user_id: p.user_id, status: p.status }))
+        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
       );
     } finally {
       setIsSaving(false);
@@ -85,12 +110,12 @@ export default function AttendancePage() {
   };
 
   const handleSubmitAttendance = async () => {
-    if (!activeMeetingId) return;
+    if (!activeMeetingId || isViewOnly) return;
     setIsSubmitting(true);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((p) => ({ user_id: p.user_id, status: p.status }))
+        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
       );
       await attendanceService.submit(activeMeetingId);
       await fetchSheet();
@@ -150,22 +175,34 @@ export default function AttendancePage() {
           </div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5">
-          {!canLoadAttendance ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">Open attendance from Meeting Management</h2>
-               
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/meetings')}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Meeting Search
-              </button>
-            </div>
-          ) : (
+          <label htmlFor="meeting-letter" className="mb-2 block text-sm font-semibold text-slate-700">
+            Select Meeting Letter
+          </label>
+          <select
+            id="meeting-letter"
+            value={isViewOnly && selectedLetterId ? selectedLetterId : ''}
+            onChange={(event) => {
+              const letterId = Number(event.target.value);
+              if (letterId) navigate(`/attendance?letter_id=${letterId}&mode=view`);
+            }}
+            disabled={isLoadingLetters}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
+          >
+            <option value="">{isLoadingLetters ? 'Loading meeting letters...' : 'Choose an approved meeting letter'}</option>
+            {letters.map((letter) => (
+              <option key={letter.letter_id} value={letter.letter_id}>
+                {letter.letter_title} — {letter.subject_code ?? letter.subject_title ?? letter.meeting_title}
+              </option>
+            ))}
+          </select>
+
+          {letterError && <p className="mt-3 text-sm text-red-600">{letterError}</p>}
+
+          {!isLoadingLetters && letters.length === 0 && (
+            <p className="mt-3 text-sm text-slate-400">No approved meeting letters found.</p>
+          )}
+
+          {canLoadAttendance && (
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meeting</p>
@@ -205,10 +242,6 @@ export default function AttendancePage() {
             </div>
             <div className="flex items-center gap-2">
               <button className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                <Filter className="h-4 w-4" />
-                Filter
-              </button>
-              <button className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 <Download className="h-4 w-4" />
                 Export
               </button>
@@ -234,7 +267,7 @@ export default function AttendancePage() {
               ) : filteredParticipants.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-sm text-slate-400">
-                    {canLoadAttendance ? 'No participants found for this meeting letter.' : 'Open an attendance table from Meeting Management search results.'}
+                    {canLoadAttendance ? 'No attendance records found for this meeting letter.' : 'Search for a meeting letter above to view its attendance.'}
                   </td>
                 </tr>
               ) : filteredParticipants.map((p) => (
@@ -257,54 +290,69 @@ export default function AttendancePage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                      {(['present', 'absent', 'excused'] as AttendanceStatus[]).map((status) => {
-                        const isActive = p.status === status;
-                        const config = STATUS_CONFIG[status];
-                        return (
-                          <button
-                            key={status}
-                            onClick={() => handleStatusChange(p.user_id, status)}
-                            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                              isActive ? config.activeClasses : 'border-transparent text-slate-500 hover:bg-white'
-                            }`}
-                          >
-                            {isActive}
-                            {config.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {isViewOnly ? (
+                      <div className="flex justify-center">
+                        <span className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${STATUS_CONFIG[p.status].activeClasses}`}>
+                          {STATUS_CONFIG[p.status].label}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                        {(['present', 'absent', 'excused'] as AttendanceStatus[]).map((status) => {
+                          const isActive = p.status === status;
+                          const config = STATUS_CONFIG[status];
+                          return (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => handleStatusChange(p.user_id, status)}
+                              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                isActive ? config.activeClasses : 'border-transparent text-slate-500 hover:bg-white'
+                              }`}
+                            >
+                              {config.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-         {/* Footer */}
-          <div className="flex items-center justify-between border-t border-slate-200 p-4">
-            <p className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Info className="h-3.5 w-3.5" />
-              {isSaving ? 'Saving draft...' : 'Statuses are saved when you click Save Draft or Submit Attendance.'}
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSaveDraft}
-                disabled={isSaving || !activeMeetingId || participants.length === 0}
-                className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {isSaving ? 'Saving...' : 'Save Draft'}
-              </button>
-              <button
-                onClick={handleSubmitAttendance}
-                disabled={isSubmitting || !activeMeetingId || participants.length === 0}
-                className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
-                <span>▶</span>
-              </button>
+          {isViewOnly ? (
+            <div className="border-t border-slate-200 p-4 text-xs text-slate-400">
+              Attendance records are view-only in this mode.
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between border-t border-slate-200 p-4">
+              <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                <Info className="h-3.5 w-3.5" />
+                {isSaving ? 'Saving draft...' : 'Update the statuses, then save a draft or submit attendance.'}
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  disabled={isSaving || !activeMeetingId || participants.length === 0}
+                  className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save Draft'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitAttendance}
+                  disabled={isSubmitting || !activeMeetingId || participants.length === 0}
+                  className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
+                  <span>▶</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
