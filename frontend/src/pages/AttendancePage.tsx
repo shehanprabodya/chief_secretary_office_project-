@@ -126,30 +126,28 @@ export default function AttendancePage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Attendance Tracking</h1>
-            <p className="mt-1 max-w-xl text-sm text-slate-500">
-              Real-time attendance management for official ministerial and departmental meetings.
-            </p>
+            
           </div>
 
-          <div className=" flex flex-col gap-6 w-full max-w-xs rounded-xl bg-[var(--color-primary)] p-5 text-white">
+          <div className=" flex flex-col gap-6 w-full max-w-xs rounded-xl bg-slate-800 p-5 text-black">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Live Statistics</p>
-              <BarChart3 className="h-5 w-5 text-white/40" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-white">Live Statistics</p>
+              <BarChart3 className="h-5 w-5 text-white" />
             </div>
-            <p className="text-4xl font-bold">
+            <p className="text-4xl font-bold text-white">
               {percentage}%
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-white/10 px-2 py-2 text-center">
-                <p className="text-[11px] text-white/60">Present</p>
+              <div className="rounded-lg bg-white px-2 py-2 text-center">
+                <p className="text-[11px] text-slate-500">Present</p>
                 <p className="text-lg font-bold">{present}</p>
               </div>
-              <div className="rounded-lg bg-white/10 px-2 py-2 text-center">
-                <p className="text-[11px] text-white/60">Absent</p>
+              <div className="rounded-lg bg-white px-2 py-2 text-center">
+                <p className="text-[11px] text-slate-500">Absent</p>
                 <p className="text-lg font-bold">{absent}</p>
               </div>
-              <div className="rounded-lg bg-white/10 px-2 py-2 text-center">
-                <p className="text-[11px] text-white/60">Excused</p>
+              <div className="rounded-lg bg-white px-2 py-2 text-center">
+                <p className="text-[11px] text-slate-500">Excused</p>
                 <p className="text-lg font-bold">{excused}</p>
               </div>
             </div>
@@ -160,9 +158,7 @@ export default function AttendancePage() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">Open attendance from Meeting Management</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Search the approved meeting letter, then click the attendance icon to load that meeting's attendance table.
-                </p>
+               
               </div>
               <button
                 type="button"
