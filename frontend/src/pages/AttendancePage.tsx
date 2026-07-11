@@ -4,16 +4,12 @@ import { Search, Filter, Download, BarChart3, Info, ArrowLeft } from 'lucide-rea
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { attendanceService } from '../services/attendanceService';
-import type {
-  AttendanceSheet,
-  AttendanceStatus,
-  AttendanceParticipant,
-} from '../types/attendance';
+import type {AttendanceSheet,AttendanceStatus,AttendanceParticipant,} from '../types/attendance';
 
-const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string; icon: string }> = {
-  present: { label: 'Present', activeClasses: 'bg-white text-slate-900 border-slate-900 shadow-sm', icon: '✓' },
-  absent: { label: 'Absent', activeClasses: 'bg-red-600 text-white border-red-600', icon: '✕' },
-  excused: { label: 'Excused', activeClasses: 'bg-orange-500 text-white border-orange-500', icon: 'i' },
+const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string;}> = {
+  present: { label: 'Present', activeClasses: 'bg-white text-slate-900 border-slate-900 shadow-sm' },
+  absent: { label: 'Absent', activeClasses: 'bg-red-600 text-white border-red-600'},
+  excused: { label: 'Excused', activeClasses: 'bg-orange-500 text-white border-orange-500' },
 };
 
 function getInitials(name: string) {
