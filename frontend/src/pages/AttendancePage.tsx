@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Download, BarChart3, Info } from 'lucide-react';
+import { Search, Download, BarChart3, Info, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { attendanceService } from '../services/attendanceService';
@@ -24,6 +24,8 @@ export default function AttendancePage() {
   const [sheet, setSheet] = useState<AttendanceSheet | null>(null);
   const [participants, setParticipants] = useState<AttendanceParticipant[]>([]);
   const [search, setSearch] = useState('');
+  const [letterSearch, setLetterSearch] = useState('');
+  const [isLetterDropdownOpen, setIsLetterDropdownOpen] = useState(false);
   const [letters, setLetters] = useState<ApprovedMeetingLetter[]>([]);
   const [isLoadingLetters, setIsLoadingLetters] = useState(false);
   const [letterError, setLetterError] = useState('');
@@ -35,6 +37,12 @@ export default function AttendancePage() {
   const isViewOnly = searchParams.get('mode') === 'view';
   const showLetterSelector = !canLoadAttendance || isViewOnly;
   const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
+  const matchingLetters = letters.filter((letter) => {
+    const term = letterSearch.trim().toLowerCase();
+    if (!term) return true;
+    return [letter.letter_title, letter.meeting_title, letter.subject_code, letter.subject_title]
+      .some((value) => value?.toLowerCase().includes(term));
+  });
 
   const loadLetters = useCallback(async (term = '') => {
     setIsLoadingLetters(true);
@@ -87,6 +95,12 @@ export default function AttendancePage() {
   useEffect(() => {
     loadLetters();
   }, [loadLetters]);
+
+  useEffect(() => {
+    if (!isViewOnly || !selectedLetterId) return;
+    const selectedLetter = letters.find((letter) => letter.letter_id === selectedLetterId);
+    if (selectedLetter) setLetterSearch(selectedLetter.letter_title);
+  }, [isViewOnly, letters, selectedLetterId]);
 
   const handleStatusChange = (userId: number, status: AttendanceStatus) => {
     if (isViewOnly) return;
@@ -154,23 +168,63 @@ export default function AttendancePage() {
                 <label htmlFor="meeting-letter" className="mb-2 block text-sm font-semibold text-slate-700">
                   Select Meeting Letter
                 </label>
-                <select
-                  id="meeting-letter"
-                  value={isViewOnly && selectedLetterId ? selectedLetterId : ''}
-                  onChange={(event) => {
-                    const letterId = Number(event.target.value);
-                    if (letterId) navigate(`/attendance?letter_id=${letterId}&mode=view`);
-                  }}
-                  disabled={isLoadingLetters}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
-                >
-                  <option value="">{isLoadingLetters ? 'Loading meeting letters...' : 'Choose an approved meeting letter'}</option>
-                  {letters.map((letter) => (
-                    <option key={letter.letter_id} value={letter.letter_id}>
-                      {letter.letter_title} — {letter.subject_code ?? letter.subject_title ?? letter.meeting_title}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    id="meeting-letter"
+                    type="text"
+                    value={letterSearch}
+                    onChange={(event) => {
+                      setLetterSearch(event.target.value);
+                      setIsLetterDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsLetterDropdownOpen(true)}
+                    onBlur={() => window.setTimeout(() => setIsLetterDropdownOpen(false), 150)}
+                    placeholder={isLoadingLetters ? 'Loading meeting letters...' : 'Type to search meeting letters...'}
+                    disabled={isLoadingLetters}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-expanded={isLetterDropdownOpen}
+                    aria-controls="meeting-letter-options"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setIsLetterDropdownOpen((open) => !open)}
+                    className="absolute right-2 top-1.5 rounded p-1.5 text-slate-400 hover:bg-slate-100"
+                    aria-label="Toggle meeting letter options"
+                  >
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isLetterDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isLetterDropdownOpen && !isLoadingLetters && (
+                    <div id="meeting-letter-options" role="listbox" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                      {matchingLetters.length === 0 ? (
+                        <p className="px-4 py-3 text-sm text-slate-400">No matching meeting letters found.</p>
+                      ) : matchingLetters.map((letter) => (
+                        <button
+                          key={letter.letter_id}
+                          type="button"
+                          role="option"
+                          aria-selected={selectedLetterId === letter.letter_id}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setLetterSearch(letter.letter_title);
+                            setIsLetterDropdownOpen(false);
+                            navigate(`/attendance?letter_id=${letter.letter_id}&mode=view`);
+                          }}
+                          className={`block w-full px-4 py-2.5 text-left hover:bg-blue-50 ${selectedLetterId === letter.letter_id ? 'bg-blue-50' : ''}`}
+                        >
+                          <span className="block truncate text-sm font-semibold text-slate-900">{letter.letter_title}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {letter.subject_code ? `${letter.subject_code} · ` : ''}{letter.subject_title ?? letter.meeting_title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {letterError && <p className="mt-3 text-sm text-red-600">{letterError}</p>}
 
