@@ -7,7 +7,7 @@ import { attendanceService } from '../services/attendanceService';
 import type {AttendanceSheet,AttendanceStatus,AttendanceParticipant,} from '../types/attendance';
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string;}> = {
-  present: { label: 'Present', activeClasses: 'bg-white text-slate-900 border-slate-900 shadow-sm' },
+  present: { label: 'Present', activeClasses: 'bg-green-500 text-white border-green-500 ' },
   absent: { label: 'Absent', activeClasses: 'bg-red-600 text-white border-red-600'},
   excused: { label: 'Excused', activeClasses: 'bg-orange-500 text-white border-orange-500' },
 };
@@ -269,7 +269,7 @@ export default function AttendancePage() {
                               isActive ? config.activeClasses : 'border-transparent text-slate-500 hover:bg-white'
                             }`}
                           >
-                            {isActive && <span>{config.icon}</span>}
+                            {isActive}
                             {config.label}
                           </button>
                         );
