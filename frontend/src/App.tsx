@@ -14,6 +14,7 @@ import AttendancePage from './pages/AttendancePage';
 import ApprovalsPage from './pages/ApprovalsPage';
 import CreateMinutesPage from './pages/CreateMinutesPage';
 import UserManagementPage from './pages/UserManagementPage';
+import CreateMeetingPage from './pages/CreateMeetingPage';
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
           
           <Route element={<ProtectedRoute allowedRoles={['officer', 'admin']} />}>
             <Route path="/meetings" element={<MeetingsPage />} />
+            <Route path="/meetings/new" element={<CreateMeetingPage />} />
             <Route path="/letters/new" element={<GenerateLetterPage />} />
             <Route path="/letters/:id" element={<GenerateLetterPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
