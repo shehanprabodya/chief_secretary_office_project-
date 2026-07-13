@@ -30,7 +30,7 @@ export const meetingService = {
   },
 
   async create(payload: Partial<Meeting> & { attendee_ids?: number[] }): Promise<Meeting> {
-    const { data } = await api.post<{ meeting: Meeting }>('/officer/meetings', payload);
+    const { data } = await api.post<{ meeting: Meeting }>('/meetings', payload);
     return data.meeting;
   },
 

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, CalendarDays, Clock, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import { meetingService } from '../services/meetingService';
 
 export interface MeetingFormData {
   title: string;
@@ -25,10 +26,13 @@ export default function CreateMeetingPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<MeetingFormData>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateField = (field: keyof MeetingFormData, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+    setSubmitError('');
   };
 
   const validate = () => {
@@ -48,19 +52,42 @@ export default function CreateMeetingPage() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validate()) return;
 
-    navigate('/letters/new', {
-      state: {
-        meeting: {
-          ...form,
-          title: form.title.trim(),
-          location: form.location.trim(),
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const meeting = await meetingService.create({
+        title: form.title.trim(),
+        meeting_date: form.meetingDate,
+        start_time: form.startTime,
+        end_time: form.endTime,
+        location: form.location.trim(),
+        location_type: 'physical',
+        status: 'draft',
+      });
+
+      navigate('/letters/new', {
+        state: {
+          meeting,
         },
-      },
-    });
+      });
+    } catch (error: unknown) {
+      const apiError = error as {
+        response?: { data?: { message?: string; errors?: Record<string, string[]> } };
+      };
+      const response = apiError.response?.data;
+      const validationMessage = response?.errors
+        ? Object.values(response.errors).flat()[0]
+        : undefined;
+
+      setSubmitError(validationMessage ?? response?.message ?? 'Unable to create the meeting. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const inputClassName = (hasError: boolean) =>
@@ -208,18 +235,26 @@ export default function CreateMeetingPage() {
           </div>
 
           <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
+            {submitError && (
+              <p role="alert" className="self-center text-sm text-red-600 sm:mr-auto">
+                {submitError}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => navigate('/meetings')}
+              disabled={isSubmitting}
               className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+              disabled={isSubmitting}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Continue to letter <ArrowRight className="h-4 w-4" />
+              {isSubmitting ? 'Creating meeting…' : 'Create and continue'}
+              {!isSubmitting && <ArrowRight className="h-4 w-4" />}
             </button>
           </div>
         </form>

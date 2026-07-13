@@ -88,12 +88,13 @@ class MeetingController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'meeting_date' => 'required|date',
-            'start_time' => 'nullable|date_format:H:i',
-            'end_time' => 'nullable|date_format:H:i|after:start_time',
-            'location' => 'nullable|string|max:255',
-            'location_type' => 'required|in:physical,virtual,not_assigned',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'location' => 'required|string|max:255',
+            'location_type' => 'sometimes|in:physical,virtual,not_assigned',
+            'meeting_code' => 'nullable|string|max:50|exists:subjects,code',
             'department_id' => 'nullable|exists:departments,department_id',
-            'status' => 'required|in:draft,scheduled,completed,cancelled',
+            'status' => 'sometimes|in:draft,scheduled,completed,cancelled',
             'description' => 'nullable|string',
             'attendee_ids' => 'nullable|array',
             'attendee_ids.*' => 'exists:users,user_id',
@@ -103,11 +104,12 @@ class MeetingController extends Controller
             return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $meeting = Meeting::create([
-            ...$validator->validated(),
-            'reference_id' => Meeting::generateReferenceId(),
-            'created_by' => $request->user()->user_id,
-        ]);
+        $meetingData = $validator->safe()->except('attendee_ids');
+        $meetingData['location_type'] = $meetingData['location_type'] ?? 'physical';
+        $meetingData['status'] = $meetingData['status'] ?? 'draft';
+        $meetingData['created_by'] = $request->user()->user_id;
+
+        $meeting = Meeting::create($meetingData);
 
         if ($request->filled('attendee_ids')) {
             $meeting->attendees()->attach($request->attendee_ids);
