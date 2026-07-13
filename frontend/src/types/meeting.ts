@@ -17,8 +17,6 @@ export interface Meeting {
   end_time: string | null;
   location: string | null;
   location_type: LocationType;
-  department_id: number | null;
-  department?: { department_id: number; department_name: string };
   subject?: { id: number; code: string; title: string };
   status: MeetingStatus;
   description: string | null;

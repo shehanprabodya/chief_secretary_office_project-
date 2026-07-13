@@ -2,9 +2,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Meeting extends Model
 {
@@ -13,17 +13,12 @@ class Meeting extends Model
 
     protected $fillable = [
         'reference_id', 'meeting_code', 'title', 'meeting_date', 'start_time', 'end_time',
-        'location', 'location_type', 'department_id', 'status', 'description', 'created_by',
+        'location', 'location_type', 'status', 'description', 'created_by',
     ];
 
     protected $casts = [
         'meeting_date' => 'date',
     ];
-
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class, 'department_id', 'department_id');
-    }
 
     public function creator(): BelongsTo
     {

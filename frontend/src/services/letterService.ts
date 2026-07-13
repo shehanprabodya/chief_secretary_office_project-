@@ -3,6 +3,7 @@ import type { Letter, Organization, Subject } from '../types/letter';
 
 export interface DraftPayload {
   letter_id?: number;
+  meeting_id?: number;
   subject_id?: number;
   title?: string;
   content?: string;

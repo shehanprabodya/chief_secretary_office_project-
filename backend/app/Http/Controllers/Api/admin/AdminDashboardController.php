@@ -46,8 +46,7 @@ class AdminDashboardController extends Controller
 
     public function upcomingMeetings(): JsonResponse
     {
-        $meetings = Meeting::with('department')
-            ->whereDate('meeting_date', '>=', now())
+        $meetings = Meeting::whereDate('meeting_date', '>=', now())
             ->orderBy('meeting_date')
             ->orderBy('start_time')
             ->limit(5)
@@ -60,7 +59,6 @@ class AdminDashboardController extends Controller
                 'location' => $m->location,
                 'location_type' => $m->location_type,
                 'status' => $m->status,
-                'department' => $m->department?->department_name,
             ]);
 
         return response()->json(['meetings' => $meetings]);
@@ -115,4 +113,3 @@ class AdminDashboardController extends Controller
         ]);
     }
 }
-
