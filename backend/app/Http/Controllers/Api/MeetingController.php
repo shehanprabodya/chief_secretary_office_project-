@@ -75,7 +75,7 @@ class MeetingController extends Controller
             return response()->json(['message' => 'Invalid date'], 422);
         }
 
-        $meetings = Meeting::with('attendees')
+        $meetings = Meeting::with('subject', 'creator', 'attendees')
             ->whereDate('meeting_date', $request->date)
             ->orderBy('start_time')
             ->get();

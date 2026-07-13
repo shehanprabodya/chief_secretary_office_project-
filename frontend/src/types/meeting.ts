@@ -18,6 +18,7 @@ export interface Meeting {
   location: string | null;
   location_type: LocationType;
   subject?: { id: number; code: string; title: string };
+  creator?: { user_id: number; full_name: string };
   status: MeetingStatus;
   description: string | null;
   attendees?: MeetingAttendee[];

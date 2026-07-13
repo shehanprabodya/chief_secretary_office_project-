@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import Card from '../shared/Card';
 import { meetingService } from '../../services/meetingService';
 import type { Meeting } from '../../types/meeting';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-
 function dateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -35,8 +34,11 @@ export default function CalendarWidget() {
   );
   const [selectedDate, setSelectedDate] = useState(() => dateKey(today));
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [selectedMeetings, setSelectedMeetings] = useState<Meeting[]>([]);
+  const [isMonthLoading, setIsMonthLoading] = useState(true);
+  const [isDetailsLoading, setIsDetailsLoading] = useState(true);
+  const [monthError, setMonthError] = useState('');
+  const [detailsError, setDetailsError] = useState('');
 
   const year = visibleMonth.getFullYear();
   const month = visibleMonth.getMonth();
@@ -51,8 +53,8 @@ export default function CalendarWidget() {
     let ignore = false;
 
     async function loadMeetings() {
-      setIsLoading(true);
-      setError('');
+      setIsMonthLoading(true);
+      setMonthError('');
 
       try {
         const firstDate = new Date(year, month, 1);
@@ -67,10 +69,10 @@ export default function CalendarWidget() {
       } catch {
         if (!ignore) {
           setMeetings([]);
-          setError('Could not load meetings.');
+          setMonthError('Could not load the calendar.');
         }
       } finally {
-        if (!ignore) setIsLoading(false);
+        if (!ignore) setIsMonthLoading(false);
       }
     }
 
@@ -80,6 +82,32 @@ export default function CalendarWidget() {
     };
   }, [month, year]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadSelectedDate() {
+      setIsDetailsLoading(true);
+      setDetailsError('');
+
+      try {
+        const result = await meetingService.getByDate(selectedDate);
+        if (!ignore) setSelectedMeetings(result);
+      } catch {
+        if (!ignore) {
+          setSelectedMeetings([]);
+          setDetailsError('Could not load meeting details.');
+        }
+      } finally {
+        if (!ignore) setIsDetailsLoading(false);
+      }
+    }
+
+    void loadSelectedDate();
+    return () => {
+      ignore = true;
+    };
+  }, [selectedDate]);
+
   const meetingCounts = useMemo(() => {
     return meetings.reduce<Record<string, number>>((counts, meeting) => {
       const key = meeting.meeting_date.slice(0, 10);
@@ -87,11 +115,6 @@ export default function CalendarWidget() {
       return counts;
     }, {});
   }, [meetings]);
-
-  const selectedMeetings = useMemo(
-    () => meetings.filter((meeting) => meeting.meeting_date.slice(0, 10) === selectedDate),
-    [meetings, selectedDate],
-  );
 
   const changeMonth = (offset: number) => {
     const nextMonth = new Date(year, month + offset, 1);
@@ -196,6 +219,13 @@ export default function CalendarWidget() {
         })}
       </div>
 
+      {isMonthLoading && (
+        <p className="mt-2 text-center text-xs text-slate-400">Updating calendar…</p>
+      )}
+      {monthError && (
+        <p className="mt-2 text-center text-xs text-red-600 dark:text-red-400">{monthError}</p>
+      )}
+
       <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
         <div className="mb-3 flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -204,28 +234,25 @@ export default function CalendarWidget() {
           </h4>
         </div>
 
-        {isLoading ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Loading meetings…</p>
-        ) : error ? (
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        {isDetailsLoading ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading meeting details…</p>
+        ) : detailsError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">{detailsError}</p>
         ) : selectedMeetings.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">No meetings scheduled.</p>
         ) : (
           <div className="space-y-3">
             {selectedMeetings.map((meeting) => (
-              <div key={meeting.meeting_id} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/60">
+              <article key={meeting.meeting_id} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/60">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">{meeting.title}</p>
-                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-300">
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-300">
                   <span className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" /> {formatTime(meeting.start_time)}
+                    <Clock className="h-3.5 w-3.5" />
+                    {formatTime(meeting.start_time)}
+                    {meeting.end_time && ` – ${formatTime(meeting.end_time)}`}
                   </span>
-                  {meeting.location && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" /> {meeting.location}
-                    </span>
-                  )}
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
