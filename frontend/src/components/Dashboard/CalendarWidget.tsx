@@ -186,6 +186,7 @@ export default function CalendarWidget() {
           const isToday = key === dateKey(today);
           const isSelected = key === selectedDate;
           const count = meetingCounts[key] ?? 0;
+          const isExpiredMeetingDate = count > 0 && key < dateKey(today);
 
           return (
             <button
@@ -200,10 +201,14 @@ export default function CalendarWidget() {
               })}${count ? `, ${count} meeting${count === 1 ? '' : 's'}` : ''}`}
               aria-selected={isSelected}
               className={`relative flex h-9 items-center justify-center rounded-md text-sm transition-colors ${
-                count > 0
+                isExpiredMeetingDate
                   ? isSelected
-                    ? 'bg-green-200/80 font-semibold text-green-900 ring-2 ring-inset ring-green-600 dark:bg-green-800/60 dark:text-green-100 dark:ring-green-400'
-                    : 'bg-green-100/70 font-medium text-green-800 hover:bg-green-200/80 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-800/60'
+                    ? 'bg-orange-200/80 font-semibold text-orange-900 ring-2 ring-inset ring-orange-600 dark:bg-orange-800/60 dark:text-orange-100 dark:ring-orange-400'
+                    : 'bg-orange-100/70 font-medium text-orange-800 hover:bg-orange-200/80 dark:bg-orange-900/40 dark:text-orange-200 dark:hover:bg-orange-800/60'
+                  : count > 0
+                    ? isSelected
+                      ? 'bg-green-200/80 font-semibold text-green-900 ring-2 ring-inset ring-green-600 dark:bg-green-800/60 dark:text-green-100 dark:ring-green-400'
+                      : 'bg-green-100/70 font-medium text-green-800 hover:bg-green-200/80 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-800/60'
                   : isSelected
                     ? 'bg-blue-600 font-semibold text-white'
                   : isToday
@@ -214,7 +219,11 @@ export default function CalendarWidget() {
               {day}
               {count > 0 && (
                 <span
-                  className="absolute bottom-1 h-1 w-1 rounded-full bg-green-700 dark:bg-green-300"
+                  className={`absolute bottom-1 h-1 w-1 rounded-full ${
+                    isExpiredMeetingDate
+                      ? 'bg-orange-700 dark:bg-orange-300'
+                      : 'bg-green-700 dark:bg-green-300'
+                  }`}
                   aria-hidden="true"
                 />
               )}
