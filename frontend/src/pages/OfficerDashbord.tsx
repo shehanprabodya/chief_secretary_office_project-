@@ -41,7 +41,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Sidebar - Right Side */}
-        <div className="space-y-8">
+        <div
+          className="flex flex-col"
+          style={{ gap: '2.5rem' }}
+        >
           
           <section>
             <CalendarWidget />
