@@ -52,7 +52,7 @@ export default function TimelineWidget() {
   }, []);
 
   return (
-    <Card>
+    <Card className="border border-blue-200 bg-blue-50 dark:border-blue-900/60 dark:bg-blue-950/40">
       <h3 className="mb-4 font-semibold text-slate-900 dark:text-white">
         Today's Timeline
       </h3>

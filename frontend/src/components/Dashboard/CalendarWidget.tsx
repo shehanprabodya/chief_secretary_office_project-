@@ -134,7 +134,7 @@ export default function CalendarWidget() {
   });
 
   return (
-    <Card>
+    <Card className="border border-blue-200 bg-blue-50 dark:border-blue-900/60 dark:bg-blue-950/40">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="font-semibold text-slate-900 dark:text-white">{monthLabel}</h3>
         <div className="flex items-center gap-1">
