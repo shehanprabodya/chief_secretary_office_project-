@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import {
   Save, Eye, Printer, Play, Send,
   Download, History, Trash2,
-  CheckCircle, Clock, FileText, XCircle,
+  CalendarDays, CheckCircle, Clock, FileText, MapPin, XCircle,
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import RichTextEditor from '../components/Letters/RichTextEditor';
@@ -14,6 +14,7 @@ import { approvalService } from '../services/approvalService';
 import { useAuth } from '../context/AuthContext';
 import type {  Organization, Subject, RecipientTag, LetterStatus } from '../types/letter';
 import type { ApprovableDocument, ApprovalStep } from '../types/approval';
+import type { Meeting } from '../types/meeting';
 
 type ApiError = {
   response?: {
@@ -107,10 +108,14 @@ function StatusStep({ item, index, isLast }: {
 export default function GenerateLetterPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  const createdMeeting = (location.state as { meeting?: Meeting } | null)?.meeting;
 
   // Form state
   const [letterId, setLetterId] = useState<number | null>(id ? Number(id) : null);
+  const [meetingId, setMeetingId] = useState<number | null>(createdMeeting?.meeting_id ?? null);
+  const [meetingContext] = useState<Meeting | null>(createdMeeting ?? null);
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -170,6 +175,7 @@ export default function GenerateLetterPage() {
     if (!id) return;
     letterService.getById(Number(id)).then((letter) => {
       setLetterId(letter.letter_id);
+      setMeetingId(letter.meeting_id);
       setLetterOwnerId(letter.created_by);
       setLetterStatus(letter.status);
       setSubjectId(letter.subject_id);
@@ -226,6 +232,7 @@ export default function GenerateLetterPage() {
 
   const buildPayload = useCallback(() => ({
     letter_id: letterId ?? undefined,
+    meeting_id: meetingId ?? undefined,
     subject_id: subjectId ?? undefined,
     title,
     content,
@@ -237,7 +244,7 @@ export default function GenerateLetterPage() {
       user_id: r.user_id,
       recipient_label: r.recipient_label,
     })),
-  }), [content, designation, letterId, recipients, signatoryName, signatureDate, subjectId, title]);
+  }), [content, designation, letterId, meetingId, recipients, signatoryName, signatureDate, subjectId, title]);
 
   const handleSaveDraft = useCallback(async (silent = false) => {
     if (!canEditLetter) return;
@@ -451,6 +458,35 @@ export default function GenerateLetterPage() {
             )}
           </div>
         </div>
+
+        {meetingContext && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Created meeting</p>
+                <p className="mt-1 font-semibold text-slate-900">{meetingContext.title}</p>
+                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {new Date(`${meetingContext.meeting_date.slice(0, 10)}T00:00:00`).toLocaleDateString()}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {meetingContext.start_time?.slice(0, 5)} – {meetingContext.end_time?.slice(0, 5)}
+                  </span>
+                  {meetingContext.location && (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5" /> {meetingContext.location}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+                Step 2 of 2
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Auto-save indicator */}
         {canEditLetter ? (

@@ -58,7 +58,7 @@ class MeetingController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $meeting = Meeting::with('department', 'creator', 'attendees')->findOrFail($id);
+        $meeting = Meeting::with('creator', 'attendees')->findOrFail($id);
         return response()->json(['meeting' => $meeting]);
     }
 
@@ -75,9 +75,28 @@ class MeetingController extends Controller
             return response()->json(['message' => 'Invalid date'], 422);
         }
 
-        $meetings = Meeting::with('department', 'attendees')
+        $meetings = Meeting::with('subject', 'creator', 'attendees')
             ->whereDate('meeting_date', $request->date)
             ->orderBy('start_time')
+            ->get();
+
+        return response()->json(['meetings' => $meetings]);
+    }
+
+    /**
+     * Upcoming meetings assigned to the authenticated officer.
+     */
+    public function assignedUpcoming(Request $request): JsonResponse
+    {
+        $userId = $request->user()->user_id;
+
+        $meetings = Meeting::with('subject')
+            ->whereHas('attendees', fn ($query) => $query->where('users.user_id', $userId))
+            ->whereDate('meeting_date', '>=', now()->toDateString())
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->orderBy('meeting_date')
+            ->orderBy('start_time')
+            ->limit(5)
             ->get();
 
         return response()->json(['meetings' => $meetings]);
@@ -88,12 +107,12 @@ class MeetingController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'meeting_date' => 'required|date',
-            'start_time' => 'nullable|date_format:H:i',
-            'end_time' => 'nullable|date_format:H:i|after:start_time',
-            'location' => 'nullable|string|max:255',
-            'location_type' => 'required|in:physical,virtual,not_assigned',
-            'department_id' => 'nullable|exists:departments,department_id',
-            'status' => 'required|in:draft,scheduled,completed,cancelled',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'location' => 'required|string|max:255',
+            'location_type' => 'sometimes|in:physical,virtual,not_assigned',
+            'meeting_code' => 'nullable|string|max:50|exists:subjects,code',
+            'status' => 'sometimes|in:draft,scheduled,completed,cancelled',
             'description' => 'nullable|string',
             'attendee_ids' => 'nullable|array',
             'attendee_ids.*' => 'exists:users,user_id',
@@ -103,11 +122,12 @@ class MeetingController extends Controller
             return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $meeting = Meeting::create([
-            ...$validator->validated(),
-            'reference_id' => Meeting::generateReferenceId(),
-            'created_by' => $request->user()->user_id,
-        ]);
+        $meetingData = $validator->safe()->except('attendee_ids');
+        $meetingData['location_type'] = $meetingData['location_type'] ?? 'physical';
+        $meetingData['status'] = $meetingData['status'] ?? 'draft';
+        $meetingData['created_by'] = $request->user()->user_id;
+
+        $meeting = Meeting::create($meetingData);
 
         if ($request->filled('attendee_ids')) {
             $meeting->attendees()->attach($request->attendee_ids);
@@ -115,7 +135,7 @@ class MeetingController extends Controller
 
         return response()->json([
             'message' => 'Meeting created successfully',
-            'meeting' => $meeting->load('department', 'attendees'),
+            'meeting' => $meeting->load('attendees'),
         ], 201);
     }
 
@@ -133,7 +153,6 @@ class MeetingController extends Controller
             'end_time' => 'nullable|date_format:H:i|after:start_time',
             'location' => 'nullable|string|max:255',
             'location_type' => 'sometimes|in:physical,virtual,not_assigned',
-            'department_id' => 'nullable|exists:departments,department_id',
             'status' => 'sometimes|in:draft,scheduled,completed,cancelled',
             'description' => 'nullable|string',
             'attendee_ids' => 'nullable|array',
@@ -152,7 +171,7 @@ class MeetingController extends Controller
 
         return response()->json([
             'message' => 'Meeting updated successfully',
-            'meeting' => $meeting->load('department', 'attendees'),
+            'meeting' => $meeting->load('attendees'),
         ]);
     }
 

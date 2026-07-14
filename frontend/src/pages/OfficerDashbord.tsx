@@ -12,21 +12,27 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Main Content - Left Side */}
-        <div className="lg:col-span-2">
+        <div
+          className="flex flex-col lg:col-span-2"
+          style={{ gap: '2.5rem' }}
+        >
           
           {/* Welcome Section */}
-          <section className="mb-10">
+          <section>
             <WelcomeSection />
           </section>
 
           {/* Assigned Meetings */}
-          <section className="mb-10">
+          <section>
             <AssignedMeetingsCard />
           </section>
 
           {/* Draft Cards */}
           <section>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div
+              className="grid grid-cols-1 md:grid-cols-2"
+              style={{ columnGap: '2.5rem', rowGap: '2.5rem' }}
+            >
               <DraftMinutesCard />
               <DraftLettersCard />
             </div>
@@ -35,7 +41,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Sidebar - Right Side */}
-        <div className="space-y-8">
+        <div
+          className="flex flex-col"
+          style={{ gap: '2.5rem' }}
+        >
           
           <section>
             <CalendarWidget />

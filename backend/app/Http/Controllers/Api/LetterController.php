@@ -79,6 +79,7 @@ class LetterController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'letter_id'         => 'nullable|exists:letters,letter_id',
+            'meeting_id'        => 'nullable|exists:meetings,meeting_id',
             'meeting_code'      => 'nullable|string|max:50',
             'subject_id'        => 'nullable|exists:subjects,id',
             'title'             => 'nullable|string|max:255',
@@ -99,7 +100,9 @@ class LetterController extends Controller
         $user = $request->user();
         $meeting = null;
 
-        if ($request->filled('meeting_code')) {
+        if ($request->filled('meeting_id')) {
+            $meeting = Meeting::find($request->meeting_id);
+        } elseif ($request->filled('meeting_code')) {
             $meeting = Meeting::where('meeting_code', $request->meeting_code)->first();
 
             if (!$meeting && !$request->filled('subject_id')) {
