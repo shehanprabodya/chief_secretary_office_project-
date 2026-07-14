@@ -83,6 +83,25 @@ class MeetingController extends Controller
         return response()->json(['meetings' => $meetings]);
     }
 
+    /**
+     * Upcoming meetings assigned to the authenticated officer.
+     */
+    public function assignedUpcoming(Request $request): JsonResponse
+    {
+        $userId = $request->user()->user_id;
+
+        $meetings = Meeting::with('subject')
+            ->whereHas('attendees', fn ($query) => $query->where('users.user_id', $userId))
+            ->whereDate('meeting_date', '>=', now()->toDateString())
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->orderBy('meeting_date')
+            ->orderBy('start_time')
+            ->limit(5)
+            ->get();
+
+        return response()->json(['meetings' => $meetings]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

@@ -24,6 +24,13 @@ export const meetingService = {
     return data.meetings;
   },
 
+  async getAssignedUpcoming(): Promise<Meeting[]> {
+    const { data } = await api.get<{ meetings: Meeting[] }>(
+      '/officer/meetings/assigned-upcoming',
+    );
+    return data.meetings;
+  },
+
   async getById(id: number): Promise<Meeting> {
     const { data } = await api.get<{ meeting: Meeting }>(`/officer/meetings/${id}`);
     return data.meeting;

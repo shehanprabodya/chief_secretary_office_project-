@@ -1,8 +1,4 @@
-import type { ComponentProps } from 'react';
 import { Clock, MapPin } from 'lucide-react';
-import Badge from '../shared/Badge';
-
-type BadgeVariant = ComponentProps<typeof Badge>['variant'];
 
 interface MeetingItemProps {
   meeting: {
@@ -11,15 +7,13 @@ interface MeetingItemProps {
     date: string;
     time: string;
     location: string;
-    status: string;
-    statusColor: BadgeVariant;
   };
 }
 
 export default function MeetingItem({ meeting }: MeetingItemProps) {
   return (
     <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start gap-4">
         <div className="flex-1">
           <h3 className="font-semibold text-slate-900 dark:text-white">
             {meeting.title}
@@ -36,10 +30,6 @@ export default function MeetingItem({ meeting }: MeetingItemProps) {
             </div>
           </div>
         </div>
-        <Badge 
-          label={meeting.status} 
-          variant={meeting.statusColor}
-        />
       </div>
     </div>
   );
