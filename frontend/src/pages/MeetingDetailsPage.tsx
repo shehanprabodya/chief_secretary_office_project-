@@ -151,14 +151,13 @@ export default function MeetingDetailsPage() {
             </div>
           ) : (
             <div className="p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3 pb-10">
+              <div className="pb-10">
                 <h2 className="text-xl font-bold text-slate-900">{meeting.title}</h2>
-                <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium capitalize text-blue-700">{meeting.status}</span>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><CalendarDays className="h-5 w-5 text-blue-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Meeting Date</p><p className="mt-1 text-sm font-semibold text-slate-800">{new Date(`${meeting.meeting_date.slice(0, 10)}T00:00:00`).toLocaleDateString()}</p></div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><Clock className="h-5 w-5 text-blue-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Meeting Time</p><p className="mt-1 text-sm font-semibold text-slate-800">{meeting.start_time?.slice(0, 5) || 'Not assigned'}{meeting.end_time ? ` – ${meeting.end_time.slice(0, 5)}` : ''}</p></div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><MapPin className="h-5 w-5 text-blue-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Location</p><p className="mt-1 text-sm font-semibold text-slate-800">{meeting.location || 'Not assigned'}</p></div>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4"><CalendarDays className="h-5 w-5 text-blue-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-blue-500">Meeting Date</p><p className="mt-1 text-sm font-semibold text-blue-950">{new Date(`${meeting.meeting_date.slice(0, 10)}T00:00:00`).toLocaleDateString()}</p></div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4"><Clock className="h-5 w-5 text-amber-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-amber-600">Meeting Time</p><p className="mt-1 text-sm font-semibold text-amber-950">{meeting.start_time?.slice(0, 5) || 'Not assigned'}{meeting.end_time ? ` – ${meeting.end_time.slice(0, 5)}` : ''}</p></div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4"><MapPin className="h-5 w-5 text-emerald-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-emerald-600">Location</p><p className="mt-1 text-sm font-semibold text-emerald-950">{meeting.location || 'Not assigned'}</p></div>
               </div>
               {meeting.description && <p className="mt-5 border-t border-slate-100 pt-5 text-sm leading-6 text-slate-600">{meeting.description}</p>}
               {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
