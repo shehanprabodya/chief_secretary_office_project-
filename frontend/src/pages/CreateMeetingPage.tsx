@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, CalendarDays, Clock, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import ActionMessage from '../components/shared/ActionMessage';
 import { meetingService } from '../services/meetingService';
 
 export interface MeetingFormData {
@@ -231,11 +232,7 @@ export default function CreateMeetingPage() {
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
-            {submitError && (
-              <p role="alert" className="self-center text-sm text-red-600 sm:mr-auto">
-                {submitError}
-              </p>
-            )}
+            {submitError && <ActionMessage type="error" message={submitError} onDismiss={() => setSubmitError('')} className="sm:mr-auto" />}
             <button
               type="button"
               onClick={() => navigate('/meetings')}

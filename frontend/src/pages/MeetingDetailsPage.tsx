@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, Clock, FileText, MapPin, Pencil, Save, X } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import ActionMessage from '../components/shared/ActionMessage';
 import { useAuth } from '../context/AuthContext';
 import { letterService } from '../services/letterService';
 import { meetingService } from '../services/meetingService';
@@ -146,7 +147,7 @@ export default function MeetingDetailsPage() {
               <label className="flex flex-col gap-3 text-xs font-medium text-slate-600">Start Time<input type="time" value={form.start_time} onChange={(event) => updateField('start_time', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" /></label>
               <label className="flex flex-col gap-3 text-xs font-medium text-slate-600">End Time<input type="time" value={form.end_time} onChange={(event) => updateField('end_time', event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" /></label>
               <label className="flex flex-col gap-3 text-xs font-medium text-slate-600 sm:col-span-2">Description<textarea rows={4} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" /></label>
-              {error && <p className="sm:col-span-2 text-sm text-red-600">{error}</p>}
+              {error && <ActionMessage type="error" message={error} onDismiss={() => setError('')} className="sm:col-span-2" />}
               <div className="sm:col-span-2 flex justify-end gap-3">
                 <button type="button" onClick={() => { setIsEditing(false); setForm(null); setError(''); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><X className="h-4 w-4" /> Cancel</button>
                 <button type="button" onClick={saveMeeting} disabled={isSaving} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-60"><Save className="h-4 w-4" /> {isSaving ? 'Saving…' : 'Save Changes'}</button>
@@ -163,7 +164,7 @@ export default function MeetingDetailsPage() {
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4"><MapPin className="h-5 w-5 text-emerald-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-emerald-600">Location</p><p className="mt-1 text-sm font-semibold text-emerald-950">{meeting.location || 'Not assigned'}</p></div>
               </div>
               {meeting.description && <p className="mt-5 border-t border-slate-100 pt-5 text-sm leading-6 text-slate-600">{meeting.description}</p>}
-              {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+              {error && <ActionMessage type="error" message={error} onDismiss={() => setError('')} className="mt-4" />}
             </div>
           )}
         </section>

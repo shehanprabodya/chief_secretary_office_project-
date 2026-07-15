@@ -9,6 +9,8 @@ import DashboardLayout from '../components/layouts/DashboardLayout';
 import RichTextEditor from '../components/Letters/RichTextEditor';
 import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import PreviewModal from '../components/Letters/PreviewModal';
+import ActionMessage, { type ActionMessageType } from '../components/shared/ActionMessage';
+import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { letterService } from '../services/letterService';
 import { approvalService } from '../services/approvalService';
 import { useAuth } from '../context/AuthContext';
@@ -140,9 +142,31 @@ export default function GenerateLetterPage() {
   const [approvalDocument, setApprovalDocument] = useState<ApprovableDocument | null>(null);
   const [isStatusLoading, setIsStatusLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('unsaved');
+  const [actionMessage, setActionMessage] = useState<{ type: ActionMessageType; text: string } | null>(null);
+  const [showDiscardConfirmation, setShowDiscardConfirmation] = useState(false);
+  const [approvedRevision, setApprovedRevision] = useState<string | null>(null);
   const isExistingLetter = Boolean(id);
   const canEditLetter = !isExistingLetter || (letterOwnerId !== null && String(letterOwnerId) === user?.id);
   const isReadOnly = !canEditLetter;
+
+  const currentRevision = useMemo(() => JSON.stringify({
+    subjectId,
+    title,
+    content,
+    designation,
+    signatoryName,
+    signatureDate,
+    recipients: recipients.map((recipient) => ({
+      organization_id: recipient.organization_id ?? null,
+      user_id: recipient.user_id ?? null,
+      recipient_label: recipient.recipient_label ?? null,
+    })),
+  }), [content, designation, recipients, signatoryName, signatureDate, subjectId, title]);
+
+  const isApprovedWithoutChanges = letterStatus === 'approved'
+    && approvedRevision !== null
+    && currentRevision === approvedRevision;
+  const actionsLocked = letterStatus === 'pending_approval' || isApprovedWithoutChanges;
 
   const refreshStatus = useCallback(async (idToRefresh: number, silent = false) => {
     if (!silent) setIsStatusLoading(true);
@@ -154,6 +178,21 @@ export default function GenerateLetterPage() {
       ]);
 
       setLetterStatus(letter.status);
+      if (letter.status === 'approved' && approvedRevision === null) {
+        setApprovedRevision(JSON.stringify({
+          subjectId: letter.subject_id,
+          title: letter.title,
+          content: letter.content,
+          designation: letter.designation ?? 'ප්‍රධාන ලේකම්',
+          signatoryName: letter.signatory_name ?? '',
+          signatureDate: letter.signature_date ?? '',
+          recipients: letter.recipients.map((recipient) => ({
+            organization_id: recipient.organization_id ?? null,
+            user_id: recipient.user_id ?? null,
+            recipient_label: recipient.recipient_label ?? null,
+          })),
+        }));
+      }
       setApprovalDocument(
         approvalDocuments.find((document) => document.document_type === 'letter' && document.source_id === idToRefresh) ?? null
       );
@@ -162,7 +201,7 @@ export default function GenerateLetterPage() {
     } finally {
       if (!silent) setIsStatusLoading(false);
     }
-  }, []);
+  }, [approvedRevision]);
 
   // Load data
   useEffect(() => {
@@ -190,6 +229,21 @@ export default function GenerateLetterPage() {
           id: `loaded-${i}`,
         }))
       );
+      if (letter.status === 'approved') {
+        setApprovedRevision(JSON.stringify({
+          subjectId: letter.subject_id,
+          title: letter.title,
+          content: letter.content,
+          designation: letter.designation ?? 'ප්‍රධාන ලේකම්',
+          signatoryName: letter.signatory_name ?? '',
+          signatureDate: letter.signature_date ?? '',
+          recipients: letter.recipients.map((recipient) => ({
+            organization_id: recipient.organization_id ?? null,
+            user_id: recipient.user_id ?? null,
+            recipient_label: recipient.recipient_label ?? null,
+          })),
+        }));
+      }
     });
   }, [id]);
 
@@ -249,6 +303,7 @@ export default function GenerateLetterPage() {
   const handleSaveDraft = useCallback(async (silent = false) => {
     if (!canEditLetter) return;
     if (!silent) setIsSaving(true);
+    if (!silent) setActionMessage(null);
     setSaveStatus('saving');
     try {
       const saved = await letterService.saveDraft(buildPayload());
@@ -256,13 +311,14 @@ export default function GenerateLetterPage() {
       setLetterStatus(saved.status);
       setSaveStatus('saved');
       if (!silent) {
+        setActionMessage({ type: 'success', text: 'Letter draft saved successfully.' });
         navigate(`/letters/${saved.letter_id}`, { replace: true });
       }
     } catch (err: unknown) {
       console.error(err);
       setSaveStatus('unsaved');
       if (!silent) {
-        alert(getErrorMessage(err, 'Failed to save draft'));
+        setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to save draft') });
       }
     } finally {
       if (!silent) setIsSaving(false);
@@ -280,8 +336,9 @@ export default function GenerateLetterPage() {
   }, [canEditLetter, content, handleSaveDraft, title]);
 
   const handleGenerate = async () => {
-    if (!canEditLetter) return;
+    if (!canEditLetter || actionsLocked) return;
     setIsGenerating(true);
+    setActionMessage(null);
     try {
       const saved = await letterService.saveDraft(buildPayload());
       const idToGenerate = saved.letter_id;
@@ -291,10 +348,11 @@ export default function GenerateLetterPage() {
       const result = await letterService.generate(idToGenerate);
       setPreviewHtml(result.generated_html);
       setShowPreview(true);
+      setActionMessage({ type: 'success', text: 'Letter generated successfully and is ready to preview.' });
     } catch (err: unknown) {
       console.error(err);
       setSaveStatus('unsaved');
-      alert(getErrorMessage(err, 'Failed to generate letter'));
+      setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to generate letter') });
     } finally {
       setIsGenerating(false);
     }
@@ -302,7 +360,7 @@ export default function GenerateLetterPage() {
 
   const handlePreview = async () => {
     if (!letterId) {
-      alert('Save the draft first to preview');
+      setActionMessage({ type: 'info', text: 'Please save the draft before previewing the letter.' });
       return;
     }
     try {
@@ -321,13 +379,13 @@ export default function GenerateLetterPage() {
       setShowPreview(true);
     } catch (err: unknown) {
       console.error(err);
-      alert(getErrorMessage(err, 'Failed to preview letter'));
+      setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to preview letter') });
     }
   };
 
   const handlePrint = () => {
     if (!previewHtml) {
-      alert('Generate or preview the letter first');
+      setActionMessage({ type: 'info', text: 'Please generate or preview the letter before printing.' });
       return;
     }
     const win = window.open('', '_blank');
@@ -352,35 +410,38 @@ export default function GenerateLetterPage() {
 
   const handleDownloadPdf = async () => {
     if (!canEditLetter) return;
-    if (!letterId) { alert('Save the draft first'); return; }
+    if (!letterId) { setActionMessage({ type: 'info', text: 'Please save the draft before downloading a PDF.' }); return; }
     try {
       const saved = await letterService.saveDraft(buildPayload());
       setLetterId(saved.letter_id);
       setLetterStatus(saved.status);
       await letterService.downloadPdf(saved.letter_id);
+      setActionMessage({ type: 'success', text: 'The PDF download was prepared successfully.' });
     } catch (err: unknown) {
       console.error(err);
-      alert(getErrorMessage(err, 'Failed to download PDF'));
+      setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to download PDF') });
     }
   };
 
   const handleDownloadDocx = async () => {
     if (!canEditLetter) return;
-    if (!letterId) { alert('Save the draft first'); return; }
+    if (!letterId) { setActionMessage({ type: 'info', text: 'Please save the draft before downloading a DOCX file.' }); return; }
     try {
       const saved = await letterService.saveDraft(buildPayload());
       setLetterId(saved.letter_id);
       setLetterStatus(saved.status);
       await letterService.downloadDocx(saved.letter_id);
+      setActionMessage({ type: 'success', text: 'The DOCX download was prepared successfully.' });
     } catch (err: unknown) {
       console.error(err);
-      alert(getErrorMessage(err, 'Failed to download DOCX'));
+      setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to download DOCX') });
     }
   };
 
   const handleSendForApproval = async () => {
-    if (!canEditLetter) return;
+    if (!canEditLetter || actionsLocked) return;
     setIsSendingApproval(true);
+    setActionMessage(null);
     try {
       const saved = await letterService.saveDraft(buildPayload());
       setLetterId(saved.letter_id);
@@ -401,11 +462,11 @@ export default function GenerateLetterPage() {
       setApprovalDocument(submittedDocument);
       setLetterStatus('pending_approval');
 
-      alert('Letter sent for approval successfully');
-      navigate('/approvals');
+      setActionMessage({ type: 'success', text: 'Letter sent for approval successfully. Opening the approvals page…' });
+      window.setTimeout(() => navigate('/approvals'), 1000);
     } catch (err: unknown) {
       console.error(err);
-      alert(getErrorMessage(err, 'Failed to send letter for approval'));
+      setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to send letter for approval') });
     } finally {
       setIsSendingApproval(false);
     }
@@ -413,7 +474,7 @@ export default function GenerateLetterPage() {
 
   const handleDiscard = async () => {
     if (!canEditLetter) return;
-    if (!confirm('Discard this draft? This cannot be undone.')) return;
+    setShowDiscardConfirmation(false);
     navigate('/meetings');
   };
 
@@ -458,6 +519,14 @@ export default function GenerateLetterPage() {
             )}
           </div>
         </div>
+
+        {actionMessage && (
+          <ActionMessage
+            type={actionMessage.type}
+            message={actionMessage.text}
+            onDismiss={() => setActionMessage(null)}
+          />
+        )}
 
         {meetingContext && (
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
@@ -652,9 +721,17 @@ export default function GenerateLetterPage() {
               <div className="flex flex-col gap-3">
                 {canEditLetter ? (
                   <>
+                    {actionsLocked && (
+                      <ActionMessage
+                        type="info"
+                        message={letterStatus === 'pending_approval'
+                          ? 'This letter is currently in the approval workflow. Generate and submission actions are unavailable.'
+                          : 'This letter is approved. Edit the letter to enable generation and resubmission.'}
+                      />
+                    )}
                     <button
                       onClick={handleGenerate}
-                      disabled={isGenerating}
+                      disabled={isGenerating || actionsLocked}
                       className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                     >
                       <Play className="h-4 w-4" />
@@ -662,7 +739,7 @@ export default function GenerateLetterPage() {
                     </button>
                     <button
                       onClick={handleSendForApproval}
-                      disabled={isSendingApproval}
+                      disabled={isSendingApproval || actionsLocked}
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-60"
                     >
                       <Send className="h-4 w-4" />
@@ -687,7 +764,7 @@ export default function GenerateLetterPage() {
                       <History className="h-4 w-4" /> Revision History
                     </button>
                     <button
-                      onClick={handleDiscard}
+                      onClick={() => setShowDiscardConfirmation(true)}
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400 bg-red-50 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100"
                     >
                       <Trash2 className="h-4 w-4" /> Discard Draft
@@ -736,6 +813,14 @@ export default function GenerateLetterPage() {
           onClose={() => setShowPreview(false)}
         />
       )}
+      <ConfirmDialog
+        open={showDiscardConfirmation}
+        title="Discard Draft"
+        message="Are you sure you want to discard this draft? Unsaved changes cannot be recovered."
+        confirmLabel="Discard Draft"
+        onConfirm={handleDiscard}
+        onCancel={() => setShowDiscardConfirmation(false)}
+      />
     </DashboardLayout>
   );
 }
