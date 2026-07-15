@@ -263,7 +263,9 @@ export default function MeetingsPage() {
                     <td className="px-6 py-4">
                       <button
                         type="button"
-                        onClick={() => navigate(`/letters/${letter.letter_id}`)}
+                        onClick={() => navigate(letter.meeting_id
+                          ? `/meetings/${letter.meeting_id}?letter_id=${letter.letter_id}`
+                          : `/letters/${letter.letter_id}`)}
                         className="text-left font-semibold text-blue-700 hover:underline"
                       >
                         {formatLetterTitle(letter.title)}
