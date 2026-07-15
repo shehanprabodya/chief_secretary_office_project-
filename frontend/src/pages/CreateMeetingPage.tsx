@@ -19,7 +19,7 @@ const EMPTY_FORM: MeetingFormData = {
   meetingDate: '',
   startTime: '',
   endTime: '',
-  location: '',
+  location: 'Chief Secretary Office',
 };
 
 export default function CreateMeetingPage() {
@@ -128,7 +128,6 @@ export default function CreateMeetingPage() {
         <form onSubmit={handleSubmit} noValidate className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-200 bg-slate-100 px-6 py-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Meeting Information</h2>
-            <p className="mt-1 text-sm text-slate-500">Enter all required details before generating the letter.</p>
           </div>
 
           <div className="flex flex-col p-6 sm:p-8" style={{ gap: '2.5rem' }}>
