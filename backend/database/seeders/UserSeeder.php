@@ -289,6 +289,90 @@ class UserSeeder extends Seeder
                 'designation' => 'දිස්ත්‍රික් ලේකම්',
                 'org'         => 'DS-HAM',
             ],
+            [
+                'full_name' => 'කේ. ඒ. ප්‍රියන්ත', 'email' => 'k.priyantha@aso.sp.gov.lk',
+                'username' => 'k.priyantha.aso', 'designation' => 'සහකාර ලේකම්', 'org' => 'ASO',
+            ],
+            [
+                'full_name' => 'එස්. එම්. විජේරත්න', 'email' => 's.wijerathne@pcsc.sp.gov.lk',
+                'username' => 's.wijerathne.pcsc', 'designation' => 'ලේකම්', 'org' => 'PCSC',
+            ],
+            [
+                'full_name' => 'ඩී. පී. අබේසේකර', 'email' => 'd.abeysekara@rpsis.sp.gov.lk',
+                'username' => 'd.abeysekara.rpsis', 'designation' => 'නියෝජ්‍ය ප්‍රධාන ලේකම්', 'org' => 'RPS-IS',
+            ],
+            [
+                'full_name' => 'එම්. ආර්. ද සිල්වා', 'email' => 'm.desilva@pmtco.sp.gov.lk',
+                'username' => 'm.desilva.pmtco', 'designation' => 'පළාත් මෝටර් රථ කොමසාරිස්', 'org' => 'PMTCO',
+            ],
+            [
+                'full_name' => 'පී. ජී. සමන්ති', 'email' => 'p.samanthi@rpssw.sp.gov.lk',
+                'username' => 'p.samanthi.rpssw', 'designation' => 'නියෝජ්‍ය ප්‍රධාන ලේකම්', 'org' => 'RPS-SW',
+            ],
+            [
+                'full_name' => 'එන්. ඩී. කරුණාරත්න', 'email' => 'n.karunarathne@sph.sp.gov.lk',
+                'username' => 'n.karunarathne.sph', 'designation' => 'අමාත්‍යාංශ ලේකම්', 'org' => 'SPH',
+            ],
+            [
+                'full_name' => 'ආර්. පී. ගමගේ', 'email' => 'r.gamage@prpa.sp.gov.lk',
+                'username' => 'r.gamage.prpa', 'designation' => 'සභාපති', 'org' => 'PRPA',
+            ],
+            [
+                'full_name' => 'ටී. එන්. මුණසිංහ', 'email' => 't.munasinghe@ric.sp.gov.lk',
+                'username' => 't.munasinghe.ric', 'designation' => 'අධ්‍යක්ෂ', 'org' => 'RIC',
+            ],
+            [
+                'full_name' => 'එච්. කේ. ජයතිලක', 'email' => 'h.jayathilaka@pad.sp.gov.lk',
+                'username' => 'h.jayathilaka.pad', 'designation' => 'පළාත් ආයුර්වේද කොමසාරිස්', 'org' => 'PAD',
+            ],
+            [
+                'full_name' => 'ඩබ්. ඒ. රත්නායක', 'email' => 'w.rathnayake@spam.sp.gov.lk',
+                'username' => 'w.rathnayake.spam', 'designation' => 'අමාත්‍යාංශ ලේකම්', 'org' => 'SPAM',
+            ],
+            [
+                'full_name' => 'ජී. එස්. පෙරේරා', 'email' => 'g.perera@pssd.sp.gov.lk',
+                'username' => 'g.perera.pssd', 'designation' => 'පළාත් අධ්‍යක්ෂ', 'org' => 'PSSD',
+            ],
+            [
+                'full_name' => 'සී. එල්. ප්‍රනාන්දු', 'email' => 'c.fernando@phrda.sp.gov.lk',
+                'username' => 'c.fernando.phrda', 'designation' => 'අධ්‍යක්ෂ ජනරාල්', 'org' => 'PHRDA',
+            ],
+            [
+                'full_name' => 'බී. එම්. දිසානායක', 'email' => 'b.dissanayake@pau.sp.gov.lk',
+                'username' => 'b.dissanayake.pau', 'designation' => 'සමූපකාර සේවා කොමසාරිස්', 'org' => 'PAU',
+            ],
+            [
+                'full_name' => 'ඒ. පී. කුමාරි', 'email' => 'a.kumari@cam.sp.gov.lk',
+                'username' => 'a.kumari.cam', 'designation' => 'අමාත්‍යාංශ ලේකම්', 'org' => 'CAM',
+            ],
+            [
+                'full_name' => 'යූ. ආර්. හේමචන්ද්‍ර', 'email' => 'u.hemachandra@pas.sp.gov.lk',
+                'username' => 'u.hemachandra.pas', 'designation' => 'ලේකම්', 'org' => 'PAS',
+            ],
+            [
+                'full_name' => 'එල්. එම්. සෙනෙවිරත්න', 'email' => 'l.senevirathne@gac.sp.gov.lk',
+                'username' => 'l.senevirathne.gac', 'designation' => 'සාමාන්‍යාධිකාරී', 'org' => 'GAC',
+            ],
+            [
+                'full_name' => 'වී. කේ. අමරසිංහ', 'email' => 'v.amarasinghe@sc.sp.gov.lk',
+                'username' => 'v.amarasinghe.sc', 'designation' => 'කොමසාරිස්', 'org' => 'SC',
+            ],
+            [
+                'full_name' => 'කේ. ඩී. ලියනගේ', 'email' => 'k.liyanage@pco.sp.gov.lk',
+                'username' => 'k.liyanage.pco', 'designation' => 'පළාත් ඉඩම් කොමසාරිස්', 'org' => 'PCO',
+            ],
+            [
+                'full_name' => 'එස්. ඒ. මධුෂානි', 'email' => 's.madushani@pyb.sp.gov.lk',
+                'username' => 's.madushani.pyb', 'designation' => 'අධ්‍යක්ෂ', 'org' => 'PYB',
+            ],
+            [
+                'full_name' => 'පී. එච්. දයාරත්න', 'email' => 'p.dayaratne@sssd.sp.gov.lk',
+                'username' => 'p.dayaratne.sssd', 'designation' => 'කොමසාරිස්', 'org' => 'SSSD',
+            ],
+            [
+                'full_name' => 'ආර්. එම්. චන්ද්‍රසේන', 'email' => 'r.chandrasena@phco.sp.gov.lk',
+                'username' => 'r.chandrasena.phco', 'designation' => 'දිස්ත්‍රික් නිවාස කොමසාරිස්', 'org' => 'PHCO',
+            ],
         ];
 
         foreach ($externalUsers as $u) {

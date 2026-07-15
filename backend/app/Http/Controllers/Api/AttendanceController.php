@@ -156,7 +156,10 @@ class AttendanceController extends Controller
         $approvedLetterQuery = Letter::where('status', 'approved')
             ->with([
                 'recipients.user.organization',
+                'recipients.user.role',
                 'recipients.organization',
+                'recipients.organization.users.organization',
+                'recipients.organization.users.role',
             ])
             ->latest('letter_id');
 
@@ -180,27 +183,73 @@ class AttendanceController extends Controller
         }
 
         $existingRecords = AttendanceRecord::where('meeting_id', $meetingId)
+            ->where(function ($query) use ($approvedLetter) {
+                $query->where('letter_id', $approvedLetter->letter_id)
+                    ->orWhereNull('letter_id');
+            })
             ->with('user.organization', 'user.role')
-            ->get()
-            ->keyBy('user_id');
+            ->get();
 
-        $participants = $approvedLetter->recipients
-            ->filter(fn ($recipient) => $recipient->user_id && $recipient->user)
-            ->unique('user_id')
-            ->map(function ($recipient) use ($existingRecords) {
+        $recordsByUser = $existingRecords->whereNotNull('user_id')->keyBy('user_id');
+        $recordsByRecipient = $existingRecords->whereNotNull('letter_recipient_id')->keyBy('letter_recipient_id');
+
+        $recipientParticipants = $approvedLetter->recipients
+            ->map(function ($recipient) use ($recordsByUser, $recordsByRecipient) {
                 $user = $recipient->user;
-                $record = $existingRecords->get($user->user_id);
+
+                // Older letters sometimes stored only the organization even
+                // when that organization has one unambiguous registered officer.
+                if (!$user && $recipient->organization?->users?->count() === 1) {
+                    $user = $recipient->organization->users->first();
+                }
+                $record = $user
+                    ? ($recordsByUser->get($user->user_id)
+                        ?? $recordsByRecipient->get($recipient->letter_recipient_id))
+                    : $recordsByRecipient->get($recipient->letter_recipient_id);
+
+                return [
+                    'user_id' => $user?->user_id,
+                    'letter_recipient_id' => $user ? null : $recipient->letter_recipient_id,
+                    'full_name' => $user?->full_name
+                        ?? $recipient->recipient_label
+                        ?? $recipient->organization?->organization_name
+                        ?? 'Organization representative',
+                    'email' => $user?->email ?? '',
+                    'department' => $user?->organization?->organization_name
+                        ?? $recipient->organization?->organization_name,
+                    'role' => $user?->designation
+                        ?? $recipient->recipient_label
+                        ?? 'Organization representative',
+                    'status' => $record?->status ?? 'absent',
+                ];
+            })
+            ->unique(fn ($participant) => $participant['user_id']
+                ? 'user-'.$participant['user_id']
+                : 'recipient-'.$participant['letter_recipient_id']);
+
+        // Keep previously saved people visible even if the letter recipients are edited later.
+        $savedParticipants = $existingRecords
+            ->filter(fn ($record) => $record->user)
+            ->map(function ($record) {
+                $user = $record->user;
 
                 return [
                     'user_id' => $user->user_id,
+                    'letter_recipient_id' => null,
                     'full_name' => $user->full_name,
                     'email' => $user->email,
-                    'department' => $user->organization->organization_name
-                        ?? $recipient->organization?->organization_name,
-                    'role' => $user->designation ?? $recipient->recipient_label,
-                    'status' => $record?->status ?? 'absent',
+                    'department' => $user->organization?->organization_name,
+                    'role' => $user->designation ?? $user->role?->role_name,
+                    'status' => $record->status,
                 ];
             });
+
+        $participants = $recipientParticipants
+            ->concat($savedParticipants)
+            ->unique(fn ($participant) => $participant['user_id']
+                ? 'user-'.$participant['user_id']
+                : 'recipient-'.$participant['letter_recipient_id'])
+            ->values();
 
         $present = $participants->where('status', 'present')->count();
         $absent = $participants->where('status', 'absent')->count();
@@ -209,6 +258,7 @@ class AttendanceController extends Controller
 
         return response()->json([
             'meeting' => $meeting,
+            'letter_id' => $approvedLetter->letter_id,
             'participants' => $participants->values(),
             'statistics' => [
                 'attendance_percentage' => $total > 0 ? round(($present / $total) * 100) : 0,
@@ -225,8 +275,10 @@ class AttendanceController extends Controller
     public function saveDraft(Request $request, int $meetingId): JsonResponse
     {
         $validator = Validator::make($request->all(), [
+            'letter_id' => 'required|exists:letters,letter_id',
             'records' => 'required|array',
-            'records.*.user_id' => 'required|exists:users,user_id',
+            'records.*.user_id' => 'nullable|exists:users,user_id|required_without:records.*.letter_recipient_id',
+            'records.*.letter_recipient_id' => 'nullable|exists:letter_recipients,letter_recipient_id|required_without:records.*.user_id',
             'records.*.status' => 'required|in:present,absent,excused',
         ]);
 
@@ -234,10 +286,34 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
+        $letter = Letter::where('letter_id', $request->integer('letter_id'))
+            ->where('meeting_id', $meetingId)
+            ->where('created_by', $request->user()->user_id)
+            ->first();
+
+        if (!$letter) {
+            return response()->json(['message' => 'Only the meeting letter creator can edit attendance.'], 403);
+        }
+
+        $validRecipientIds = $letter->recipients()->pluck('letter_recipient_id');
+
         foreach ($request->records as $record) {
+            if (!empty($record['letter_recipient_id']) && !$validRecipientIds->contains((int) $record['letter_recipient_id'])) {
+                return response()->json(['message' => 'An attendance recipient does not belong to this meeting letter.'], 422);
+            }
+        }
+
+        foreach ($request->records as $record) {
+            $identity = !empty($record['user_id'])
+                ? ['letter_id' => $letter->letter_id, 'user_id' => $record['user_id']]
+                : ['letter_id' => $letter->letter_id, 'letter_recipient_id' => $record['letter_recipient_id']];
+
             AttendanceRecord::updateOrCreate(
-                ['meeting_id' => $meetingId, 'user_id' => $record['user_id']],
+                $identity,
                 [
+                    'meeting_id' => $meetingId,
+                    'user_id' => $record['user_id'] ?? null,
+                    'letter_recipient_id' => $record['letter_recipient_id'] ?? null,
                     'status' => $record['status'],
                     'is_draft' => true,
                     'recorded_by' => $request->user()->user_id,
@@ -253,7 +329,26 @@ class AttendanceController extends Controller
      */
     public function submit(Request $request, int $meetingId): JsonResponse
     {
-        AttendanceRecord::where('meeting_id', $meetingId)->update(['is_draft' => false]);
+        $validator = Validator::make($request->all(), [
+            'letter_id' => 'required|exists:letters,letter_id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
+
+        $letter = Letter::where('letter_id', $request->integer('letter_id'))
+            ->where('meeting_id', $meetingId)
+            ->where('created_by', $request->user()->user_id)
+            ->first();
+
+        if (!$letter) {
+            return response()->json(['message' => 'Only the meeting letter creator can submit attendance.'], 403);
+        }
+
+        AttendanceRecord::where('meeting_id', $meetingId)
+            ->where('letter_id', $letter->letter_id)
+            ->update(['is_draft' => false]);
 
         return response()->json(['message' => 'Attendance submitted and synced']);
     }

@@ -37,6 +37,7 @@ export default function AttendancePage() {
   const isViewOnly = searchParams.get('mode') === 'view';
   const showLetterSelector = !canLoadAttendance || isViewOnly;
   const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
+  const activeLetterId = selectedLetterId ?? sheet?.letter_id ?? null;
   const matchingLetters = letters.filter((letter) => {
     const term = letterSearch.trim().toLowerCase();
     if (!term) return true;
@@ -102,22 +103,26 @@ export default function AttendancePage() {
     if (selectedLetter) setLetterSearch(selectedLetter.letter_title);
   }, [isViewOnly, letters, selectedLetterId]);
 
-  const handleStatusChange = (userId: number, status: AttendanceStatus) => {
+  const participantKey = (participant: AttendanceParticipant) =>
+    participant.user_id ? `user-${participant.user_id}` : `recipient-${participant.letter_recipient_id}`;
+
+  const handleStatusChange = (key: string, status: AttendanceStatus) => {
     if (isViewOnly) return;
     setParticipants((previous) =>
       previous.map((participant) =>
-        participant.user_id === userId ? { ...participant, status } : participant
+        participantKey(participant) === key ? { ...participant, status } : participant
       )
     );
   };
 
   const handleSaveDraft = async () => {
-    if (!activeMeetingId || isViewOnly) return;
+    if (!activeMeetingId || !activeLetterId || isViewOnly) return;
     setIsSaving(true);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
+        activeLetterId,
+        participants.map((participant) => ({ user_id: participant.user_id, letter_recipient_id: participant.letter_recipient_id, status: participant.status }))
       );
     } finally {
       setIsSaving(false);
@@ -125,14 +130,15 @@ export default function AttendancePage() {
   };
 
   const handleSubmitAttendance = async () => {
-    if (!activeMeetingId || isViewOnly) return;
+    if (!activeMeetingId || !activeLetterId || isViewOnly) return;
     setIsSubmitting(true);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
+        activeLetterId,
+        participants.map((participant) => ({ user_id: participant.user_id, letter_recipient_id: participant.letter_recipient_id, status: participant.status }))
       );
-      await attendanceService.submit(activeMeetingId);
+      await attendanceService.submit(activeMeetingId, activeLetterId);
       await fetchSheet();
     } finally {
       setIsSubmitting(false);
@@ -331,16 +337,13 @@ export default function AttendancePage() {
                   </td>
                 </tr>
               ) : filteredParticipants.map((p) => (
-                <tr key={p.user_id}>
+                <tr key={participantKey(p)}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700">
                         {getInitials(p.full_name)}
                       </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">{p.full_name}</p>
-                        <p className="text-xs text-slate-400">{p.email}</p>
-                      </div>
+                      <p className="font-semibold text-slate-900">{p.full_name}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">{p.department ?? '—'}</td>
@@ -365,7 +368,7 @@ export default function AttendancePage() {
                             <button
                               key={status}
                               type="button"
-                              onClick={() => handleStatusChange(p.user_id, status)}
+                              onClick={() => handleStatusChange(participantKey(p), status)}
                               className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
                                 isActive ? config.activeClasses : 'border-transparent text-slate-500 hover:bg-white'
                               }`}
