@@ -144,6 +144,8 @@ export default function GenerateLetterPage() {
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('unsaved');
   const [actionMessage, setActionMessage] = useState<{ type: ActionMessageType; text: string } | null>(null);
   const [showDiscardConfirmation, setShowDiscardConfirmation] = useState(false);
+  const [showGenerateConfirmation, setShowGenerateConfirmation] = useState(false);
+  const [showApprovalConfirmation, setShowApprovalConfirmation] = useState(false);
   const [approvedRevision, setApprovedRevision] = useState<string | null>(null);
   const isExistingLetter = Boolean(id);
   const canEditLetter = !isExistingLetter || (letterOwnerId !== null && String(letterOwnerId) === user?.id);
@@ -337,8 +339,9 @@ export default function GenerateLetterPage() {
 
   const handleGenerate = async () => {
     if (!canEditLetter || actionsLocked) return;
+    setShowGenerateConfirmation(false);
     setIsGenerating(true);
-    setActionMessage(null);
+    setActionMessage({ type: 'info', text: 'Generating the meeting letter. Please wait…' });
     try {
       const saved = await letterService.saveDraft(buildPayload());
       const idToGenerate = saved.letter_id;
@@ -440,8 +443,9 @@ export default function GenerateLetterPage() {
 
   const handleSendForApproval = async () => {
     if (!canEditLetter || actionsLocked) return;
+    setShowApprovalConfirmation(false);
     setIsSendingApproval(true);
-    setActionMessage(null);
+    setActionMessage({ type: 'info', text: 'Sending the letter for approval. Please wait…' });
     try {
       const saved = await letterService.saveDraft(buildPayload());
       setLetterId(saved.letter_id);
@@ -463,7 +467,7 @@ export default function GenerateLetterPage() {
       setLetterStatus('pending_approval');
 
       setActionMessage({ type: 'success', text: 'Letter sent for approval successfully. Opening the approvals page…' });
-      window.setTimeout(() => navigate('/approvals'), 1000);
+      window.setTimeout(() => navigate('/approvals'), 1800);
     } catch (err: unknown) {
       console.error(err);
       setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to send letter for approval') });
@@ -521,11 +525,13 @@ export default function GenerateLetterPage() {
         </div>
 
         {actionMessage && (
-          <ActionMessage
-            type={actionMessage.type}
-            message={actionMessage.text}
-            onDismiss={() => setActionMessage(null)}
-          />
+          <div className="fixed right-5 top-5 z-[70] w-[min(26rem,calc(100vw-2.5rem))] shadow-lg">
+            <ActionMessage
+              type={actionMessage.type}
+              message={actionMessage.text}
+              onDismiss={() => setActionMessage(null)}
+            />
+          </div>
         )}
 
         {meetingContext && (
@@ -730,7 +736,7 @@ export default function GenerateLetterPage() {
                       />
                     )}
                     <button
-                      onClick={handleGenerate}
+                      onClick={() => setShowGenerateConfirmation(true)}
                       disabled={isGenerating || actionsLocked}
                       className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                     >
@@ -738,7 +744,7 @@ export default function GenerateLetterPage() {
                       {isGenerating ? 'Generating...' : 'Generate Letter'}
                     </button>
                     <button
-                      onClick={handleSendForApproval}
+                      onClick={() => setShowApprovalConfirmation(true)}
                       disabled={isSendingApproval || actionsLocked}
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-60"
                     >
@@ -813,6 +819,24 @@ export default function GenerateLetterPage() {
           onClose={() => setShowPreview(false)}
         />
       )}
+      <ConfirmDialog
+        open={showGenerateConfirmation}
+        title="Generate Letter"
+        message="Generate this meeting letter now? The latest letter details will be saved and used to create the preview."
+        confirmLabel="Generate Letter"
+        isProcessing={isGenerating}
+        onConfirm={handleGenerate}
+        onCancel={() => setShowGenerateConfirmation(false)}
+      />
+      <ConfirmDialog
+        open={showApprovalConfirmation}
+        title="Send for Approval"
+        message="Send this letter into the approval workflow? Please confirm that the subject, recipients, content, and signature details are correct."
+        confirmLabel="Send for Approval"
+        isProcessing={isSendingApproval}
+        onConfirm={handleSendForApproval}
+        onCancel={() => setShowApprovalConfirmation(false)}
+      />
       <ConfirmDialog
         open={showDiscardConfirmation}
         title="Discard Draft"
