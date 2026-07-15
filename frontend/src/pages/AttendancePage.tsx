@@ -1,10 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Download, BarChart3, Info, ChevronDown } from 'lucide-react';
+import { Search, Download, BarChart3, Info, ChevronDown, Pencil, Save, X } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { attendanceService } from '../services/attendanceService';
+import { meetingService } from '../services/meetingService';
 import type { AttendanceSheet, AttendanceStatus, AttendanceParticipant, ApprovedMeetingLetter } from '../types/attendance';
+
+type MeetingEditForm = {
+  title: string;
+  meeting_date: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+};
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string;}> = {
   present: { label: 'Present', activeClasses: 'bg-green-500 text-white border-green-500 ' },
@@ -33,6 +42,11 @@ export default function AttendancePage() {
   const [attendanceError, setAttendanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hoveredLetter, setHoveredLetter] = useState<ApprovedMeetingLetter | null>(null);
+  const [editingMeeting, setEditingMeeting] = useState(false);
+  const [meetingForm, setMeetingForm] = useState<MeetingEditForm | null>(null);
+  const [isUpdatingMeeting, setIsUpdatingMeeting] = useState(false);
+  const [meetingUpdateError, setMeetingUpdateError] = useState('');
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
   const isViewOnly = searchParams.get('mode') === 'view';
   const showLetterSelector = !canLoadAttendance || isViewOnly;
@@ -111,6 +125,82 @@ export default function AttendancePage() {
     );
   };
 
+  const startEditingMeeting = () => {
+    if (!hoveredLetter) return;
+    setMeetingForm({
+      title: hoveredLetter.meeting_title,
+      meeting_date: hoveredLetter.meeting_date?.slice(0, 10) ?? '',
+      start_time: hoveredLetter.start_time?.slice(0, 5) ?? '',
+      end_time: hoveredLetter.end_time?.slice(0, 5) ?? '',
+      location: hoveredLetter.location ?? '',
+    });
+    setMeetingUpdateError('');
+    setEditingMeeting(true);
+  };
+
+  const updateMeetingField = (field: keyof MeetingEditForm, value: string) => {
+    setMeetingForm((current) => current ? { ...current, [field]: value } : current);
+  };
+
+  const saveMeetingDetails = async () => {
+    if (!hoveredLetter || !meetingForm) return;
+    if (!meetingForm.title.trim() || !meetingForm.meeting_date) {
+      setMeetingUpdateError('Meeting title and date are required.');
+      return;
+    }
+    if (Boolean(meetingForm.start_time) !== Boolean(meetingForm.end_time)) {
+      setMeetingUpdateError('Please enter both the start and end time, or leave both empty.');
+      return;
+    }
+    if (meetingForm.start_time && meetingForm.end_time && meetingForm.end_time <= meetingForm.start_time) {
+      setMeetingUpdateError('End time must be after the start time.');
+      return;
+    }
+
+    setIsUpdatingMeeting(true);
+    setMeetingUpdateError('');
+    try {
+      const updated = await meetingService.update(hoveredLetter.meeting_id, {
+        title: meetingForm.title.trim(),
+        meeting_date: meetingForm.meeting_date,
+        start_time: meetingForm.start_time || null,
+        end_time: meetingForm.end_time || null,
+        location: meetingForm.location.trim() || null,
+      });
+      const mergeUpdate = (letter: ApprovedMeetingLetter): ApprovedMeetingLetter =>
+        letter.meeting_id === updated.meeting_id ? {
+          ...letter,
+          meeting_title: updated.title,
+          meeting_date: updated.meeting_date,
+          start_time: updated.start_time,
+          end_time: updated.end_time,
+          location: updated.location,
+        } : letter;
+      setLetters((current) => current.map(mergeUpdate));
+      setHoveredLetter((current) => current ? mergeUpdate(current) : current);
+      setSheet((current) => current?.meeting.meeting_id === updated.meeting_id ? {
+        ...current,
+        meeting: {
+          ...current.meeting,
+          title: updated.title,
+          meeting_date: updated.meeting_date,
+          start_time: updated.start_time,
+          end_time: updated.end_time,
+          location: updated.location,
+        },
+      } : current);
+      setEditingMeeting(false);
+      setMeetingForm(null);
+    } catch (err) {
+      const message = axios.isAxiosError<{ message?: string; errors?: Record<string, string[]> }>(err)
+        ? Object.values(err.response?.data?.errors ?? {})[0]?.[0] ?? err.response?.data?.message
+        : null;
+      setMeetingUpdateError(message ?? 'Failed to update the meeting details.');
+    } finally {
+      setIsUpdatingMeeting(false);
+    }
+  };
+
   const handleSaveDraft = async () => {
     if (!activeMeetingId || isViewOnly) return;
     setIsSaving(true);
@@ -168,7 +258,14 @@ export default function AttendancePage() {
                 <label htmlFor="meeting-letter" className="mb-2 block text-sm font-semibold text-slate-700">
                   Select Meeting Letter
                 </label>
-                <div className="relative">
+                <div
+                  className="relative"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      window.setTimeout(() => setIsLetterDropdownOpen(false), 100);
+                    }
+                  }}
+                >
                   <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <input
                     id="meeting-letter"
@@ -179,7 +276,6 @@ export default function AttendancePage() {
                       setIsLetterDropdownOpen(true);
                     }}
                     onFocus={() => setIsLetterDropdownOpen(true)}
-                    onBlur={() => window.setTimeout(() => setIsLetterDropdownOpen(false), 150)}
                     placeholder={isLoadingLetters ? 'Loading meeting letters...' : 'Type to search meeting letters...'}
                     disabled={isLoadingLetters}
                     autoComplete="off"
@@ -199,16 +295,23 @@ export default function AttendancePage() {
                   </button>
 
                   {isLetterDropdownOpen && !isLoadingLetters && (
-                    <div id="meeting-letter-options" role="listbox" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                      {matchingLetters.length === 0 ? (
-                        <p className="px-4 py-3 text-sm text-slate-400">No matching meeting letters found.</p>
-                      ) : matchingLetters.map((letter) => (
+                    <div id="meeting-letter-options" role="listbox" className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {matchingLetters.length === 0 ? (
+                          <p className="px-4 py-3 text-sm text-slate-400">No matching meeting letters found.</p>
+                        ) : matchingLetters.map((letter) => (
                         <button
                           key={letter.letter_id}
                           type="button"
                           role="option"
                           aria-selected={selectedLetterId === letter.letter_id}
                           onMouseDown={(event) => event.preventDefault()}
+                          onMouseEnter={() => {
+                            if (!editingMeeting) {
+                              setHoveredLetter(letter);
+                              setMeetingUpdateError('');
+                            }
+                          }}
                           onClick={() => {
                             setLetterSearch(letter.letter_title);
                             setIsLetterDropdownOpen(false);
@@ -221,7 +324,66 @@ export default function AttendancePage() {
                             {letter.subject_code ? `${letter.subject_code} · ` : ''}{letter.subject_title ?? letter.meeting_title}
                           </span>
                         </button>
-                      ))}
+                        ))}
+                      </div>
+
+                      {hoveredLetter && (
+                        <div
+                          className="absolute right-0 top-full mt-3 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xl lg:left-full lg:right-auto lg:top-0 lg:ml-3 lg:mt-0"
+                          onMouseLeave={() => {
+                            if (!editingMeeting) setHoveredLetter(null);
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Meeting details</p>
+                              {!editingMeeting && <h3 className="mt-1 font-semibold text-slate-900">{hoveredLetter.meeting_title}</h3>}
+                            </div>
+                            {editingMeeting ? (
+                              <button type="button" onClick={() => { setEditingMeeting(false); setMeetingForm(null); setMeetingUpdateError(''); }} className="rounded p-1 text-slate-400 hover:bg-slate-100" aria-label="Cancel editing">
+                                <X className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <button type="button" onClick={startEditingMeeting} className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+                                <Pencil className="h-3.5 w-3.5" /> Edit
+                              </button>
+                            )}
+                          </div>
+
+                          {editingMeeting && meetingForm ? (
+                            <div className="mt-3 space-y-3">
+                              <label className="block text-xs font-medium text-slate-600">Title
+                                <input value={meetingForm.title} onChange={(event) => updateMeetingField('title', event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                              </label>
+                              <label className="block text-xs font-medium text-slate-600">Date
+                                <input type="date" value={meetingForm.meeting_date} onChange={(event) => updateMeetingField('meeting_date', event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                              </label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <label className="block text-xs font-medium text-slate-600">Start time
+                                  <input type="time" value={meetingForm.start_time} onChange={(event) => updateMeetingField('start_time', event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                                </label>
+                                <label className="block text-xs font-medium text-slate-600">End time
+                                  <input type="time" value={meetingForm.end_time} onChange={(event) => updateMeetingField('end_time', event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                                </label>
+                              </div>
+                              <label className="block text-xs font-medium text-slate-600">Location
+                                <input value={meetingForm.location} onChange={(event) => updateMeetingField('location', event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                              </label>
+                              {meetingUpdateError && <p className="text-xs text-red-600">{meetingUpdateError}</p>}
+                              <button type="button" onClick={saveMeetingDetails} disabled={isUpdatingMeeting} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                                <Save className="h-4 w-4" /> {isUpdatingMeeting ? 'Updating…' : 'Update meeting'}
+                              </button>
+                            </div>
+                          ) : (
+                            <dl className="mt-3 space-y-2 text-sm">
+                              <div><dt className="text-xs text-slate-400">Date</dt><dd className="font-medium text-slate-700">{hoveredLetter.meeting_date ? new Date(`${hoveredLetter.meeting_date.slice(0, 10)}T00:00:00`).toLocaleDateString() : 'Not assigned'}</dd></div>
+                              <div><dt className="text-xs text-slate-400">Time</dt><dd className="font-medium text-slate-700">{hoveredLetter.start_time?.slice(0, 5) || 'Not assigned'}{hoveredLetter.end_time ? ` – ${hoveredLetter.end_time.slice(0, 5)}` : ''}</dd></div>
+                              <div><dt className="text-xs text-slate-400">Location</dt><dd className="font-medium text-slate-700">{hoveredLetter.location || 'Not assigned'}</dd></div>
+                              <div><dt className="text-xs text-slate-400">Recipients</dt><dd className="font-medium text-slate-700">{hoveredLetter.recipient_count}</dd></div>
+                            </dl>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
