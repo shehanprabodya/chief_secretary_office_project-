@@ -108,6 +108,23 @@ class MeetingController extends Controller
     }
 
     /**
+     * Upcoming meetings created by the authenticated officer.
+     */
+    public function createdUpcoming(Request $request): JsonResponse
+    {
+        $meetings = Meeting::with('subject', 'creator')
+            ->where('created_by', $request->user()->user_id)
+            ->whereDate('meeting_date', '>=', now()->toDateString())
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->orderBy('meeting_date')
+            ->orderBy('start_time')
+            ->limit(5)
+            ->get();
+
+        return response()->json(['meetings' => $meetings]);
+    }
+
+    /**
      * Upcoming meetings assigned to the authenticated officer.
      */
     public function assignedUpcoming(Request $request): JsonResponse

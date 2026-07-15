@@ -33,10 +33,10 @@ export default function AssignedMeetingsCard() {
 
     async function loadMeetings() {
       try {
-        const result = await meetingService.getAssignedUpcoming();
+        const result = await meetingService.getCreatedUpcoming();
         if (!ignore) setMeetings(result);
       } catch {
-        if (!ignore) setError('Could not load your assigned meetings.');
+        if (!ignore) setError('Could not load your meetings.');
       } finally {
         if (!ignore) setIsLoading(false);
       }
@@ -53,7 +53,7 @@ export default function AssignedMeetingsCard() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            My Assigned Meetings
+            My Meetings
           </h2>
           <Link
             to="/meetings"
@@ -70,7 +70,7 @@ export default function AssignedMeetingsCard() {
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       ) : meetings.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          You have no upcoming assigned meetings.
+          You have no upcoming meetings.
         </p>
       ) : (
         <div className="space-y-4">

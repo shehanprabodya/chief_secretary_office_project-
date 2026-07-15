@@ -1,4 +1,5 @@
 import { Clock, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface MeetingItemProps {
   meeting: {
@@ -12,7 +13,11 @@ interface MeetingItemProps {
 
 export default function MeetingItem({ meeting }: MeetingItemProps) {
   return (
-    <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
+    <Link
+      to={`/meetings/${meeting.id}`}
+      className="block rounded-lg border border-slate-200 p-4 transition-colors hover:border-blue-200 hover:bg-blue-50/60 dark:border-slate-700 dark:hover:bg-slate-700/50"
+      aria-label={`View details for ${meeting.title}`}
+    >
       <div className="flex items-start gap-4">
         <div className="flex-1">
           <h3 className="font-semibold text-slate-900 dark:text-white">
@@ -31,6 +36,6 @@ export default function MeetingItem({ meeting }: MeetingItemProps) {
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

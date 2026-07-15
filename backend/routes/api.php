@@ -70,6 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/meetings', [MeetingController::class, 'index']);
         Route::get('/meetings/by-date', [MeetingController::class, 'byDate']);
         Route::get('/meetings/created-by-date', [MeetingController::class, 'createdByDate']);
+        Route::get('/meetings/created-upcoming', [MeetingController::class, 'createdUpcoming']);
         Route::get('/meetings/assigned-upcoming', [MeetingController::class, 'assignedUpcoming']);
         Route::get('/meetings/{id}', [MeetingController::class, 'show']);
         Route::put('/meetings/{id}', [MeetingController::class, 'update']);
