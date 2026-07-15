@@ -151,11 +151,11 @@ export default function MeetingDetailsPage() {
             </div>
           ) : (
             <div className="p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3 pb-10">
                 <h2 className="text-xl font-bold text-slate-900">{meeting.title}</h2>
                 <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium capitalize text-blue-700">{meeting.status}</span>
               </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><CalendarDays className="h-5 w-5 text-blue-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Meeting Date</p><p className="mt-1 text-sm font-semibold text-slate-800">{new Date(`${meeting.meeting_date.slice(0, 10)}T00:00:00`).toLocaleDateString()}</p></div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><Clock className="h-5 w-5 text-blue-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Meeting Time</p><p className="mt-1 text-sm font-semibold text-slate-800">{meeting.start_time?.slice(0, 5) || 'Not assigned'}{meeting.end_time ? ` – ${meeting.end_time.slice(0, 5)}` : ''}</p></div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><MapPin className="h-5 w-5 text-blue-600" /><p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Location</p><p className="mt-1 text-sm font-semibold text-slate-800">{meeting.location || 'Not assigned'}</p></div>
