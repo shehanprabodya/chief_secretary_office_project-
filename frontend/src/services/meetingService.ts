@@ -24,9 +24,24 @@ export const meetingService = {
     return data.meetings;
   },
 
+  async getCreatedByDate(date: string): Promise<Meeting[]> {
+    const { data } = await api.get<{ meetings: Meeting[] }>(
+      '/officer/meetings/created-by-date',
+      { params: { date } },
+    );
+    return data.meetings;
+  },
+
   async getAssignedUpcoming(): Promise<Meeting[]> {
     const { data } = await api.get<{ meetings: Meeting[] }>(
       '/officer/meetings/assigned-upcoming',
+    );
+    return data.meetings;
+  },
+
+  async getCreatedUpcoming(): Promise<Meeting[]> {
+    const { data } = await api.get<{ meetings: Meeting[] }>(
+      '/officer/meetings/created-upcoming',
     );
     return data.meetings;
   },
@@ -41,7 +56,7 @@ export const meetingService = {
     return data.meeting;
   },
 
-  async update(id: number, payload: Partial<Meeting> & { attendee_ids?: number[] }): Promise<Meeting> {
+  async update(id: number, payload: Partial<Meeting> & { attendee_ids?: number[]; letter_id?: number }): Promise<Meeting> {
     const { data } = await api.put<{ meeting: Meeting }>(`/officer/meetings/${id}`, payload);
     return data.meeting;
   },

@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
+use App\Models\Letter;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -84,6 +85,46 @@ class MeetingController extends Controller
     }
 
     /**
+     * Get meetings created by the authenticated officer for a specific date.
+     */
+    public function createdByDate(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Invalid date'], 422);
+        }
+
+        $meetings = Meeting::with('subject', 'creator')
+            ->where('created_by', $request->user()->user_id)
+            ->whereDate('meeting_date', $request->date)
+            ->where('status', '!=', 'cancelled')
+            ->orderBy('start_time')
+            ->get();
+
+        return response()->json(['meetings' => $meetings]);
+    }
+
+    /**
+     * Upcoming meetings created by the authenticated officer.
+     */
+    public function createdUpcoming(Request $request): JsonResponse
+    {
+        $meetings = Meeting::with('subject', 'creator')
+            ->where('created_by', $request->user()->user_id)
+            ->whereDate('meeting_date', '>=', now()->toDateString())
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->orderBy('meeting_date')
+            ->orderBy('start_time')
+            ->limit(5)
+            ->get();
+
+        return response()->json(['meetings' => $meetings]);
+    }
+
+    /**
      * Upcoming meetings assigned to the authenticated officer.
      */
     public function assignedUpcoming(Request $request): JsonResponse
@@ -145,6 +186,21 @@ class MeetingController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $meeting = Meeting::findOrFail($id);
+
+        $canEdit = (int) $meeting->created_by === (int) $request->user()->user_id;
+
+        if ($request->filled('letter_id')) {
+            $canEdit = Letter::where('letter_id', $request->integer('letter_id'))
+                ->where('meeting_id', $meeting->meeting_id)
+                ->where('created_by', $request->user()->user_id)
+                ->exists();
+        }
+
+        if (!$canEdit) {
+            return response()->json([
+                'message' => 'Only the creator can edit these meeting details.',
+            ], 403);
+        }
         
         $validator = Validator::make($request->all(), [
             'title' => 'sometimes|string|max:255',
@@ -155,6 +211,7 @@ class MeetingController extends Controller
             'location_type' => 'sometimes|in:physical,virtual,not_assigned',
             'status' => 'sometimes|in:draft,scheduled,completed,cancelled',
             'description' => 'nullable|string',
+            'letter_id' => 'nullable|exists:letters,letter_id',
             'attendee_ids' => 'nullable|array',
             'attendee_ids.*' => 'exists:users,user_id',
         ]);
@@ -163,7 +220,7 @@ class MeetingController extends Controller
             return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $meeting->update($validator->safe()->except('attendee_ids'));
+        $meeting->update($validator->safe()->except(['attendee_ids', 'letter_id']));
 
         if ($request->has('attendee_ids')) {
             $meeting->attendees()->sync($request->attendee_ids);

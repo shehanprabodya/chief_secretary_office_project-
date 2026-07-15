@@ -19,12 +19,8 @@ export default function WelcomeSection() {
 
     async function loadMeetingCount() {
       try {
-        const meetings = await meetingService.getByDate(dateKey(new Date()));
-        const scheduledMeetings = meetings.filter(
-          (meeting) => meeting.status !== 'cancelled',
-        );
-
-        if (!ignore) setMeetingCount(scheduledMeetings.length);
+        const meetings = await meetingService.getCreatedByDate(dateKey(new Date()));
+        if (!ignore) setMeetingCount(meetings.length);
       } catch {
         if (!ignore) setHasError(true);
       }
@@ -42,9 +38,8 @@ export default function WelcomeSection() {
     scheduleMessage = "Today's meeting schedule is unavailable.";
   } else if (meetingCount === 0) {
     scheduleMessage = 'You have no meetings scheduled for today.';
-  } else if (meetingCount === 1) {
-    scheduleMessage = 'You have 1 meeting scheduled for today.';
-  } else if (meetingCount !== null) {
+  } 
+   else if (meetingCount !== null) {
     scheduleMessage = `You have ${meetingCount} meetings scheduled for today.`;
   }
 

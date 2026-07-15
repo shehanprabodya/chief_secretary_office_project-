@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import PreviewModal from '../components/Letters/PreviewModal';
+import { useAuth } from '../context/AuthContext';
 import { letterService } from '../services/letterService';
 import type { Letter, Subject } from '../types/letter';
 
@@ -41,6 +42,7 @@ const LETTERS_PER_PAGE = 10;
 
 export default function MeetingsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [letters, setLetters] = useState<Letter[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -263,7 +265,9 @@ export default function MeetingsPage() {
                     <td className="px-6 py-4">
                       <button
                         type="button"
-                        onClick={() => navigate(`/letters/${letter.letter_id}`)}
+                        onClick={() => navigate(letter.meeting_id
+                          ? `/meetings/${letter.meeting_id}?letter_id=${letter.letter_id}`
+                          : `/letters/${letter.letter_id}`)}
                         className="text-left font-semibold text-blue-700 hover:underline"
                       >
                         {formatLetterTitle(letter.title)}
@@ -282,22 +286,34 @@ export default function MeetingsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button
-                        type="button"
-                        disabled={letter.status !== 'approved'}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          navigate(`/attendance?letter_id=${letter.letter_id}`);
-                        }}
-                        className="rounded p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
-                        title={
-                          letter.status === 'approved'
-                            ? 'Open participant attendance table'
-                            : 'Attendance opens after this meeting letter is approved'
-                        }
-                      >
-                        <ClipboardCheck className="h-4 w-4" />
-                      </button>
+                      {Number(user?.id) === letter.created_by ? (
+                        <button
+                          type="button"
+                          disabled={letter.status !== 'approved'}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/attendance?letter_id=${letter.letter_id}`);
+                          }}
+                          className="rounded p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                          title={
+                            letter.status === 'approved'
+                              ? 'Edit participant attendance'
+                              : 'Attendance editing opens after this meeting letter is approved'
+                          }
+                        >
+                          <ClipboardCheck className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="cursor-not-allowed rounded p-1.5 text-slate-300"
+                          title="Only the meeting letter creator can edit attendance"
+                          aria-label="Attendance editing is available only to the meeting letter creator"
+                        >
+                          <ClipboardCheck className="h-4 w-4" />
+                        </button>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
