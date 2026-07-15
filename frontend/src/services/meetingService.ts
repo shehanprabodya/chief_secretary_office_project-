@@ -24,6 +24,14 @@ export const meetingService = {
     return data.meetings;
   },
 
+  async getCreatedByDate(date: string): Promise<Meeting[]> {
+    const { data } = await api.get<{ meetings: Meeting[] }>(
+      '/officer/meetings/created-by-date',
+      { params: { date } },
+    );
+    return data.meetings;
+  },
+
   async getAssignedUpcoming(): Promise<Meeting[]> {
     const { data } = await api.get<{ meetings: Meeting[] }>(
       '/officer/meetings/assigned-upcoming',

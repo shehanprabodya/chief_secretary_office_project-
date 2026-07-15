@@ -85,6 +85,29 @@ class MeetingController extends Controller
     }
 
     /**
+     * Get meetings created by the authenticated officer for a specific date.
+     */
+    public function createdByDate(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Invalid date'], 422);
+        }
+
+        $meetings = Meeting::with('subject', 'creator')
+            ->where('created_by', $request->user()->user_id)
+            ->whereDate('meeting_date', $request->date)
+            ->where('status', '!=', 'cancelled')
+            ->orderBy('start_time')
+            ->get();
+
+        return response()->json(['meetings' => $meetings]);
+    }
+
+    /**
      * Upcoming meetings assigned to the authenticated officer.
      */
     public function assignedUpcoming(Request $request): JsonResponse

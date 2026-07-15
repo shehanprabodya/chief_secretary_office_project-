@@ -19,12 +19,8 @@ export default function WelcomeSection() {
 
     async function loadMeetingCount() {
       try {
-        const meetings = await meetingService.getByDate(dateKey(new Date()));
-        const scheduledMeetings = meetings.filter(
-          (meeting) => meeting.status !== 'cancelled',
-        );
-
-        if (!ignore) setMeetingCount(scheduledMeetings.length);
+        const meetings = await meetingService.getCreatedByDate(dateKey(new Date()));
+        if (!ignore) setMeetingCount(meetings.length);
       } catch {
         if (!ignore) setHasError(true);
       }
