@@ -99,44 +99,41 @@ export default function CreateMeetingPage() {
 
   return (
     <DashboardLayout pageTitle="Create Meeting">
-      <div className="mx-auto max-w-3xl space-y-6">
-        <div>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             onClick={() => navigate('/meetings')}
-            className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800"
+            className="inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-700"
           >
             <ArrowLeft className="h-4 w-4" /> Back to meetings
           </button>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Meetings &nbsp;›&nbsp; Create Meeting &nbsp;›&nbsp; Generate Letter
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">Create Meeting</h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-slate-900">Create Meeting</h1>
+          <p className="text-sm text-slate-500">
             Add the meeting details before preparing its official letter.
           </p>
         </div>
 
         <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
-          <div className="flex items-center gap-3 bg-blue-50 px-4 py-3 font-semibold text-blue-700">
+          <div className="flex items-center gap-3 border-r border-blue-200 bg-blue-50 px-5 py-4 font-semibold text-blue-700">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs text-white">1</span>
             Meeting details
           </div>
-          <div className="flex items-center gap-3 px-4 py-3 text-slate-400">
+          <div className="flex items-center gap-3 bg-slate-50 px-5 py-4 text-slate-400">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs">2</span>
             Generate letter
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-base font-semibold text-slate-800">Meeting information</h2>
-            <p className="mt-1 text-sm text-slate-500">All fields are required.</p>
+        <form onSubmit={handleSubmit} noValidate className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 bg-slate-100 px-6 py-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Meeting Information</h2>
+            <p className="mt-1 text-sm text-slate-500">Enter all required details before generating the letter.</p>
           </div>
 
-          <div className="mt-6 space-y-6">
+          <div className="flex flex-col p-6 sm:p-8" style={{ gap: '2.5rem' }}>
             <div>
-              <label htmlFor="meeting-title" className="mb-2 block text-sm font-semibold text-slate-700">
+              <label htmlFor="meeting-title" className="mb-3 block text-sm font-semibold text-slate-700">
                 Meeting title
               </label>
               <input
@@ -152,9 +149,9 @@ export default function CreateMeetingPage() {
               {errors.title && <p id="meeting-title-error" className="mt-1.5 text-xs text-red-600">{errors.title}</p>}
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2">
+            <div className="grid sm:grid-cols-2" style={{ columnGap: '2rem', rowGap: '2.5rem' }}>
               <div>
-                <label htmlFor="meeting-date" className="mb-2 block text-sm font-semibold text-slate-700">
+                <label htmlFor="meeting-date" className="mb-3 block text-sm font-semibold text-slate-700">
                   Meeting date
                 </label>
                 <div className="relative">
@@ -173,7 +170,7 @@ export default function CreateMeetingPage() {
               </div>
 
               <div>
-                <label htmlFor="meeting-location" className="mb-2 block text-sm font-semibold text-slate-700">
+                <label htmlFor="meeting-location" className="mb-3 block text-sm font-semibold text-slate-700">
                   Location
                 </label>
                 <div className="relative">
@@ -193,9 +190,9 @@ export default function CreateMeetingPage() {
               </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2">
+            <div className="grid sm:grid-cols-2" style={{ columnGap: '2rem', rowGap: '2.5rem' }}>
               <div>
-                <label htmlFor="meeting-start-time" className="mb-2 block text-sm font-semibold text-slate-700">
+                <label htmlFor="meeting-start-time" className="mb-3 block text-sm font-semibold text-slate-700">
                   Start time
                 </label>
                 <div className="relative">
@@ -214,7 +211,7 @@ export default function CreateMeetingPage() {
               </div>
 
               <div>
-                <label htmlFor="meeting-end-time" className="mb-2 block text-sm font-semibold text-slate-700">
+                <label htmlFor="meeting-end-time" className="mb-3 block text-sm font-semibold text-slate-700">
                   End time
                 </label>
                 <div className="relative">
@@ -234,7 +231,7 @@ export default function CreateMeetingPage() {
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
             {submitError && (
               <p role="alert" className="self-center text-sm text-red-600 sm:mr-auto">
                 {submitError}
@@ -244,14 +241,14 @@ export default function CreateMeetingPage() {
               type="button"
               onClick={() => navigate('/meetings')}
               disabled={isSubmitting}
-              className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 bg-slate-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? 'Creating meeting…' : 'Create and continue'}
               {!isSubmitting && <ArrowRight className="h-4 w-4" />}
