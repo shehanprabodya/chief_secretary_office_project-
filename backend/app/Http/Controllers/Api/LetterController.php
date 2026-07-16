@@ -674,8 +674,16 @@ class LetterController extends Controller
         $designation = e($letter->designation ?? 'ප්‍රධාන ලේකම්');
         $office = 'දකුණු පළාත';
 
+        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
+        $fontFace = is_file($fontPath)
+            ? '@font-face { font-family: "Iskoola Pota"; src: url("data:font/ttf;base64,'
+                . base64_encode((string) file_get_contents($fontPath))
+                . '") format("truetype"); font-style: normal; font-weight: 400; }'
+            : '';
+
         $css = '
             <style>
+                __ISKOOLA_FONT_FACE__
                 @page {
                     size: Letter portrait;
                     margin: 1in;
@@ -767,6 +775,7 @@ class LetterController extends Controller
                 }
             </style>
         ';
+        $css = str_replace('__ISKOOLA_FONT_FACE__', $fontFace, $css);
 
         $wrapStart = $standalone
             ? "<!DOCTYPE html><html><head><meta charset='UTF-8'>{$css}</head><body>"

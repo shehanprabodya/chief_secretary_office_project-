@@ -28,6 +28,12 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         <head>
           <title>Letter</title>
           <style>
+            @font-face {
+              font-family: 'Iskoola Pota';
+              src: url('/fonts/Iskoola Pota Regular.ttf') format('truetype');
+              font-style: normal;
+              font-weight: 400;
+            }
             @page { size: Letter portrait; margin: 1in; }
             html, body { margin: 0; padding: 0; }
             body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
