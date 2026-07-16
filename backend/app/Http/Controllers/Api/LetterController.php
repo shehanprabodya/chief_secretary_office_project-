@@ -686,6 +686,7 @@ class LetterController extends Controller
                     font-size: 12pt;
                     line-height: 1.3;
                     letter-spacing: normal;
+                    word-spacing: -1.5pt;
                     color: #000;
                     width: 100%;
                     box-sizing: border-box;
@@ -695,6 +696,7 @@ class LetterController extends Controller
                     font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
                     font-size: 12pt;
                     letter-spacing: normal;
+                    word-spacing: -1.5pt;
                 }
 
                 .letterhead-meta {
@@ -739,6 +741,11 @@ class LetterController extends Controller
 
                 .body {
                     text-align: justify;
+                    word-spacing: -1.5pt !important;
+                }
+
+                .body * {
+                    word-spacing: -1.5pt !important;
                 }
 
                 .body p {

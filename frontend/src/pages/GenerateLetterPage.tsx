@@ -402,6 +402,8 @@ export default function GenerateLetterPage() {
             html, body { margin: 0; padding: 0; }
             body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page { width: 100%; box-sizing: border-box; }
+            .letter-page, .letter-page * { word-spacing: -1.5pt; }
+            .letter-page .body, .letter-page .body * { word-spacing: -1.5pt !important; }
           </style>
         </head>
         <body>${previewHtml}</body>
