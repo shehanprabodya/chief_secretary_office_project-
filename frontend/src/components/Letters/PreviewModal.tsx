@@ -30,7 +30,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
           <style>
             @page { size: 8.27in 11.69in; margin: 30mm 20mm 25mm 30mm; }
             html, body { margin: 0; padding: 0; }
-            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 10pt; line-height: 0.5; }
             .letter-page { width: 100%; box-sizing: border-box; }
             .letter-page, .letter-page * { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page .subject, .letter-page .subject * { font-size: 13pt; }
@@ -95,8 +95,8 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
               width: '8.27in',
               minHeight: '11.69in',
               fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif",
-              fontSize: '12pt',
-              lineHeight: '1.75',
+              fontSize: '10pt',
+              lineHeight: '0.5',
             }}
             dangerouslySetInnerHTML={{ __html: safeHtml }}
           />
