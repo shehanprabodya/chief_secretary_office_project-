@@ -242,11 +242,11 @@ export default function ApprovalsPage() {
 
               {/* Document Preview */}
               {activeTab === 'preview' && (
-                <div className="mt-6 rounded-lg border border-slate-200 bg-slate-200 p-6">
+                <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-slate-200 p-6">
                   {hasHtml(selectedDoc.full_content) ? (
                     <div
-                      className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
-                      style={{ fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
+                      className="mx-auto shrink-0 box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
+                      style={{ width: '8.27in', minHeight: '11.69in', fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
                       dangerouslySetInnerHTML={{ __html: sanitizeDocumentHtml(selectedDoc.full_content ?? '') }}
                     />
                   ) : (

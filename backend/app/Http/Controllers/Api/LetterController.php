@@ -677,7 +677,7 @@ class LetterController extends Controller
         $css = '
             <style>
                 @page {
-                    size: A4;
+                    size: 8.27in 11.69in;
                     /* Keep clear space for printer-supplied headers and footers. */
                     margin: 30mm 20mm 25mm 30mm;
                 }
