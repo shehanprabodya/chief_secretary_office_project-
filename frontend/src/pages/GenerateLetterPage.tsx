@@ -398,9 +398,9 @@ export default function GenerateLetterPage() {
         <head>
           <title>Print Letter</title>
           <style>
-            @page { size: 8.27in 11.69in; margin: 30mm 20mm 25mm 30mm; }
+            @page { size: Letter portrait; margin: 1in; }
             html, body { margin: 0; padding: 0; }
-            body { font-family: 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page { width: 100%; box-sizing: border-box; }
           </style>
         </head>

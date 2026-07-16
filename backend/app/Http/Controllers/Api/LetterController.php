@@ -270,7 +270,7 @@ class LetterController extends Controller
 
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->setPaper('letter', 'portrait');
         $dompdf->render();
 
         return response($dompdf->output(), 200, [
@@ -403,8 +403,8 @@ class LetterController extends Controller
             <w:body>
                 <w:altChunk r:id="htmlChunk"/>
                 <w:sectPr>
-                    <w:pgSz w:w="11906" w:h="16838"/>
-                    <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
+                    <w:pgSz w:w="12240" w:h="15840"/>
+                    <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
                 </w:sectPr>
             </w:body>
         </w:document>
@@ -539,8 +539,8 @@ class LetterController extends Controller
             <w:body>
                 {$body}
                 <w:sectPr>
-                    <w:pgSz w:w="11906" w:h="16838"/>
-                    <w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
+                    <w:pgSz w:w="12240" w:h="15840"/>
+                    <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
                 </w:sectPr>
             </w:body>
         </w:document>
@@ -677,15 +677,15 @@ class LetterController extends Controller
         $css = '
             <style>
                 @page {
-                    size: 8.27in 11.69in;
-                    /* Keep clear space for printer-supplied headers and footers. */
-                    margin: 30mm 20mm 25mm 30mm;
+                    size: Letter portrait;
+                    margin: 1in;
                 }
 
                 .letter-page {
                     font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
                     font-size: 12pt;
-                    line-height: 1.75;
+                    line-height: 1.3;
+                    letter-spacing: normal;
                     color: #000;
                     width: 100%;
                     box-sizing: border-box;
@@ -694,6 +694,7 @@ class LetterController extends Controller
                 .letter-page * {
                     font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
                     font-size: 12pt;
+                    letter-spacing: normal;
                 }
 
                 .letterhead-meta {
@@ -706,6 +707,8 @@ class LetterController extends Controller
                     width: 50%;
                     padding: 0;
                     vertical-align: top;
+                    font-family: Calibri, Arial, sans-serif;
+                    font-size: 12pt;
                 }
 
                 .letterhead-date {
@@ -714,6 +717,8 @@ class LetterController extends Controller
 
                 .recipients {
                     margin-bottom: 22px;
+                    line-height: 1.3;
+                    text-align: left;
                 }
 
                 .subject {
@@ -738,6 +743,12 @@ class LetterController extends Controller
 
                 .body p {
                     margin: 0 0 14px 0;
+                    line-height: 1.3;
+                    text-indent: 0;
+                }
+
+                .body p + p {
+                    line-height: 1.5;
                 }
 
                 .signature {

@@ -28,12 +28,11 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         <head>
           <title>Letter</title>
           <style>
-            @page { size: 8.27in 11.69in; margin: 30mm 20mm 25mm 30mm; }
+            @page { size: Letter portrait; margin: 1in; }
             html, body { margin: 0; padding: 0; }
-            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 10pt; line-height: 0.5; }
+            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page { width: 100%; box-sizing: border-box; }
-            .letter-page, .letter-page * { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
-            .letter-page .subject, .letter-page .subject * { font-size: 13pt; }
+            .letter-page, .letter-page * { letter-spacing: normal; }
           </style>
         </head>
         <body>${safeHtml}</body>
@@ -51,8 +50,8 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
       <div
         className="relative z-10 flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         style={{
-          width: 'min(calc(8.27in + 4rem), calc(100vw - 2rem))',
-          height: 'min(calc(11.69in + 5rem), 95vh)',
+          width: 'min(calc(8.5in + 4rem), calc(100vw - 2rem))',
+          height: 'min(calc(11in + 5rem), 95vh)',
         }}
       >
         {/* Header */}
@@ -90,13 +89,12 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         {/* Preview Content */}
         <div className="flex-1 overflow-auto bg-slate-200 p-4 sm:p-8">
           <div
-            className="mx-auto shrink-0 box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
+            className="mx-auto shrink-0 box-border bg-white p-[1in] shadow-xl"
             style={{
-              width: '8.27in',
-              minHeight: '11.69in',
+              width: '8.5in',
+              minHeight: '11in',
               fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif",
-              fontSize: '10pt',
-              lineHeight: '0.5',
+              fontSize: '12pt',
             }}
             dangerouslySetInnerHTML={{ __html: safeHtml }}
           />
