@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class UserManagementController extends Controller
 {
@@ -215,5 +216,54 @@ class UserManagementController extends Controller
             ->get(['id', 'name', 'last_used_at', 'expires_at', 'created_at']);
 
         return response()->json(['logs' => $tokens]);
+    }
+
+    /**
+     * Paginated access-session activity across all users for the admin log tab.
+     */
+    public function allAccessLogs(Request $request): JsonResponse
+    {
+        $search = trim((string) $request->input('search', ''));
+
+        $logs = PersonalAccessToken::query()
+            ->with(['tokenable' => fn ($query) => $query->with('role', 'organization')])
+            ->where('tokenable_type', User::class)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('name', 'like', "%{$search}%")
+                        ->orWhereHasMorph('tokenable', [User::class], function ($userQuery) use ($search) {
+                            $userQuery->where('full_name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%")
+                                ->orWhere('username', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->orderByRaw('COALESCE(last_used_at, created_at) DESC')
+            ->paginate($request->integer('per_page', 15));
+
+        $logs->getCollection()->transform(function (PersonalAccessToken $token) {
+            /** @var User|null $user */
+            $user = $token->tokenable;
+            $isExpired = $token->expires_at && $token->expires_at->isPast();
+
+            return [
+                'id' => $token->id,
+                'token_name' => $token->name,
+                'created_at' => $token->created_at,
+                'last_used_at' => $token->last_used_at,
+                'expires_at' => $token->expires_at,
+                'status' => $isExpired ? 'expired' : 'active',
+                'user' => $user ? [
+                    'user_id' => $user->user_id,
+                    'full_name' => $user->full_name,
+                    'email' => $user->email,
+                    'username' => $user->username,
+                    'role' => $user->role?->role_name,
+                    'organization' => $user->organization?->organization_name,
+                ] : null,
+            ];
+        });
+
+        return response()->json($logs);
     }
 }

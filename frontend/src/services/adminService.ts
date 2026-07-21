@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord} from '../types/admin';
+import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs} from '../types/admin';
 
 export interface UserFilters {
   search?: string;
@@ -91,5 +91,12 @@ export const adminService = {
 
   async deleteSubject(id: number): Promise<void> {
     await api.delete(`/admin/subjects/${id}`);
+  },
+
+  async getAccessLogs(search = '', page = 1): Promise<PaginatedAccessLogs> {
+    const { data } = await api.get<PaginatedAccessLogs>('/admin/access-logs', {
+      params: { search: search || undefined, page },
+    });
+    return data;
   },
 };

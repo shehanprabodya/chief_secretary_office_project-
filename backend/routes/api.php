@@ -43,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/stats', [AdminDashboardController::class, 'stats']);
         Route::get('/upcoming-meetings', [AdminDashboardController::class, 'upcomingMeetings']);
         Route::get('/recent-activity', [AdminDashboardController::class, 'recentActivity']);
+        Route::get('/access-logs', [UserManagementController::class, 'allAccessLogs']);
 
         Route::prefix('users')->group(function () {
 
