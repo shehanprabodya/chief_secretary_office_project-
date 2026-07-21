@@ -98,4 +98,18 @@ export const navigation = {
       href: "/approvals",
     },
   ],
+
+  external_officer: [
+    {
+      icon: LayoutDashboard,
+      label: "Dashboard",
+      href: "/dashboard/external-officer",
+    },
+    {
+      icon: Calendar,
+      label: "My Meetings",
+      href: "/dashboard/external-officer#meetings",
+    },
+    
+  ],
 };

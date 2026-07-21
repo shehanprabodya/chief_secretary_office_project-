@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<string, string> = {
   dept_head: 'Department Head',
   deputy: 'Deputy Secretary',
   chief_secretary: 'Chief Secretary',
+  external_officer: 'External Officer',
 };
 
 export default function TopNavbar({ onMenuClick, pageTitle = 'Development Division' }: TopNavbarProps) {

@@ -159,10 +159,76 @@ class LetterController extends Controller
             }
         }
 
+        if ($letter->meeting_id) {
+            $this->syncExternalMeetingAttendees($letter->meeting_id);
+        }
+
         return response()->json([
             'message' => 'Draft saved',
             'letter'  => $letter->load('recipients.organization', 'recipients.user.organization', 'subject'),
         ]);
+    }
+
+    /**
+     * Treat meeting-letter recipient tags as the source of truth for external
+     * meeting assignments. Internal attendees assigned through the meeting
+     * form are preserved.
+     */
+    private function syncExternalMeetingAttendees(int $meetingId): void
+    {
+        $meeting = Meeting::with('letters.recipients')->find($meetingId);
+
+        if (!$meeting) {
+            return;
+        }
+
+        $directUserIds = $meeting->letters
+            ->flatMap(fn (Letter $letter) => $letter->recipients)
+            ->pluck('user_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $organizationIds = $meeting->letters
+            ->flatMap(fn (Letter $letter) => $letter->recipients)
+            ->filter(fn ($recipient) => !$recipient->user_id)
+            ->pluck('organization_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $assignedExternalIds = User::query()
+            ->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($query) => $query->where('role_name', 'external_officer'))
+            ->where(function ($query) use ($directUserIds, $organizationIds) {
+                if ($directUserIds->isNotEmpty()) {
+                    $query->whereIn('user_id', $directUserIds);
+                }
+
+                if ($organizationIds->isNotEmpty()) {
+                    $method = $directUserIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('organization_id', $organizationIds);
+                }
+
+                if ($directUserIds->isEmpty() && $organizationIds->isEmpty()) {
+                    $query->whereRaw('1 = 0');
+                }
+            })
+            ->pluck('user_id');
+
+        $currentlyAssignedExternalIds = $meeting->attendees()
+            ->whereHas('role', fn ($query) => $query->where('role_name', 'external_officer'))
+            ->pluck('users.user_id');
+
+        $meeting->attendees()->detach(
+            $currentlyAssignedExternalIds->diff($assignedExternalIds)->all()
+        );
+
+        $meeting->attendees()->syncWithoutDetaching(
+            $assignedExternalIds
+                ->mapWithKeys(fn ($userId) => [$userId => ['attendance_role' => 'assigned']])
+                ->all()
+        );
     }
 
     private function letterStatusFromApproval(?string $approvalStatus): ?string
@@ -228,6 +294,25 @@ class LetterController extends Controller
         return response()->json([
             'preview_html' => $generatedHtml,
             'letter'       => $letter,
+        ]);
+    }
+
+    public function externalPreview(Request $request, int $id): JsonResponse
+    {
+        $letter = Letter::with(
+            'recipients.organization',
+            'recipients.user.organization',
+            'subject',
+            'creator'
+        )
+            ->whereIn('status', ['approved', 'dispatched'])
+            ->whereHas('meeting.attendees', fn ($query) => $query
+                ->where('users.user_id', $request->user()->user_id))
+            ->findOrFail($id);
+
+        return response()->json([
+            'preview_html' => $this->buildLetterHtml($letter),
+            'letter_id' => $letter->letter_id,
         ]);
     }
 
@@ -729,10 +814,15 @@ class LetterController extends Controller
                     margin-bottom: 22px;
                     line-height: 1.3;
                     text-align: left;
+                    font-size: 12pt !important;
+                }
+
+                .recipients * {
+                    font-size: 12pt !important;
                 }
 
                 .subject {
-                    font-size: 13pt;
+                    font-size: 13pt !important;
                     font-weight: bold;
                     text-align: center;
                     text-decoration: underline;
@@ -740,7 +830,7 @@ class LetterController extends Controller
                 }
 
                 .subject * {
-                    font-size: 13pt;
+                    font-size: 13pt !important;
                 }
 
                 .subject p {
@@ -750,10 +840,12 @@ class LetterController extends Controller
                 .body {
                     text-align: justify;
                     word-spacing: -1.5pt !important;
+                    font-size: 12pt !important;
                 }
 
                 .body * {
                     word-spacing: -1.5pt !important;
+                    font-size: 12pt !important;
                 }
 
                 .body p {
@@ -768,10 +860,12 @@ class LetterController extends Controller
 
                 .signature {
                     margin-top: 42px;
+                    font-size: 12pt !important;
                 }
 
                 .signature p {
                     margin: 0;
+                    font-size: 12pt !important;
                 }
             </style>
         ';
