@@ -317,7 +317,7 @@ export default function UserManagementPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5">
                 <div className="rounded-xl bg-blue-50 p-3 text-blue-700"><History className="h-6 w-6" /></div>
-                <div><p className="text-2xl font-bold text-slate-900">{logsLoading ? '—' : logTotal}</p><p className="text-sm text-slate-500">Access sessions</p></div>
+                <div><p className="text-2xl font-bold text-slate-900">{logsLoading ? '—' : logTotal}</p><p className="text-sm text-slate-500">Access sessions · last 30 days</p></div>
               </div>
               <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5">
                 <div className="rounded-xl bg-green-50 p-3 text-green-700"><KeyRound className="h-6 w-6" /></div>

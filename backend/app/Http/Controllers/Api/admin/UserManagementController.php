@@ -228,6 +228,7 @@ class UserManagementController extends Controller
         $logs = PersonalAccessToken::query()
             ->with(['tokenable' => fn ($query) => $query->with('role', 'organization')])
             ->where('tokenable_type', User::class)
+            ->where('created_at', '>=', now()->subMonth())
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nested) use ($search) {
                     $nested->where('name', 'like', "%{$search}%")
