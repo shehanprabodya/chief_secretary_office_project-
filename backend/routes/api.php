@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\ApprovalController;
 use App\Http\Controllers\Api\MinuteController;
+use App\Http\Controllers\Api\ExternalOfficerController;
 use App\Http\Controllers\Api\admin\AdminDashboardController;
 use App\Http\Controllers\Api\admin\UserManagementController;
 
@@ -112,6 +113,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('role:dept_head,deputy,chief_secretary')->group(function () {
         // Route::get('/approvals/pending', [ApprovalController::class, 'pending']);
+    });
+
+    Route::middleware('role:external_officer')->prefix('external-officer')->group(function () {
+        Route::get('/dashboard', [ExternalOfficerController::class, 'dashboard']);
     });
     
 });
