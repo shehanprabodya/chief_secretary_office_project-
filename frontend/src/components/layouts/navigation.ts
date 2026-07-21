@@ -110,10 +110,6 @@ export const navigation = {
       label: "My Meetings",
       href: "/dashboard/external-officer#meetings",
     },
-    {
-      icon: FileText,
-      label: "Meeting Letters",
-      href: "/dashboard/external-officer#letters",
-    },
+    
   ],
 };

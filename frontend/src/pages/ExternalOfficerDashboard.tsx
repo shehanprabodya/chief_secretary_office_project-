@@ -88,8 +88,23 @@ export default function ExternalOfficerDashboard() {
         <section className="overflow-hidden rounded-2xl bg-[var(--color-primary)] text-white shadow-sm">
           <div className="relative px-6 py-7 sm:px-8">
             <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">External Officer Workspace</p>
-            <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Welcome, {user?.full_name ?? 'External Officer'}</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">Welcome, {user?.full_name ?? 'External Officer'}</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-blue-100">
+              <span className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span>
+                  <span className="font-semibold text-white">Designation:</span>{' '}
+                  {user?.designation || '—'}
+                </span>
+              </span>
+              <span className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                <span>
+                  <span className="font-semibold text-white">Organization:</span>{' '}
+                  {user?.organization || '—'}
+                </span>
+              </span>
+            </div>
             <p className="mt-2 max-w-2xl text-sm text-blue-100">View official meeting invitations, schedules and approved letters issued to you.</p>
           </div>
         </section>
