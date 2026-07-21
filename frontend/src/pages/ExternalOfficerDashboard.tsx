@@ -4,6 +4,7 @@ import {
   FileText, MapPin, RefreshCw, Search, Users, Video, X,
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import PreviewModal from '../components/Letters/PreviewModal';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { externalOfficerService } from '../services/externalOfficerService';
@@ -42,6 +43,9 @@ export default function ExternalOfficerDashboard() {
   const [meetings, setMeetings] = useState<ExternalOfficerMeeting[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [letterMeeting, setLetterMeeting] = useState<ExternalOfficerMeeting | null>(null);
+  const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [isLetterLoading, setIsLetterLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +85,23 @@ export default function ExternalOfficerDashboard() {
   const upcomingCount = meetings.filter((meeting) => meetingState(meeting) === 'Upcoming').length;
   const letterCount = meetings.filter((meeting) => meeting.letter).length;
   const isMeetingsView = location.hash === '#meetings';
+
+  const openLetterPreview = async (meeting: ExternalOfficerMeeting) => {
+    if (!meeting.letter) return;
+
+    setIsLetterLoading(true);
+    setError(null);
+    try {
+      const html = await externalOfficerService.previewLetter(meeting.letter.letter_id);
+      setPreviewHtml(html);
+      setPreviewLetterId(meeting.letter.letter_id);
+    } catch (err) {
+      console.error(err);
+      setError('Unable to load the approved meeting letter.');
+    } finally {
+      setIsLetterLoading(false);
+    }
+  };
 
   return (
     <DashboardLayout pageTitle="External Officer Portal">
@@ -149,10 +170,22 @@ export default function ExternalOfficerDashboard() {
             { icon: Users, label: 'Expected attendees', value: `${selected.attendees_count} participants` },
             { icon: Building2, label: 'Organised by', value: selected.organizer ?? '—' },
             { icon: CheckCircle2, label: 'Subject', value: selected.subject?.title ?? selected.meeting_code ?? '—' },
-          ].map((detail) => <div key={detail.label} className="flex gap-3 rounded-lg bg-slate-50 p-3"><detail.icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" /><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{detail.label}</p><p className="mt-0.5 text-sm font-medium text-slate-700">{detail.value}</p></div></div>)}</div><div><h3 className="text-sm font-bold text-slate-900">Meeting description</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{selected.description || 'No additional meeting description has been provided.'}</p></div>{selected.letter ? <button id="letters" onClick={() => setLetterMeeting(selected)} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white hover:opacity-90"><FileText className="h-4 w-4" />View approved meeting letter</button> : <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">The approved meeting letter is not available yet.</div>}</div></div> : <div className="self-start rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Select a meeting to view its details.</div>}
+          ].map((detail) => <div key={detail.label} className="flex gap-3 rounded-lg bg-slate-50 p-3"><detail.icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" /><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{detail.label}</p><p className="mt-0.5 text-sm font-medium text-slate-700">{detail.value}</p></div></div>)}</div><div><h3 className="text-sm font-bold text-slate-900">Meeting description</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{selected.description || 'No additional meeting description has been provided.'}</p></div>{selected.letter ? <button id="letters" onClick={() => openLetterPreview(selected)} disabled={isLetterLoading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"><FileText className="h-4 w-4" />{isLetterLoading ? 'Loading letter...' : 'View approved meeting letter'}</button> : <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">The approved meeting letter is not available yet.</div>}</div></div> : <div className="self-start rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Select a meeting to view its details.</div>}
         </section>
         </>}
       </div>
+
+      {previewLetterId !== null && (
+        <PreviewModal
+          html={previewHtml}
+          letterId={previewLetterId}
+          allowExports={false}
+          onClose={() => {
+            setPreviewLetterId(null);
+            setPreviewHtml('');
+          }}
+        />
+      )}
 
       {letterMeeting?.letter && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && setLetterMeeting(null)}><div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-slate-100 shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3"><div><h2 className="font-bold text-slate-900">Meeting letter</h2><p className="text-xs text-slate-500">Letter #{letterMeeting.letter.letter_id} · {letterMeeting.letter.status}</p></div><div className="flex gap-2"><button onClick={() => window.print()} className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" />Print / Save PDF</button><button onClick={() => setLetterMeeting(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close letter"><X className="h-5 w-5" /></button></div></div><div className="overflow-y-auto p-4 sm:p-8"><article className="mx-auto min-h-[720px] max-w-2xl bg-white px-8 py-10 text-slate-800 shadow-sm sm:px-14">{(letterMeeting.letter.sender_name || letterMeeting.letter.organization_name || letterMeeting.letter.organization_address) && <div className="border-b-2 border-slate-800 pb-5 text-center">{letterMeeting.letter.sender_name && <p className="text-lg font-bold uppercase">{letterMeeting.letter.sender_name}</p>}{letterMeeting.letter.organization_name && <p className="mt-1 text-sm">{letterMeeting.letter.organization_name}</p>}{letterMeeting.letter.organization_address && <p className="mt-1 whitespace-pre-line text-xs text-slate-500">{letterMeeting.letter.organization_address}</p>}</div>}<div className="mt-6 flex justify-between text-sm"><span>Ref: <strong>{letterMeeting.reference_id ?? letterMeeting.meeting_code ?? letterMeeting.letter.letter_id}</strong></span>{letterMeeting.letter.signature_date && <span>{formatDate(letterMeeting.letter.signature_date)}</span>}</div>{letterMeeting.letter.title && <h3 className="mt-8 text-center text-sm font-bold uppercase underline underline-offset-4">{plainText(letterMeeting.letter.title)}</h3>}{letterMeeting.letter.content && <div className="mt-8 text-sm leading-7 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeDocumentHtml(letterMeeting.letter.content) }} />}{(letterMeeting.letter.signatory_name || letterMeeting.letter.designation) && <div className="mt-12 text-sm"><div className="mt-10 w-52 border-t border-slate-500 pt-2">{letterMeeting.letter.signatory_name && <p className="font-bold">{letterMeeting.letter.signatory_name}</p>}{letterMeeting.letter.designation && <p className="text-xs text-slate-500">{letterMeeting.letter.designation}</p>}</div></div>}</article></div></div></div>}
     </DashboardLayout>

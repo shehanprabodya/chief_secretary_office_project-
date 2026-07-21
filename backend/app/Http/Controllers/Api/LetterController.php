@@ -297,6 +297,25 @@ class LetterController extends Controller
         ]);
     }
 
+    public function externalPreview(Request $request, int $id): JsonResponse
+    {
+        $letter = Letter::with(
+            'recipients.organization',
+            'recipients.user.organization',
+            'subject',
+            'creator'
+        )
+            ->whereIn('status', ['approved', 'dispatched'])
+            ->whereHas('meeting.attendees', fn ($query) => $query
+                ->where('users.user_id', $request->user()->user_id))
+            ->findOrFail($id);
+
+        return response()->json([
+            'preview_html' => $this->buildLetterHtml($letter),
+            'letter_id' => $letter->letter_id,
+        ]);
+    }
+
     /**
      * Download as PDF — returns base64 encoded PDF
      * (Uses a simple HTML-to-PDF approach; swap with wkhtmltopdf/Dompdf if needed)

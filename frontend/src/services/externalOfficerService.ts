@@ -9,4 +9,11 @@ export const externalOfficerService = {
 
     return data.meetings;
   },
+
+  async previewLetter(letterId: number): Promise<string> {
+    const { data } = await api.get<{ preview_html: string }>(
+      `/external-officer/letters/${letterId}/preview`,
+    );
+    return data.preview_html;
+  },
 };

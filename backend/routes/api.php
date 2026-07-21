@@ -117,6 +117,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('role:external_officer')->prefix('external-officer')->group(function () {
         Route::get('/dashboard', [ExternalOfficerController::class, 'dashboard']);
+        Route::get('/letters/{id}/preview', [LetterController::class, 'externalPreview']);
     });
     
 });
