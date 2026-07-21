@@ -72,3 +72,25 @@ export interface UpcomingMeeting {
   location_type: string;
   status: string;
 }
+
+export interface SubjectRecord {
+  id: number;
+  code: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubjectPayload {
+  code: string;
+  title: string;
+  description?: string | null;
+}
+
+export interface PaginatedSubjects {
+  data: SubjectRecord[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}

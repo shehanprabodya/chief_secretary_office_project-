@@ -6,6 +6,7 @@ import {
   Users,
   Files,
   BarChart3,
+  BookOpen,
 } from "lucide-react";
 
 export const navigation = {
@@ -19,6 +20,11 @@ export const navigation = {
       icon: Users,
       label: "Users",
       href: "/admin/users",
+    },
+    {
+      icon: BookOpen,
+      label: "Subjects",
+      href: "/admin/subjects",
     },
   ],
 

@@ -17,6 +17,7 @@ import UserManagementPage from './pages/UserManagementPage';
 import CreateMeetingPage from './pages/CreateMeetingPage';
 import MeetingDetailsPage from './pages/MeetingDetailsPage';
 import ExternalOfficerDashboard from './pages/ExternalOfficerDashboard';
+import SubjectManagementPage from './pages/SubjectManagementPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/dashboard/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UserManagementPage />} />
+            <Route path="/admin/subjects" element={<SubjectManagementPage />} />
           </Route>
           
           <Route element={<ProtectedRoute allowedRoles={['officer']} />}>
