@@ -159,10 +159,76 @@ class LetterController extends Controller
             }
         }
 
+        if ($letter->meeting_id) {
+            $this->syncExternalMeetingAttendees($letter->meeting_id);
+        }
+
         return response()->json([
             'message' => 'Draft saved',
             'letter'  => $letter->load('recipients.organization', 'recipients.user.organization', 'subject'),
         ]);
+    }
+
+    /**
+     * Treat meeting-letter recipient tags as the source of truth for external
+     * meeting assignments. Internal attendees assigned through the meeting
+     * form are preserved.
+     */
+    private function syncExternalMeetingAttendees(int $meetingId): void
+    {
+        $meeting = Meeting::with('letters.recipients')->find($meetingId);
+
+        if (!$meeting) {
+            return;
+        }
+
+        $directUserIds = $meeting->letters
+            ->flatMap(fn (Letter $letter) => $letter->recipients)
+            ->pluck('user_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $organizationIds = $meeting->letters
+            ->flatMap(fn (Letter $letter) => $letter->recipients)
+            ->filter(fn ($recipient) => !$recipient->user_id)
+            ->pluck('organization_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $assignedExternalIds = User::query()
+            ->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($query) => $query->where('role_name', 'external_officer'))
+            ->where(function ($query) use ($directUserIds, $organizationIds) {
+                if ($directUserIds->isNotEmpty()) {
+                    $query->whereIn('user_id', $directUserIds);
+                }
+
+                if ($organizationIds->isNotEmpty()) {
+                    $method = $directUserIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('organization_id', $organizationIds);
+                }
+
+                if ($directUserIds->isEmpty() && $organizationIds->isEmpty()) {
+                    $query->whereRaw('1 = 0');
+                }
+            })
+            ->pluck('user_id');
+
+        $currentlyAssignedExternalIds = $meeting->attendees()
+            ->whereHas('role', fn ($query) => $query->where('role_name', 'external_officer'))
+            ->pluck('users.user_id');
+
+        $meeting->attendees()->detach(
+            $currentlyAssignedExternalIds->diff($assignedExternalIds)->all()
+        );
+
+        $meeting->attendees()->syncWithoutDetaching(
+            $assignedExternalIds
+                ->mapWithKeys(fn ($userId) => [$userId => ['attendance_role' => 'assigned']])
+                ->all()
+        );
     }
 
     private function letterStatusFromApproval(?string $approvalStatus): ?string
