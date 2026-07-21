@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Search, Filter, Download, Users, Shield,
   Building2, UserX, Pencil, RotateCcw, UserMinus, UserCheck, UserPlus
+  , History, Clock3, KeyRound
 } from 'lucide-react';
 
 import AddUserModal from '../components/Admin/AddUserModal';
 import ResetPasswordModal from '../components/Admin/ResetPasswordModal';
 import { adminService } from '../services/adminService';
-import type { AdminUser, UserStats } from '../types/admin';
+import type { AccessLog, AdminUser, UserStats } from '../types/admin';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import ConfirmDialog from '../components/shared/ConfirmDialog';
 
 type Tab = 'users' | 'roles' | 'logs';
 
@@ -42,10 +44,19 @@ export default function UserManagementPage() {
   const [lastPage, setLastPage] = useState(1);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
+  const [logSearch, setLogSearch] = useState('');
+  const [logPage, setLogPage] = useState(1);
+  const [logLastPage, setLogLastPage] = useState(1);
+  const [logTotal, setLogTotal] = useState(0);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [resetUser, setResetUser] = useState<AdminUser | null>(null);
+  const [statusUser, setStatusUser] = useState<AdminUser | null>(null);
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
 
   const fetchStats = () => adminService.getUserStats().then(setStats);
 
@@ -63,15 +74,48 @@ export default function UserManagementPage() {
 
   useEffect(() => { fetchStats(); }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
   }, [search, page, fetchUsers]);
 
-  const handleToggleStatus = async (user: AdminUser) => {
-    const action = user.status === 'ACTIVE' ? 'deactivate' : 'activate';
-    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${user.full_name}?`)) return;
-    await adminService.toggleStatus(user.user_id);
-    fetchUsers();
-    fetchStats();
+  const fetchAccessLogs = useCallback(async () => {
+    if (activeTab !== 'logs') return;
+    setLogsLoading(true);
+    setLogsError(null);
+    try {
+      const result = await adminService.getAccessLogs(logSearch, logPage);
+      setAccessLogs(result.data);
+      setLogTotal(result.total);
+      setLogLastPage(result.last_page);
+    } catch (error) {
+      console.error(error);
+      setLogsError('Unable to load access logs.');
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [activeTab, logPage, logSearch]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchAccessLogs();
+  }, [fetchAccessLogs]);
+
+  const formatLogDate = (value: string | null) => value
+    ? new Date(value).toLocaleString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      })
+    : 'Never';
+
+  const handleToggleStatus = async () => {
+    if (!statusUser) return;
+    setIsChangingStatus(true);
+    try {
+      await adminService.toggleStatus(statusUser.user_id);
+      setStatusUser(null);
+      await Promise.all([fetchUsers(), fetchStats()]);
+    } finally {
+      setIsChangingStatus(false);
+    }
   };
 
   const handleSaved = () => {
@@ -228,7 +272,7 @@ export default function UserManagementPage() {
                             </button>
                             {/* Toggle active/inactive */}
                             <button
-                              onClick={() => handleToggleStatus(u)}
+                              onClick={() => setStatusUser(u)}
                               className={`rounded-lg p-1.5 ${u.status === 'ACTIVE' ? 'text-red-400 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'}`}
                               title={u.status === 'ACTIVE' ? 'Deactivate user' : 'Activate user'}
                             >
@@ -276,8 +320,39 @@ export default function UserManagementPage() {
         )}
 
         {activeTab === 'logs' && (
-          <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="text-sm text-slate-400">Select a user from the Users List tab to view their access logs.</p>
+          <div className="flex flex-col gap-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5">
+                <div className="rounded-xl bg-blue-50 p-3 text-blue-700"><History className="h-6 w-6" /></div>
+                <div><p className="text-2xl font-bold text-slate-900">{logsLoading ? '—' : logTotal}</p><p className="text-sm text-slate-500">Access sessions · last 30 days</p></div>
+              </div>
+              <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5">
+                <div className="rounded-xl bg-green-50 p-3 text-green-700"><KeyRound className="h-6 w-6" /></div>
+                <div><p className="text-2xl font-bold text-slate-900">{logsLoading ? '—' : accessLogs.filter((log) => log.status === 'active').length}</p><p className="text-sm text-slate-500">Active on this page</p></div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative max-w-md flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input value={logSearch} onChange={(e) => { setLogSearch(e.target.value); setLogPage(1); }} placeholder="Search name, username, email or token" className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <button onClick={fetchAccessLogs} disabled={logsLoading} className="flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><RotateCcw className={`h-4 w-4 ${logsLoading ? 'animate-spin' : ''}`} />Refresh</button>
+            </div>
+
+            {logsError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{logsError}</div>}
+
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><th className="px-6 py-3">User</th><th className="px-6 py-3">Role / Organization</th><th className="px-6 py-3">Session created</th><th className="px-6 py-3">Last activity</th><th className="px-6 py-3">Expires</th><th className="px-6 py-3">Status</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {logsLoading ? <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">Loading access logs...</td></tr> : accessLogs.length === 0 ? <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">No access sessions found.</td></tr> : accessLogs.map((log) => <tr key={log.id} className="hover:bg-slate-50"><td className="px-6 py-4"><p className="text-sm font-semibold text-slate-900">{log.user?.full_name ?? 'Deleted user'}</p><p className="text-xs text-slate-400">{log.user?.email ?? '—'} · {log.token_name}</p></td><td className="px-6 py-4"><p className="text-sm capitalize text-slate-700">{log.user?.role?.replaceAll('_', ' ') ?? '—'}</p><p className="text-xs text-slate-400">{log.user?.organization ?? 'No organization'}</p></td><td className="px-6 py-4 text-sm text-slate-600">{formatLogDate(log.created_at)}</td><td className="px-6 py-4"><span className="flex items-center gap-1.5 text-sm text-slate-600"><Clock3 className="h-3.5 w-3.5 text-slate-400" />{formatLogDate(log.last_used_at)}</span></td><td className="px-6 py-4 text-sm text-slate-600">{formatLogDate(log.expires_at)}</td><td className="px-6 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${log.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{log.status === 'active' ? 'Active' : 'Expired'}</span></td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3"><p className="text-sm text-slate-500">Showing {accessLogs.length} of {logTotal} sessions</p><div className="flex items-center gap-2"><button onClick={() => setLogPage((value) => Math.max(1, value - 1))} disabled={logPage === 1} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Previous</button><span className="text-sm text-slate-500">{logPage} / {logLastPage}</span><button onClick={() => setLogPage((value) => Math.min(logLastPage, value + 1))} disabled={logPage === logLastPage} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Next</button></div></div>
+            </div>
           </div>
         )}
       </div>
@@ -293,6 +368,17 @@ export default function UserManagementPage() {
       {resetUser && (
         <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />
       )}
+      <ConfirmDialog
+        open={statusUser !== null}
+        title={statusUser?.status === 'ACTIVE' ? 'Deactivate user?' : 'Activate user?'}
+        message={statusUser?.status === 'ACTIVE'
+          ? `${statusUser.full_name} will no longer be able to sign in or access the system.`
+          : `${statusUser?.full_name ?? 'This user'} will regain access to the system.`}
+        confirmLabel={statusUser?.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+        isProcessing={isChangingStatus}
+        onConfirm={handleToggleStatus}
+        onCancel={() => setStatusUser(null)}
+      />
     </DashboardLayout>
   );
 }

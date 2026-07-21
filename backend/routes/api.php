@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\MinuteController;
 use App\Http\Controllers\Api\ExternalOfficerController;
 use App\Http\Controllers\Api\admin\AdminDashboardController;
 use App\Http\Controllers\Api\admin\UserManagementController;
+use App\Http\Controllers\Api\admin\SubjectManagementController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -42,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/stats', [AdminDashboardController::class, 'stats']);
         Route::get('/upcoming-meetings', [AdminDashboardController::class, 'upcomingMeetings']);
         Route::get('/recent-activity', [AdminDashboardController::class, 'recentActivity']);
+        Route::get('/access-logs', [UserManagementController::class, 'allAccessLogs']);
 
         Route::prefix('users')->group(function () {
 
@@ -61,6 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('/{id}/logs', [UserManagementController::class, 'accessLogs']);
         });
+
+        Route::apiResource('subjects', SubjectManagementController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
     });
 
    

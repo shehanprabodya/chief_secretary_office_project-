@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization} from '../types/admin';
+import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs} from '../types/admin';
 
 export interface UserFilters {
   search?: string;
@@ -70,5 +70,33 @@ export const adminService = {
   const { data } = await api.get<{organizations: Organization[];}>('/admin/lookups/organizations');
 
   return data.organizations;
+  },
+
+  async getSubjects(search = '', page = 1): Promise<PaginatedSubjects> {
+    const { data } = await api.get<PaginatedSubjects>('/admin/subjects', {
+      params: { search: search || undefined, page },
+    });
+    return data;
+  },
+
+  async createSubject(payload: SubjectPayload): Promise<SubjectRecord> {
+    const { data } = await api.post<{ subject: SubjectRecord }>('/admin/subjects', payload);
+    return data.subject;
+  },
+
+  async updateSubject(id: number, payload: SubjectPayload): Promise<SubjectRecord> {
+    const { data } = await api.put<{ subject: SubjectRecord }>(`/admin/subjects/${id}`, payload);
+    return data.subject;
+  },
+
+  async deleteSubject(id: number): Promise<void> {
+    await api.delete(`/admin/subjects/${id}`);
+  },
+
+  async getAccessLogs(search = '', page = 1): Promise<PaginatedAccessLogs> {
+    const { data } = await api.get<PaginatedAccessLogs>('/admin/access-logs', {
+      params: { search: search || undefined, page },
+    });
+    return data;
   },
 };

@@ -72,3 +72,49 @@ export interface UpcomingMeeting {
   location_type: string;
   status: string;
 }
+
+export interface SubjectRecord {
+  id: number;
+  code: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubjectPayload {
+  code: string;
+  title: string;
+  description?: string | null;
+}
+
+export interface PaginatedSubjects {
+  data: SubjectRecord[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
+
+export interface AccessLog {
+  id: number;
+  token_name: string;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  status: 'active' | 'expired';
+  user: {
+    user_id: number;
+    full_name: string;
+    email: string;
+    username: string;
+    role: string | null;
+    organization: string | null;
+  } | null;
+}
+
+export interface PaginatedAccessLogs {
+  data: AccessLog[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
