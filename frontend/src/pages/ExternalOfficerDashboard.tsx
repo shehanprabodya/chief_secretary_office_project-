@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { externalOfficerService } from '../services/externalOfficerService';
 import type { ExternalOfficerMeeting } from '../types/externalOfficer';
 import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
@@ -37,6 +38,7 @@ const plainText = (html: string | null | undefined) => {
 
 export default function ExternalOfficerDashboard() {
   const { user } = useAuth();
+  const location = useLocation();
   const [meetings, setMeetings] = useState<ExternalOfficerMeeting[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [letterMeeting, setLetterMeeting] = useState<ExternalOfficerMeeting | null>(null);
@@ -78,6 +80,7 @@ export default function ExternalOfficerDashboard() {
 
   const upcomingCount = meetings.filter((meeting) => meetingState(meeting) === 'Upcoming').length;
   const letterCount = meetings.filter((meeting) => meeting.letter).length;
+  const isMeetingsView = location.hash === '#meetings';
 
   return (
     <DashboardLayout pageTitle="External Officer Portal">
@@ -85,7 +88,7 @@ export default function ExternalOfficerDashboard() {
         className="mx-auto flex max-w-7xl flex-col"
         style={{ gap: '2.5rem' }}
       >
-        <section className="overflow-hidden rounded-2xl bg-[var(--color-primary)] text-white shadow-sm">
+        {!isMeetingsView && <section className="overflow-hidden rounded-2xl bg-[var(--color-primary)] text-white shadow-sm">
           <div className="relative px-6 py-7 sm:px-8">
             <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
             <h1 className="text-2xl font-bold sm:text-3xl">Welcome, {user?.full_name ?? 'External Officer'}</h1>
@@ -107,18 +110,23 @@ export default function ExternalOfficerDashboard() {
             </div>
             <p className="mt-2 max-w-2xl text-sm text-blue-100">View official meeting invitations, schedules and approved letters issued to you.</p>
           </div>
-        </section>
+        </section>}
 
         {error && <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span><button onClick={loadDashboard} className="font-semibold underline">Retry</button></div>}
 
-        <section className="grid gap-5 sm:grid-cols-3">
+        {!isMeetingsView && <section className="grid gap-5 sm:grid-cols-3">
           {[
             { label: 'Total meetings', value: meetings.length, icon: CalendarDays, color: 'bg-blue-50 text-blue-700' },
             { label: 'Upcoming', value: upcomingCount, icon: Clock3, color: 'bg-amber-50 text-amber-700' },
             { label: 'Meeting letters', value: letterCount, icon: FileText, color: 'bg-emerald-50 text-emerald-700' },
           ].map((item) => <div key={item.label} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className={`rounded-xl p-3 ${item.color}`}><item.icon className="h-6 w-6" /></div><div><p className="text-2xl font-bold text-slate-900">{isLoading ? '—' : item.value}</p><p className="text-sm text-slate-500">{item.label}</p></div></div>)}
-        </section>
+        </section>}
 
+        {isMeetingsView && <>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">My Meetings</h1>
+          <p className="mt-1 text-sm text-slate-500">View your assigned meeting schedules, details and approved letters.</p>
+        </div>
         <section id="meetings" className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(390px,0.95fr)]">
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 p-5">
@@ -143,6 +151,7 @@ export default function ExternalOfficerDashboard() {
             { icon: CheckCircle2, label: 'Subject', value: selected.subject?.title ?? selected.meeting_code ?? '—' },
           ].map((detail) => <div key={detail.label} className="flex gap-3 rounded-lg bg-slate-50 p-3"><detail.icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" /><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{detail.label}</p><p className="mt-0.5 text-sm font-medium text-slate-700">{detail.value}</p></div></div>)}</div><div><h3 className="text-sm font-bold text-slate-900">Meeting description</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{selected.description || 'No additional meeting description has been provided.'}</p></div>{selected.letter ? <button id="letters" onClick={() => setLetterMeeting(selected)} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white hover:opacity-90"><FileText className="h-4 w-4" />View approved meeting letter</button> : <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">The approved meeting letter is not available yet.</div>}</div></div> : <div className="self-start rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Select a meeting to view its details.</div>}
         </section>
+        </>}
       </div>
 
       {letterMeeting?.letter && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && setLetterMeeting(null)}><div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-slate-100 shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3"><div><h2 className="font-bold text-slate-900">Meeting letter</h2><p className="text-xs text-slate-500">Letter #{letterMeeting.letter.letter_id} · {letterMeeting.letter.status}</p></div><div className="flex gap-2"><button onClick={() => window.print()} className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" />Print / Save PDF</button><button onClick={() => setLetterMeeting(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close letter"><X className="h-5 w-5" /></button></div></div><div className="overflow-y-auto p-4 sm:p-8"><article className="mx-auto min-h-[720px] max-w-2xl bg-white px-8 py-10 text-slate-800 shadow-sm sm:px-14">{(letterMeeting.letter.sender_name || letterMeeting.letter.organization_name || letterMeeting.letter.organization_address) && <div className="border-b-2 border-slate-800 pb-5 text-center">{letterMeeting.letter.sender_name && <p className="text-lg font-bold uppercase">{letterMeeting.letter.sender_name}</p>}{letterMeeting.letter.organization_name && <p className="mt-1 text-sm">{letterMeeting.letter.organization_name}</p>}{letterMeeting.letter.organization_address && <p className="mt-1 whitespace-pre-line text-xs text-slate-500">{letterMeeting.letter.organization_address}</p>}</div>}<div className="mt-6 flex justify-between text-sm"><span>Ref: <strong>{letterMeeting.reference_id ?? letterMeeting.meeting_code ?? letterMeeting.letter.letter_id}</strong></span>{letterMeeting.letter.signature_date && <span>{formatDate(letterMeeting.letter.signature_date)}</span>}</div>{letterMeeting.letter.title && <h3 className="mt-8 text-center text-sm font-bold uppercase underline underline-offset-4">{plainText(letterMeeting.letter.title)}</h3>}{letterMeeting.letter.content && <div className="mt-8 text-sm leading-7 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeDocumentHtml(letterMeeting.letter.content) }} />}{(letterMeeting.letter.signatory_name || letterMeeting.letter.designation) && <div className="mt-12 text-sm"><div className="mt-10 w-52 border-t border-slate-500 pt-2">{letterMeeting.letter.signatory_name && <p className="font-bold">{letterMeeting.letter.signatory_name}</p>}{letterMeeting.letter.designation && <p className="text-xs text-slate-500">{letterMeeting.letter.designation}</p>}</div></div>}</article></div></div></div>}
