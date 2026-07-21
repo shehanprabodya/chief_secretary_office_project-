@@ -11,6 +11,24 @@ interface PreviewModalProps {
 
 export default function PreviewModal({ html, letterId, onClose, allowExports = true }: PreviewModalProps) {
   const safeHtml = sanitizeDocumentHtml(html);
+  const previewHtml = `
+    <style>
+      .letter-page .recipients,
+      .letter-page .recipients *,
+      .letter-page .body,
+      .letter-page .body *,
+      .letter-page .signature,
+      .letter-page .signature * {
+        font-size: 12pt !important;
+      }
+
+      .letter-page .subject,
+      .letter-page .subject * {
+        font-size: 13pt !important;
+      }
+    </style>
+    ${safeHtml}
+  `;
 
   const handleDownloadPdf = async () => {
     await letterService.downloadPdf(letterId);
@@ -42,7 +60,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
             .letter-page .body, .letter-page .body * { word-spacing: -1.5pt !important; }
           </style>
         </head>
-        <body>${safeHtml}</body>
+        <body>${previewHtml}</body>
       </html>
     `);
     win.document.close();
@@ -103,7 +121,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
               fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif",
               fontSize: '12pt',
             }}
-            dangerouslySetInnerHTML={{ __html: safeHtml }}
+            dangerouslySetInnerHTML={{ __html: previewHtml }}
           />
         </div>
       </div>

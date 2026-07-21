@@ -814,10 +814,15 @@ class LetterController extends Controller
                     margin-bottom: 22px;
                     line-height: 1.3;
                     text-align: left;
+                    font-size: 12pt !important;
+                }
+
+                .recipients * {
+                    font-size: 12pt !important;
                 }
 
                 .subject {
-                    font-size: 13pt;
+                    font-size: 13pt !important;
                     font-weight: bold;
                     text-align: center;
                     text-decoration: underline;
@@ -825,7 +830,7 @@ class LetterController extends Controller
                 }
 
                 .subject * {
-                    font-size: 13pt;
+                    font-size: 13pt !important;
                 }
 
                 .subject p {
@@ -835,10 +840,12 @@ class LetterController extends Controller
                 .body {
                     text-align: justify;
                     word-spacing: -1.5pt !important;
+                    font-size: 12pt !important;
                 }
 
                 .body * {
                     word-spacing: -1.5pt !important;
+                    font-size: 12pt !important;
                 }
 
                 .body p {
@@ -853,10 +860,12 @@ class LetterController extends Controller
 
                 .signature {
                     margin-top: 42px;
+                    font-size: 12pt !important;
                 }
 
                 .signature p {
                     margin: 0;
+                    font-size: 12pt !important;
                 }
             </style>
         ';
