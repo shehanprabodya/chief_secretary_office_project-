@@ -7,13 +7,13 @@ interface DashboardLayoutProps {
   pageTitle?: string;
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, pageTitle }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       {/* Top Navbar */}
-      <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+      <TopNavbar onMenuClick={() => setSidebarOpen(true)} pageTitle={pageTitle} />
 
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">

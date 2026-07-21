@@ -16,6 +16,7 @@ import CreateMinutesPage from './pages/CreateMinutesPage';
 import UserManagementPage from './pages/UserManagementPage';
 import CreateMeetingPage from './pages/CreateMeetingPage';
 import MeetingDetailsPage from './pages/MeetingDetailsPage';
+import ExternalOfficerDashboard from './pages/ExternalOfficerDashboard';
 
 export default function App() {
   return (
@@ -36,6 +37,10 @@ export default function App() {
           
           <Route element={<ProtectedRoute allowedRoles={['officer']} />}>
             <Route path="/dashboard/officer" element={<OfficerDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['external_officer']} />}>
+            <Route path="/dashboard/external-officer" element={<ExternalOfficerDashboard />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['dept_head']} />}>
