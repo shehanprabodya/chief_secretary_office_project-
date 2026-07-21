@@ -1,7 +1,8 @@
 export type AttendanceStatus = 'present' | 'absent' | 'excused';
 
 export interface AttendanceParticipant {
-  user_id: number;
+  user_id: number | null;
+  letter_recipient_id: number | null;
   full_name: string;
   email: string;
   department: string | null;
@@ -31,6 +32,7 @@ export interface AttendanceStatistics {
 }
 
 export interface AttendanceSheet {
+  letter_id: number;
   meeting: {
     meeting_id: number;
     title: string;

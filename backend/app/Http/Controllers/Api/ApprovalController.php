@@ -77,6 +77,41 @@ class ApprovalController extends Controller
                 ->first();
 
             if ($existingDocument) {
+                if ($existingDocument->document_type === 'letter'
+                    && $existingDocument->sourceLetter
+                    && (int) $existingDocument->sourceLetter->created_by !== (int) $request->user()->user_id) {
+                    return response()->json(['message' => 'Only the letter creator can resubmit a revised letter.'], 403);
+                }
+
+                $approvedContentChanged = $existingDocument->status === 'approved'
+                    && array_key_exists('full_content', $validated)
+                    && trim((string) $existingDocument->full_content) !== trim((string) $validated['full_content']);
+
+                if ($approvedContentChanged) {
+                    $existingDocument->update([
+                        'subject' => $validated['subject'],
+                        'description' => $validated['description'] ?? null,
+                        'full_content' => $validated['full_content'],
+                        'amount' => $validated['amount'] ?? null,
+                        'submitted_by' => $request->user()->user_id,
+                        'status' => 'pending',
+                        'current_step_order' => 2,
+                    ]);
+
+                    $this->resetWorkflowForResubmission($existingDocument, $request->user()->user_id);
+
+                    if ($existingDocument->document_type === 'letter' && $existingDocument->source_id) {
+                        Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
+                    }
+
+                    return response()->json([
+                        'message' => 'Revised approved document submitted for approval',
+                        'document' => $this->withSubjectCode(
+                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
+                        ),
+                    ]);
+                }
+
                 if ($existingDocument->status === 'rejected') {
                     $existingDocument->update([
                         'subject' => $validated['subject'],

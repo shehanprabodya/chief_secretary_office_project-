@@ -43,6 +43,25 @@ export default function RecipientTagInput({ organizations, recipients, onChange,
   };
 
   const addOrg = (org: Organization) => {
+    if (org.officers?.length) {
+      const existingUserIds = new Set(recipients.map((recipient) => recipient.user_id));
+      const officerRecipients: RecipientTag[] = org.officers
+        .filter((officer) => !existingUserIds.has(officer.user_id))
+        .map((officer) => ({
+          id: `user-${officer.user_id}`,
+          user_id: officer.user_id,
+          organization_id: org.organization_id,
+          recipient_label: `${officer.designation}, ${org.organization_name}`,
+          designation: officer.designation,
+          organization_name: org.organization_name,
+        }));
+
+      onChange([...recipients, ...officerRecipients]);
+      setOpen(false);
+      setSearch('');
+      return;
+    }
+
     const alreadyAdded = recipients.some((r) => r.organization_id === org.organization_id && !r.user_id);
     if (alreadyAdded) return;
 
@@ -134,7 +153,9 @@ export default function RecipientTagInput({ organizations, recipients, onChange,
                 className="flex w-full items-center justify-between px-4 py-2 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
               >
                 <span>{org.organization_name}</span>
-                <span className="text-xs font-normal text-slate-400">{org.abbreviation}</span>
+                <span className="text-xs font-normal text-slate-400">
+                  {org.officers?.length ? `Add ${org.officers.length} officer${org.officers.length === 1 ? '' : 's'}` : org.abbreviation}
+                </span>
               </button>
 
               {/* Officer level — "designation, org name" */}

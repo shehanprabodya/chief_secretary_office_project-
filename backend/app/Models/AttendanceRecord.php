@@ -11,7 +11,7 @@ class AttendanceRecord extends Model
     protected $primaryKey = 'attendance_id';
 
     protected $fillable = [
-        'meeting_id', 'user_id', 'status', 'is_draft', 'recorded_by',
+        'meeting_id', 'letter_id', 'letter_recipient_id', 'user_id', 'status', 'is_draft', 'recorded_by',
     ];
 
     public function user(): BelongsTo
@@ -22,6 +22,11 @@ class AttendanceRecord extends Model
     public function meeting(): BelongsTo
     {
         return $this->belongsTo(Meeting::class, 'meeting_id', 'meeting_id');
+    }
+
+    public function letter(): BelongsTo
+    {
+        return $this->belongsTo(Letter::class, 'letter_id', 'letter_id');
     }
 }
 

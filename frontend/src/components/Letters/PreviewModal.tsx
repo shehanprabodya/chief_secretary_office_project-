@@ -28,12 +28,18 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         <head>
           <title>Letter</title>
           <style>
-            @page { size: A4 portrait; margin: 30mm 20mm 25mm 30mm; }
+            @font-face {
+              font-family: 'Iskoola Pota';
+              src: url('/fonts/Iskoola Pota Regular.ttf') format('truetype');
+              font-style: normal;
+              font-weight: 400;
+            }
+            @page { size: Letter portrait; margin: 1in; }
             html, body { margin: 0; padding: 0; }
-            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; line-height: 1.75; }
+            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page { width: 100%; box-sizing: border-box; }
-            .letter-page, .letter-page * { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
-            .letter-page .subject, .letter-page .subject * { font-size: 13pt; }
+            .letter-page, .letter-page * { letter-spacing: normal; word-spacing: -1.5pt; }
+            .letter-page .body, .letter-page .body * { word-spacing: -1.5pt !important; }
           </style>
         </head>
         <body>${safeHtml}</body>
@@ -48,11 +54,17 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-2xl">
+      <div
+        className="relative z-10 flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        style={{
+          width: 'min(calc(8.5in + 4rem), calc(100vw - 2rem))',
+          height: 'min(calc(11in + 5rem), 95vh)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
           <h2 className="text-lg font-bold text-slate-900">Letter Preview</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             {allowExports && (
               <>
                 <button
@@ -82,10 +94,15 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         </div>
 
         {/* Preview Content */}
-        <div className="flex-1 overflow-auto bg-slate-200 p-8">
+        <div className="flex-1 overflow-auto bg-slate-200 p-4 sm:p-8">
           <div
-            className="mx-auto min-h-[297mm] w-[210mm] box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
-            style={{ fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
+            className="mx-auto shrink-0 box-border bg-white p-[1in] shadow-xl"
+            style={{
+              width: '8.5in',
+              minHeight: '11in',
+              fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif",
+              fontSize: '12pt',
+            }}
             dangerouslySetInnerHTML={{ __html: safeHtml }}
           />
         </div>

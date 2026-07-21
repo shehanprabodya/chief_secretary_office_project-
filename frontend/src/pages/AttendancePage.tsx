@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Download, BarChart3, Info, ChevronDown } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import ActionMessage, { type ActionMessageType } from '../components/shared/ActionMessage';
+import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { attendanceService } from '../services/attendanceService';
 import type { AttendanceSheet, AttendanceStatus, AttendanceParticipant, ApprovedMeetingLetter } from '../types/attendance';
 
@@ -33,10 +35,13 @@ export default function AttendancePage() {
   const [attendanceError, setAttendanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: ActionMessageType; text: string } | null>(null);
+  const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
   const isViewOnly = searchParams.get('mode') === 'view';
   const showLetterSelector = !canLoadAttendance || isViewOnly;
   const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
+  const activeLetterId = selectedLetterId ?? sheet?.letter_id ?? null;
   const matchingLetters = letters.filter((letter) => {
     const term = letterSearch.trim().toLowerCase();
     if (!term) return true;
@@ -102,38 +107,65 @@ export default function AttendancePage() {
     if (selectedLetter) setLetterSearch(selectedLetter.letter_title);
   }, [isViewOnly, letters, selectedLetterId]);
 
-  const handleStatusChange = (userId: number, status: AttendanceStatus) => {
+  const participantKey = (participant: AttendanceParticipant) =>
+    participant.user_id ? `user-${participant.user_id}` : `recipient-${participant.letter_recipient_id}`;
+
+  const handleStatusChange = (key: string, status: AttendanceStatus) => {
     if (isViewOnly) return;
+    setActionMessage(null);
     setParticipants((previous) =>
       previous.map((participant) =>
-        participant.user_id === userId ? { ...participant, status } : participant
+        participantKey(participant) === key ? { ...participant, status } : participant
       )
     );
   };
 
   const handleSaveDraft = async () => {
-    if (!activeMeetingId || isViewOnly) return;
+    if (!activeMeetingId || !activeLetterId || isViewOnly) return;
     setIsSaving(true);
+    setActionMessage(null);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
+        activeLetterId,
+        participants.map((participant) => ({ user_id: participant.user_id, letter_recipient_id: participant.letter_recipient_id, status: participant.status }))
       );
+      setActionMessage({
+        type: 'success',
+        text: 'Attendance draft saved successfully. You can continue editing before submitting.',
+      });
+    } catch (error) {
+      const message = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : null;
+      setActionMessage({ type: 'error', text: message ?? 'Unable to save the attendance draft. Please try again.' });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSubmitAttendance = async () => {
-    if (!activeMeetingId || isViewOnly) return;
+    if (!activeMeetingId || !activeLetterId || isViewOnly) return;
+    setShowSubmitConfirmation(false);
     setIsSubmitting(true);
+    setActionMessage(null);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
-        participants.map((participant) => ({ user_id: participant.user_id, status: participant.status }))
+        activeLetterId,
+        participants.map((participant) => ({ user_id: participant.user_id, letter_recipient_id: participant.letter_recipient_id, status: participant.status }))
       );
-      await attendanceService.submit(activeMeetingId);
+      await attendanceService.submit(activeMeetingId, activeLetterId);
       await fetchSheet();
+      setActionMessage({
+        type: 'success',
+        text: 'Attendance submitted successfully. All participant statuses have been recorded.',
+      });
+    } catch (error) {
+      const message = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : null;
+      setActionMessage({ type: 'error', text: message ?? 'Unable to submit attendance. Please check the records and try again.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -331,16 +363,13 @@ export default function AttendancePage() {
                   </td>
                 </tr>
               ) : filteredParticipants.map((p) => (
-                <tr key={p.user_id}>
+                <tr key={participantKey(p)}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700">
                         {getInitials(p.full_name)}
                       </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">{p.full_name}</p>
-                        <p className="text-xs text-slate-400">{p.email}</p>
-                      </div>
+                      <p className="font-semibold text-slate-900">{p.full_name}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">{p.department ?? '—'}</td>
@@ -365,7 +394,7 @@ export default function AttendancePage() {
                             <button
                               key={status}
                               type="button"
-                              onClick={() => handleStatusChange(p.user_id, status)}
+                              onClick={() => handleStatusChange(participantKey(p), status)}
                               className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
                                 isActive ? config.activeClasses : 'border-transparent text-slate-500 hover:bg-white'
                               }`}
@@ -387,7 +416,11 @@ export default function AttendancePage() {
               Attendance records are view-only in this mode.
             </div>
           ) : (
-            <div className="flex items-center justify-between border-t border-slate-200 p-4">
+            <div className="border-t border-slate-200 p-4">
+              {actionMessage && (
+                <ActionMessage type={actionMessage.type} message={actionMessage.text} onDismiss={() => setActionMessage(null)} className="mb-4" />
+              )}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-center gap-1.5 text-xs text-slate-400">
                 <Info className="h-3.5 w-3.5" />
                 {isSaving ? 'Saving draft...' : 'Update the statuses, then save a draft or submit attendance.'}
@@ -396,25 +429,35 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   onClick={handleSaveDraft}
-                  disabled={isSaving || !activeMeetingId || participants.length === 0}
+                  disabled={isSaving || isSubmitting || !activeMeetingId || !activeLetterId || participants.length === 0}
                   className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   {isSaving ? 'Saving...' : 'Save Draft'}
                 </button>
                 <button
                   type="button"
-                  onClick={handleSubmitAttendance}
-                  disabled={isSubmitting || !activeMeetingId || participants.length === 0}
+                  onClick={() => setShowSubmitConfirmation(true)}
+                  disabled={isSubmitting || isSaving || !activeMeetingId || !activeLetterId || participants.length === 0}
                   className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
                   <span>▶</span>
                 </button>
               </div>
+              </div>
             </div>
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={showSubmitConfirmation}
+        title="Submit Attendance"
+        message="Please confirm that every participant status is correct. Submitted attendance will be recorded for this meeting letter."
+        confirmLabel="Submit Attendance"
+        isProcessing={isSubmitting}
+        onConfirm={handleSubmitAttendance}
+        onCancel={() => setShowSubmitConfirmation(false)}
+      />
     </DashboardLayout>
   );
 }
