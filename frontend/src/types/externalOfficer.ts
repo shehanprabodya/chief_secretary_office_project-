@@ -1,8 +1,11 @@
 export interface ExternalMeetingLetter {
   letter_id: number;
+  sender_name: string;
   title: string;
   content: string | null;
   designation: string | null;
+  organization_name: string | null;
+  organization_address: string | null;
   signatory_name: string | null;
   signature_date: string | null;
   status: 'approved' | 'dispatched';
