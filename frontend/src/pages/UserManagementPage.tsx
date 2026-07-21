@@ -10,6 +10,7 @@ import ResetPasswordModal from '../components/Admin/ResetPasswordModal';
 import { adminService } from '../services/adminService';
 import type { AccessLog, AdminUser, UserStats } from '../types/admin';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import ConfirmDialog from '../components/shared/ConfirmDialog';
 
 type Tab = 'users' | 'roles' | 'logs';
 
@@ -54,6 +55,8 @@ export default function UserManagementPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [resetUser, setResetUser] = useState<AdminUser | null>(null);
+  const [statusUser, setStatusUser] = useState<AdminUser | null>(null);
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
 
   const fetchStats = () => adminService.getUserStats().then(setStats);
 
@@ -103,12 +106,16 @@ export default function UserManagementPage() {
       })
     : 'Never';
 
-  const handleToggleStatus = async (user: AdminUser) => {
-    const action = user.status === 'ACTIVE' ? 'deactivate' : 'activate';
-    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${user.full_name}?`)) return;
-    await adminService.toggleStatus(user.user_id);
-    fetchUsers();
-    fetchStats();
+  const handleToggleStatus = async () => {
+    if (!statusUser) return;
+    setIsChangingStatus(true);
+    try {
+      await adminService.toggleStatus(statusUser.user_id);
+      setStatusUser(null);
+      await Promise.all([fetchUsers(), fetchStats()]);
+    } finally {
+      setIsChangingStatus(false);
+    }
   };
 
   const handleSaved = () => {
@@ -265,7 +272,7 @@ export default function UserManagementPage() {
                             </button>
                             {/* Toggle active/inactive */}
                             <button
-                              onClick={() => handleToggleStatus(u)}
+                              onClick={() => setStatusUser(u)}
                               className={`rounded-lg p-1.5 ${u.status === 'ACTIVE' ? 'text-red-400 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'}`}
                               title={u.status === 'ACTIVE' ? 'Deactivate user' : 'Activate user'}
                             >
@@ -361,6 +368,17 @@ export default function UserManagementPage() {
       {resetUser && (
         <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />
       )}
+      <ConfirmDialog
+        open={statusUser !== null}
+        title={statusUser?.status === 'ACTIVE' ? 'Deactivate user?' : 'Activate user?'}
+        message={statusUser?.status === 'ACTIVE'
+          ? `${statusUser.full_name} will no longer be able to sign in or access the system.`
+          : `${statusUser?.full_name ?? 'This user'} will regain access to the system.`}
+        confirmLabel={statusUser?.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+        isProcessing={isChangingStatus}
+        onConfirm={handleToggleStatus}
+        onCancel={() => setStatusUser(null)}
+      />
     </DashboardLayout>
   );
 }
