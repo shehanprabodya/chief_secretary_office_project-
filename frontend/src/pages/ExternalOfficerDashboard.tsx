@@ -81,7 +81,10 @@ export default function ExternalOfficerDashboard() {
 
   return (
     <DashboardLayout pageTitle="External Officer Portal">
-      <div className="mx-auto max-w-7xl space-y-7">
+      <div
+        className="mx-auto flex max-w-7xl flex-col"
+        style={{ gap: '2.5rem' }}
+      >
         <section className="overflow-hidden rounded-2xl bg-[var(--color-primary)] text-white shadow-sm">
           <div className="relative px-6 py-7 sm:px-8">
             <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
@@ -93,7 +96,7 @@ export default function ExternalOfficerDashboard() {
 
         {error && <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span><button onClick={loadDashboard} className="font-semibold underline">Retry</button></div>}
 
-        <section className="grid gap-4 sm:grid-cols-3">
+        <section className="grid gap-5 sm:grid-cols-3">
           {[
             { label: 'Total meetings', value: meetings.length, icon: CalendarDays, color: 'bg-blue-50 text-blue-700' },
             { label: 'Upcoming', value: upcomingCount, icon: Clock3, color: 'bg-amber-50 text-amber-700' },
