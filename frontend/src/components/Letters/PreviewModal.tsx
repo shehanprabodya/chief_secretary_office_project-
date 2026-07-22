@@ -28,6 +28,21 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
       }
     </style>
     ${safeHtml}
+    <style>
+      /* Counter the 125% screen zoom for fixed header coordinates. These
+         values keep the visible subject and date at 1.5in and 6.5in. */
+      .letter-page .letterhead-spacer {
+        width: 20.5mm !important;
+      }
+
+      .letter-page .letterhead-subject-column {
+        width: 101.6mm !important;
+      }
+
+      .letter-page .letterhead-date-column {
+        width: 61.1mm !important;
+      }
+    </style>
   `;
 
   const handleDownloadPdf = async () => {
@@ -52,7 +67,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
               font-style: normal;
               font-weight: 400;
             }
-            @page { size: A4 portrait; margin: 25mm; }
+            @page { size: 8in 297mm; margin: 10mm; }
             html, body { margin: 0; padding: 0; }
             body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page { width: 100%; box-sizing: border-box; }
@@ -112,12 +127,13 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         </div>
 
         {/* Preview Content */}
-        <div className="flex-1 overflow-auto bg-slate-200 p-4 sm:p-8">
+        <div className="flex-1 overflow-auto bg-slate-200 p-1 sm:p-2">
           <div
-            className="mx-auto shrink-0 box-border bg-white p-[1in] shadow-xl"
+            className="mx-auto shrink-0 box-border bg-white p-[10mm] shadow-xl"
             style={{
-              width: '210mm',
+              width: '8in',
               minHeight: '297mm',
+              zoom: 1.25,
               fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif",
               fontSize: '12pt',
             }}
