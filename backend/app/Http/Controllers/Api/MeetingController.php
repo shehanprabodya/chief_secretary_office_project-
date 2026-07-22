@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\Letter;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
 class MeetingController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     /**
      * List meetings with subject and date filters.
      */
@@ -174,6 +179,8 @@ class MeetingController extends Controller
             $meeting->attendees()->attach($request->attendee_ids);
         }
 
+        $this->notifyMeetingAttendees($meeting->load('attendees.role'), 'meeting_assigned', 'New meeting assigned');
+
         return response()->json([
             'message' => 'Meeting created successfully',
             'meeting' => $meeting->load('attendees'),
@@ -226,18 +233,55 @@ class MeetingController extends Controller
             $meeting->attendees()->sync($request->attendee_ids);
         }
 
+        $this->notifyMeetingAttendees($meeting->load('attendees.role'), 'meeting_updated', 'Meeting details updated');
+
         return response()->json([
             'message' => 'Meeting updated successfully',
             'meeting' => $meeting->load('attendees'),
         ]);
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
-        $meeting = Meeting::findOrFail($id);
+        $meeting = Meeting::with('attendees.role')->findOrFail($id);
+
+        if ((int) $meeting->created_by !== (int) $request->user()->user_id) {
+            return response()->json(['message' => 'Only the creator can cancel this meeting.'], 403);
+        }
+
         $meeting->update(['status' => 'cancelled']);
 
+        $this->notifyMeetingAttendees($meeting, 'meeting_cancelled', 'Meeting cancelled', 'urgent');
+
         return response()->json(['message' => 'Meeting cancelled']);
+    }
+
+    private function notifyMeetingAttendees(
+        Meeting $meeting,
+        string $type,
+        string $title,
+        string $priority = 'important',
+    ): void {
+        foreach ($meeting->attendees as $attendee) {
+            if ((int) $attendee->user_id === (int) $meeting->created_by) {
+                continue;
+            }
+
+            $actionUrl = $attendee->role?->role_name === 'external_officer'
+                ? '/dashboard/external-officer#meetings'
+                : "/meetings/{$meeting->meeting_id}";
+
+            $this->notifications->sendToUser(
+                $attendee->user_id,
+                $type,
+                $title,
+                "{$meeting->title} — {$meeting->meeting_date} {$meeting->start_time}",
+                $actionUrl,
+                'meeting',
+                $meeting->meeting_id,
+                $priority,
+            );
+        }
     }
 }
 

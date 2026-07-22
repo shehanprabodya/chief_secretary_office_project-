@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ApprovableDocument;
 use App\Models\Letter;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
 class ApprovalController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     /**
      * List documents this user's role needs to see/act on,
      * plus a search by reference ID or subject.
@@ -18,6 +23,12 @@ class ApprovalController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject');
+
+        // Officers may track only the documents they personally submitted.
+        // Reviewing roles retain the shared workflow queue they need to act on.
+        if ($request->user()->hasRole('officer')) {
+            $query->where('submitted_by', $request->user()->user_id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -42,10 +53,15 @@ class ApprovalController extends Controller
         return response()->json(['documents' => $documents]);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
         $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
             ->findOrFail($id);
+
+        if ($request->user()->hasRole('officer')
+            && (int) $document->submitted_by !== (int) $request->user()->user_id) {
+            return response()->json(['message' => 'You can only view documents you submitted.'], 403);
+        }
 
         return response()->json(['document' => $this->withSubjectCode($document)]);
     }
@@ -104,6 +120,8 @@ class ApprovalController extends Controller
                         Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
                     }
 
+                    $this->notifyCurrentReviewer($existingDocument, $request->user()->user_id, true);
+
                     return response()->json([
                         'message' => 'Revised approved document submitted for approval',
                         'document' => $this->withSubjectCode(
@@ -128,6 +146,8 @@ class ApprovalController extends Controller
                     if ($existingDocument->document_type === 'letter' && $existingDocument->source_id) {
                         Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
                     }
+
+                    $this->notifyCurrentReviewer($existingDocument, $request->user()->user_id, true);
 
                     return response()->json([
                         'message' => 'Rejected document resubmitted for approval',
@@ -162,6 +182,8 @@ class ApprovalController extends Controller
         ]);
 
         $document->initializeWorkflow();
+
+        $this->notifyCurrentReviewer($document, $request->user()->user_id);
 
         if ($document->document_type === 'letter' && $document->source_id) {
             Letter::where('letter_id', $document->source_id)->update(['status' => 'pending_approval']);
@@ -232,6 +254,35 @@ class ApprovalController extends Controller
             ]);
         }
 
+        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
+            $this->notifications->sendToUser(
+                $document->submitted_by,
+                'approval_step_approved',
+                $nextStep ? 'Document moved to the next approval stage' : 'Document approved',
+                $nextStep
+                    ? "{$document->reference_id} was approved by {$request->user()->full_name}."
+                    : "{$document->reference_id} received final approval.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+                'important',
+            );
+        }
+
+        if ($nextStep) {
+            $this->notifications->sendToRole(
+                $nextStep->required_role,
+                'approval_action_required',
+                'Approval action required',
+                "{$document->reference_id} is ready for your review.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+                'important',
+                $request->user()->user_id,
+            );
+        }
+
         return response()->json([
             'message' => 'Approved',
             'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
@@ -260,6 +311,19 @@ class ApprovalController extends Controller
                 'user_id' => $request->user()->user_id,
                 'comment' => $request->notes,
             ]);
+        }
+
+        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
+            $this->notifications->sendToUser(
+                $document->submitted_by,
+                'approval_rejected',
+                'Document rejected',
+                "{$document->reference_id} was rejected by {$request->user()->full_name}.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+                'urgent',
+            );
         }
 
         return response()->json([
@@ -294,6 +358,40 @@ class ApprovalController extends Controller
             'comment' => $request->comment,
         ]);
 
+        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
+            $this->notifications->sendToUser(
+                $document->submitted_by,
+                'approval_comment_added',
+                'New approval comment',
+                "{$request->user()->full_name} commented on {$document->reference_id}.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+            );
+        }
+
         return response()->json(['comment' => $comment->load('user')], 201);
+    }
+
+    private function notifyCurrentReviewer(ApprovableDocument $document, int $actorUserId, bool $resubmitted = false): void
+    {
+        $document->loadMissing('steps');
+        $currentStep = $document->steps->firstWhere('step_order', $document->current_step_order);
+
+        if (!$currentStep) {
+            return;
+        }
+
+        $this->notifications->sendToRole(
+            $currentStep->required_role,
+            'approval_action_required',
+            $resubmitted ? 'Document resubmitted' : 'New document awaiting approval',
+            "{$document->reference_id} is ready for your review.",
+            '/approvals',
+            'approval_document',
+            $document->document_id,
+            'important',
+            $actorUserId,
+        );
     }
 }
