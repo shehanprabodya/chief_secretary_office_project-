@@ -109,7 +109,7 @@ export default function ExternalOfficerDashboard() {
         className="mx-auto flex max-w-7xl flex-col"
         style={{ gap: '2.5rem' }}
       >
-        {!isMeetingsView && <section className="overflow-hidden rounded-2xl bg-[var(--color-primary)] text-white shadow-sm">
+        {!isMeetingsView && <section className="welcome-font-size overflow-hidden rounded-2xl bg-[var(--color-primary)] text-white shadow-sm">
           <div className="relative px-6 py-7 sm:px-8">
             <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
             <h1 className="text-2xl font-bold sm:text-3xl">Welcome, {user?.full_name ?? 'External Officer'}</h1>

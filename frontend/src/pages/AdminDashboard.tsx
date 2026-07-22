@@ -101,7 +101,7 @@ export default function AdminDashboard() {
     <DashboardLayout pageTitle="Admin Dashboard">
       <div className="flex flex-col gap-6">
         {/* Welcome header */}
-        <section className="relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
+        <section className="welcome-font-size relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
           <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>

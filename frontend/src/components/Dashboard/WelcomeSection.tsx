@@ -44,7 +44,7 @@ export default function WelcomeSection() {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
+    <div className="welcome-font-size relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
       <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
       <h1 className="relative text-2xl font-bold sm:text-3xl">
         Welcome back, {user?.full_name}

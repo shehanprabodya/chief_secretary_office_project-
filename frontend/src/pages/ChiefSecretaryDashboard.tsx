@@ -85,7 +85,7 @@ export default function ChiefSecretaryDashboard() {
   return (
     <DashboardLayout pageTitle="Chief Secretary Dashboard">
       <div className="approval-dashboard-sections">
-        <section className="relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
+        <section className="welcome-font-size relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
           <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>

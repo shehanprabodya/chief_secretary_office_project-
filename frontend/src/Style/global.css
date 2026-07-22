@@ -6,6 +6,18 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
+  /* Sinhala and Sinhala Archaic Unicode blocks. */
+  unicode-range: U+0D80-0DFF, U+111E0-111FF;
+}
+
+@font-face {
+  font-family: "Iskoola Pota UI";
+  src: url("/fonts/Iskoola Pota Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 115%;
+  unicode-range: U+0D80-0DFF, U+111E0-111FF;
 }
 
 
@@ -72,6 +84,7 @@ body {
   color: var(--color-text-primary);
 
   font-family:
+    "Iskoola Pota UI",
     Inter,
     system-ui,
     -apple-system,
@@ -168,6 +181,19 @@ h6 {
 
 .text-muted {
   color: var(--color-text-secondary);
+}
+
+/* Welcome banners already use large display type, so Sinhala remains at its
+   natural Iskoola Pota scale in those sections. */
+.welcome-font-size {
+  font-family:
+    "Iskoola Pota",
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 /* Shared spacing for the approval-role dashboards. Keeping these rules scoped
