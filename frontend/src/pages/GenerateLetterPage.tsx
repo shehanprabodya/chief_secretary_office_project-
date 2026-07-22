@@ -404,7 +404,7 @@ export default function GenerateLetterPage() {
               font-style: normal;
               font-weight: 400;
             }
-            @page { size: Letter portrait; margin: 1in; }
+            @page { size: A4 portrait; margin: 25mm; }
             html, body { margin: 0; padding: 0; }
             body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page { width: 100%; box-sizing: border-box; }

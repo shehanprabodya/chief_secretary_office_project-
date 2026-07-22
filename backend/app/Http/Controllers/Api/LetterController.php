@@ -355,7 +355,7 @@ class LetterController extends Controller
 
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html);
-        $dompdf->setPaper('letter', 'portrait');
+        $dompdf->setPaper('a4', 'portrait');
         $dompdf->render();
 
         return response($dompdf->output(), 200, [
@@ -770,8 +770,8 @@ class LetterController extends Controller
             <style>
                 __ISKOOLA_FONT_FACE__
                 @page {
-                    size: Letter portrait;
-                    margin: 1in;
+                    size: A4 portrait;
+                    margin: 25mm;
                 }
 
                 .letter-page {

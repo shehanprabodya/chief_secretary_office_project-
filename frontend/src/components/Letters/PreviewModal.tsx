@@ -52,7 +52,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
               font-style: normal;
               font-weight: 400;
             }
-            @page { size: Letter portrait; margin: 1in; }
+            @page { size: A4 portrait; margin: 25mm; }
             html, body { margin: 0; padding: 0; }
             body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
             .letter-page { width: 100%; box-sizing: border-box; }
@@ -76,7 +76,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         className="relative z-10 flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         style={{
           width: 'min(96rem, calc(100vw - 2rem))',
-          height: 'min(calc(11in + 5rem), 95vh)',
+          height: 'min(calc(297mm + 5rem), 95vh)',
         }}
       >
         {/* Header */}
@@ -116,8 +116,8 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
           <div
             className="mx-auto shrink-0 box-border bg-white p-[1in] shadow-xl"
             style={{
-              width: '8.5in',
-              minHeight: '11in',
+              width: '210mm',
+              minHeight: '297mm',
               fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif",
               fontSize: '12pt',
             }}
