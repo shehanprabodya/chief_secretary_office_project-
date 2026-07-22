@@ -262,6 +262,19 @@ class MeetingController extends Controller
         string $title,
         string $priority = 'important',
     ): void {
+        $meetingCode = $meeting->meeting_code ?: "Meeting {$meeting->meeting_id}";
+        $scheduledAt = \Carbon\Carbon::parse("{$meeting->meeting_date} {$meeting->start_time}")
+            ->format('d M Y, h:i A');
+        $changedAt = now()->format('d M Y, h:i A');
+        $location = $meeting->location ?: 'a venue to be confirmed';
+
+        $message = match ($type) {
+            'meeting_assigned' => "You were assigned to meeting {$meetingCode}, “{$meeting->title}”, scheduled for {$scheduledAt} at {$location}.",
+            'meeting_updated' => "Meeting {$meetingCode}, “{$meeting->title}”, was updated on {$changedAt}. It is scheduled for {$scheduledAt} at {$location}.",
+            'meeting_cancelled' => "Meeting {$meetingCode}, “{$meeting->title}”, scheduled for {$scheduledAt}, was cancelled on {$changedAt}.",
+            default => "Meeting {$meetingCode}, “{$meeting->title}”, has a new update dated {$changedAt}.",
+        };
+
         foreach ($meeting->attendees as $attendee) {
             if ((int) $attendee->user_id === (int) $meeting->created_by) {
                 continue;
@@ -274,8 +287,8 @@ class MeetingController extends Controller
             $this->notifications->sendToUser(
                 $attendee->user_id,
                 $type,
-                $title,
-                "{$meeting->title} — {$meeting->meeting_date} {$meeting->start_time}",
+                "{$title}: {$meetingCode}",
+                $message,
                 $actionUrl,
                 'meeting',
                 $meeting->meeting_id,

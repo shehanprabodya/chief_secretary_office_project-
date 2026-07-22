@@ -195,7 +195,7 @@ export default function DeputyDashboard() {
               <table className="w-full">
                 <thead className="bg-slate-50">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    <th className="px-4 py-3">Reference</th>
+                    <th className="px-4 py-3">Subject Code</th>
                     <th className="px-4 py-3">Subject</th>
                     <th className="px-4 py-3">Submitted By</th>
                     <th className="px-4 py-3">Status</th>
@@ -222,7 +222,7 @@ export default function DeputyDashboard() {
                         className="cursor-pointer hover:bg-slate-50"
                         onClick={() => navigate('/approvals')}
                       >
-                        <td className="px-4 py-4 text-sm font-semibold text-slate-800">{doc.reference_id}</td>
+                        <td className="px-4 py-4 text-sm font-semibold text-slate-800">{doc.subject_code ?? '—'}</td>
                         <td className="px-4 py-4 text-sm text-slate-600">{doc.subject}</td>
                         <td className="px-4 py-4 text-sm text-slate-500">{doc.submitter?.full_name ?? 'Unknown'}</td>
                         <td className="px-4 py-4">

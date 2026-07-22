@@ -168,40 +168,40 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
             >
               <Bell size={20} />
               {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-5 text-white">
+                <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-[var(--color-secondary)] px-1 text-[10px] font-bold leading-5 text-[var(--color-primary)] shadow-sm">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
 
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <div className="absolute right-0 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
                   <div>
                     <h2 className="text-sm font-bold">Notifications</h2>
-                    <p className="text-xs text-slate-500">{unreadCount} unread</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{unreadCount} unread</p>
                   </div>
                   {unreadCount > 0 && (
-                    <button onClick={markAllNotificationsRead} className="text-xs font-semibold text-blue-700 hover:underline">
+                    <button onClick={markAllNotificationsRead} className="text-xs font-semibold text-[var(--color-primary)] hover:underline dark:text-blue-300">
                       Mark all read
                     </button>
                   )}
                 </div>
                 <div className="max-h-96 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <p className="px-4 py-10 text-center text-sm text-slate-400">No notifications yet.</p>
+                    <p className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500">No notifications yet.</p>
                   ) : notifications.map((notification) => (
                     <button
                       key={notification.notification_id}
                       onClick={() => openNotification(notification)}
-                      className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 ${notification.read_at ? 'bg-white' : 'bg-blue-50/70'}`}
+                      className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 ${notification.read_at ? 'bg-white dark:bg-slate-900' : 'bg-blue-50/70 dark:bg-blue-950/40'}`}
                     >
                       <div className="flex items-start gap-3">
-                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.read_at ? 'bg-slate-200' : notification.priority === 'urgent' ? 'bg-red-500' : 'bg-blue-600'}`} />
+                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.read_at ? 'bg-slate-200 dark:bg-slate-600' : notification.priority === 'urgent' ? 'bg-red-500' : 'bg-[var(--color-primary)] dark:bg-blue-400'}`} />
                         <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-slate-900">{notification.title}</span>
-                          <span className="mt-0.5 block text-xs leading-5 text-slate-600">{notification.message}</span>
-                          <span className="mt-1 block text-[11px] text-slate-400">{new Date(notification.created_at).toLocaleString()}</span>
+                          <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{notification.title}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-slate-600 dark:text-slate-300">{notification.message}</span>
+                          <span className="mt-1 block text-[11px] text-slate-400 dark:text-slate-500">{new Date(notification.created_at).toLocaleString()}</span>
                         </span>
                       </div>
                     </button>
