@@ -169,3 +169,27 @@ h6 {
 .text-muted {
   color: var(--color-text-secondary);
 }
+
+/* Shared spacing for the approval-role dashboards. Keeping these rules scoped
+   prevents spacing changes from leaking into the other dashboard layouts. */
+@layer components {
+  .approval-dashboard-sections {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1.25rem, 2vw, 2rem);
+  }
+
+  .approval-dashboard-stats {
+    gap: clamp(1rem, 1.5vw, 1.5rem);
+  }
+
+  .approval-dashboard-content {
+    gap: clamp(1.25rem, 2vw, 2rem);
+  }
+
+  .approval-dashboard-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1rem, 1.5vw, 1.5rem);
+  }
+}

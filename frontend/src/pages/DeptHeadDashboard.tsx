@@ -76,7 +76,7 @@ export default function DeptHeadDashboard() {
 
   return (
     <DashboardLayout pageTitle="Department Head Dashboard">
-      <div className="space-y-6">
+      <div className="approval-dashboard-sections">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Approval Desk</p>
@@ -113,7 +113,7 @@ export default function DeptHeadDashboard() {
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="approval-dashboard-stats grid sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-t-4 border-t-orange-400 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
@@ -167,7 +167,7 @@ export default function DeptHeadDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+        <div className="approval-dashboard-content grid xl:grid-cols-[1fr_360px]">
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
@@ -230,7 +230,7 @@ export default function DeptHeadDashboard() {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="approval-dashboard-sidebar">
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900">Workflow Position</h2>
               <div className="mt-5 space-y-4">
