@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Globe, ChevronDown, LogOut } from 'lucide-react';
+import { Menu, Bell, Globe, ChevronDown, LogOut, UserRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/logo.svg';
 
@@ -42,15 +42,6 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
     await logout();
     navigate('/', { replace: true });
   };
-
-  const initials = user?.full_name
-    ? user.full_name
-        .split(' ')
-        .map((n) => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
-    : 'U';
 
   return (
     <header className="sticky top-0 z-40 h-16 border-b border-white/10 bg-[var(--color-primary)]">
@@ -113,8 +104,8 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2 rounded-lg p-1.5 transition hover:bg-white/10"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white">
-                {initials}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white">
+                <UserRound className="h-5 w-5" aria-hidden="true" />
               </div>
               <ChevronDown
                 className={`h-4 w-4 text-white/70 transition-transform ${
