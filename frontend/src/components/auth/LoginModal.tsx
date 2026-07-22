@@ -94,7 +94,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div>
             <label htmlFor="identifier" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Email or Username
@@ -160,7 +160,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full mt-6 rounded-lg bg-blue-600 py-2.5 font-medium text-white transition-all hover:bg-blue-700 disabled:bg-slate-400 flex items-center justify-center gap-2"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 font-medium text-white transition-all hover:bg-blue-700 disabled:bg-slate-400"
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>

@@ -348,14 +348,29 @@ class LetterController extends Controller
 
         // Fallback: Dompdf (composer require dompdf/dompdf)
         $options = new \Dompdf\Options();
+        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
         $options->set('defaultFont', 'Iskoola Pota');
-        $options->setChroot(['/usr/share/fonts', base_path()]);
+        $options->setChroot(['/usr/share/fonts', base_path(), dirname($fontPath)]);
+
+        $dompdfFontDir = storage_path('app/dompdf-fonts');
+        if (!is_dir($dompdfFontDir)) {
+            mkdir($dompdfFontDir, 0775, true);
+        }
+        $options->set('fontDir', $dompdfFontDir);
+        $options->set('fontCache', $dompdfFontDir);
 
         $dompdf = new \Dompdf\Dompdf($options);
+        if (is_file($fontPath)) {
+            $dompdf->getFontMetrics()->registerFont([
+                'family' => 'Iskoola Pota',
+                'weight' => 'normal',
+                'style' => 'normal',
+            ], 'file://' . $fontPath);
+        }
         $dompdf->loadHtml($html);
-        $dompdf->setPaper('letter', 'portrait');
+        $dompdf->setPaper([0, 0, 576, 841.89], 'portrait');
         $dompdf->render();
 
         return response($dompdf->output(), 200, [
@@ -408,22 +423,36 @@ class LetterController extends Controller
 
         $htmlPath = $workDir . '/letter.html';
         $profileDir = $workDir . '/lo-profile';
+        $runtimeDir = $workDir . '/runtime';
         mkdir($profileDir, 0775, true);
+        mkdir($runtimeDir, 0700, true);
         file_put_contents($htmlPath, $html);
+
+        $fontConfigPath = $this->createExportFontConfig($workDir);
+
+        $conversionFilter = match ($format) {
+            'docx' => 'docx:Office Open XML Text',
+            'pdf' => 'pdf:writer_pdf_Export',
+            default => $format,
+        };
 
         $process = new Process([
             $binary,
             '--headless',
             '-env:UserInstallation=file://' . $profileDir,
             '--convert-to',
-            $format,
+            $conversionFilter,
             '--outdir',
             $workDir,
             $htmlPath,
         ]);
         $process->setEnv([
             'HOME' => $workDir,
-            'XDG_RUNTIME_DIR' => $workDir,
+            'XDG_RUNTIME_DIR' => $runtimeDir,
+            'FONTCONFIG_FILE' => $fontConfigPath,
+            'FONTCONFIG_PATH' => $workDir,
+            'SAL_FONTPATH' => base_path('../frontend/public/fonts'),
+            'LANG' => 'en_US.UTF-8',
         ]);
         $process->setTimeout(60);
         $process->run();
@@ -436,6 +465,32 @@ class LetterController extends Controller
         }
 
         return $outputPath;
+    }
+
+    private function createExportFontConfig(string $workDir): string
+    {
+        $fontDir = base_path('../frontend/public/fonts');
+        $cacheDir = $workDir . '/font-cache';
+        mkdir($cacheDir, 0775, true);
+
+        $escapeXml = static fn (string $value): string => htmlspecialchars(
+            $value,
+            ENT_XML1 | ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $configPath = $workDir . '/fonts.conf';
+        $config = '<?xml version="1.0"?>'
+            . '<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">'
+            . '<fontconfig>'
+            . '<dir>' . $escapeXml($fontDir) . '</dir>'
+            . '<cachedir>' . $escapeXml($cacheDir) . '</cachedir>'
+            . '<config><rescan><int>0</int></rescan></config>'
+            . '</fontconfig>';
+
+        file_put_contents($configPath, $config);
+
+        return $configPath;
     }
 
     private function libreOfficeBinary(): ?string
@@ -488,8 +543,8 @@ class LetterController extends Controller
             <w:body>
                 <w:altChunk r:id="htmlChunk"/>
                 <w:sectPr>
-                    <w:pgSz w:w="12240" w:h="15840"/>
-                    <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+                    <w:pgSz w:w="11520" w:h="16838"/>
+                    <w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="567" w:header="360" w:footer="360" w:gutter="0"/>
                 </w:sectPr>
             </w:body>
         </w:document>
@@ -624,8 +679,8 @@ class LetterController extends Controller
             <w:body>
                 {$body}
                 <w:sectPr>
-                    <w:pgSz w:w="12240" w:h="15840"/>
-                    <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+                    <w:pgSz w:w="11520" w:h="16838"/>
+                    <w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="567" w:header="360" w:footer="360" w:gutter="0"/>
                 </w:sectPr>
             </w:body>
         </w:document>
@@ -640,8 +695,8 @@ class LetterController extends Controller
         return <<<XML
         <w:p>
             <w:pPr>
-                <w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>
-                <w:spacing w:after="0" w:line="420" w:lineRule="auto"/>
+                <w:tabs><w:tab w:val="right" w:pos="9072"/></w:tabs>
+                <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
             </w:pPr>
             <w:r><w:rPr><w:rFonts w:ascii="Iskoola Pota" w:hAnsi="Iskoola Pota" w:cs="Iskoola Pota"/><w:sz w:val="24"/></w:rPr><w:t>{$left}</w:t></w:r>
             <w:r><w:tab/></w:r>
@@ -662,7 +717,7 @@ class LetterController extends Controller
         <w:p>
             <w:pPr>
                 <w:jc w:val="{$alignment}"/>
-                <w:spacing w:after="160" w:line="420" w:lineRule="auto"/>
+                <w:spacing w:after="210" w:line="312" w:lineRule="auto"/>
             </w:pPr>
             <w:r>
                 <w:rPr>
@@ -720,23 +775,23 @@ class LetterController extends Controller
             ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
             : now()->format('Y.m.d');
 
-        $subjectCode = e($letter->subject?->code ?? $letter->meeting_code ?? '');
+        $subjectCode = $letter->subject?->code ?? $letter->meeting_code ?? '';
 
-        $recipientsHtml = $letter->recipients->map(function ($r) {
+        $recipientLines = $letter->recipients->map(function ($r) {
             if ($r->recipient_label) {
-                return e($r->recipient_label);
+                return $r->recipient_label;
             }
 
             if ($r->user) {
-                return e(trim(($r->user->designation ?? '') . ', ' . ($r->user->organization?->organization_name ?? '')));
+                return trim(($r->user->designation ?? '') . ', ' . ($r->user->organization?->organization_name ?? ''));
             }
 
             if ($r->organization) {
-                return e($r->organization->organization_name);
+                return $r->organization->organization_name;
             }
 
             return null;
-        })->filter()->map(fn ($line) => "<div>{$line}</div>")->implode('');
+        })->filter()->values();
 
         $title = $letter->title ?? $letter->subject?->title ?? '';
         $titleHtml = $title !== strip_tags($title) ? $title : e($title);
@@ -755,8 +810,8 @@ class LetterController extends Controller
                 })
                 ->implode('');
 
-        $signatoryName = e($letter->signatory_name ?? 'නදීකා සී. මුහන්දිරම්ගේ');
-        $designation = e($letter->designation ?? 'ප්‍රධාන ලේකම්');
+        $signatoryName = $letter->signatory_name ?? 'නදීකා සී. මුහන්දිරම්ගේ';
+        $designation = $letter->designation ?? 'ප්‍රධාන ලේකම්';
         $office = 'දකුණු පළාත';
 
         $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
@@ -766,147 +821,18 @@ class LetterController extends Controller
                 . '") format("truetype"); font-style: normal; font-weight: 400; }'
             : '';
 
-        $css = '
-            <style>
-                __ISKOOLA_FONT_FACE__
-                @page {
-                    size: Letter portrait;
-                    margin: 1in;
-                }
-
-                .letter-page {
-                    font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
-                    font-size: 12pt;
-                    line-height: 1.3;
-                    letter-spacing: normal;
-                    word-spacing: -1.5pt;
-                    color: #000;
-                    width: 100%;
-                    box-sizing: border-box;
-                }
-
-                .letter-page * {
-                    font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
-                    font-size: 12pt;
-                    letter-spacing: normal;
-                    word-spacing: -1.5pt;
-                }
-
-                .letterhead-meta {
-                    width: 100%;
-                    margin-bottom: 22px;
-                    border-collapse: collapse;
-                }
-
-                .letterhead-meta td {
-                    width: 50%;
-                    padding: 0;
-                    vertical-align: top;
-                    font-family: Calibri, Arial, sans-serif;
-                    font-size: 12pt;
-                }
-
-                .letterhead-date {
-                    text-align: right;
-                }
-
-                .recipients {
-                    margin-bottom: 22px;
-                    line-height: 1.3;
-                    text-align: left;
-                    font-size: 12pt !important;
-                }
-
-                .recipients * {
-                    font-size: 12pt !important;
-                }
-
-                .subject {
-                    font-size: 13pt !important;
-                    font-weight: bold;
-                    text-align: center;
-                    text-decoration: underline;
-                    margin: 22px 0;
-                }
-
-                .subject * {
-                    font-size: 13pt !important;
-                }
-
-                .subject p {
-                    margin: 0;
-                }
-
-                .body {
-                    text-align: justify;
-                    word-spacing: -1.5pt !important;
-                    font-size: 12pt !important;
-                }
-
-                .body * {
-                    word-spacing: -1.5pt !important;
-                    font-size: 12pt !important;
-                }
-
-                .body p {
-                    margin: 0 0 14px 0;
-                    line-height: 1.3;
-                    text-indent: 0;
-                }
-
-                .body p + p {
-                    line-height: 1.5;
-                }
-
-                .signature {
-                    margin-top: 42px;
-                    font-size: 12pt !important;
-                }
-
-                .signature p {
-                    margin: 0;
-                    font-size: 12pt !important;
-                }
-            </style>
-        ';
-        $css = str_replace('__ISKOOLA_FONT_FACE__', $fontFace, $css);
-
-        $wrapStart = $standalone
-            ? "<!DOCTYPE html><html><head><meta charset='UTF-8'>{$css}</head><body>"
-            : $css;
-
-        $wrapEnd = $standalone ? '</body></html>' : '';
-
-        return <<<HTML
-    {$wrapStart}
-    <div class="letter-page">
-        <table class="letterhead-meta" role="presentation">
-            <tr>
-                <td class="letterhead-subject">{$subjectCode}</td>
-                <td class="letterhead-date">{$date}</td>
-            </tr>
-        </table>
-
-        <div class="recipients">
-            {$recipientsHtml}
-        </div>
-
-        <div class="subject">
-            {$titleHtml}
-        </div>
-
-        <div class="body">
-            {$bodyHtml}
-        </div>
-
-        <div class="signature">
-            <p>{$signatoryName}</p>
-            <p>{$designation}</p>
-            <p>{$office}</p>
-        </div>
-    </div>
-    {$wrapEnd}
-    HTML;
+        return view('letters.document', compact(
+            'standalone',
+            'fontFace',
+            'subjectCode',
+            'date',
+            'recipientLines',
+            'titleHtml',
+            'bodyHtml',
+            'signatoryName',
+            'designation',
+            'office',
+        ))->render();
     }
 
     /**

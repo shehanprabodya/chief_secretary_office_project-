@@ -82,14 +82,16 @@ export default function DeputyDashboard() {
 
   return (
     <DashboardLayout pageTitle="Deputy Dashboard">
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="approval-dashboard-sections">
+        <section className="welcome-font-size relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
+          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Deputy Approval Desk</p>
-            <h1 className="mt-1 text-3xl font-bold text-slate-900">
-              Welcome, <span className="text-[var(--color-primary)]">{user?.full_name ?? 'Deputy'}</span>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Deputy Approval Desk</p>
+            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
+              Welcome, {user?.full_name ?? 'Deputy'}
             </h1>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 max-w-2xl text-sm text-blue-100">
               Review documents cleared by Department Heads and forward final-ready items to the Chief Secretary.
             </p>
           </div>
@@ -98,20 +100,21 @@ export default function DeputyDashboard() {
             <button
               onClick={loadApprovals}
               disabled={isLoading}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
             <button
               onClick={() => navigate('/approvals')}
-              className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[var(--color-primary)] hover:bg-blue-50"
             >
               <Inbox className="h-4 w-4" />
               Open Approval Queue
             </button>
           </div>
-        </div>
+          </div>
+        </section>
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -119,7 +122,7 @@ export default function DeputyDashboard() {
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="approval-dashboard-stats grid sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-t-4 border-t-orange-400 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
@@ -173,7 +176,7 @@ export default function DeputyDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+        <div className="approval-dashboard-content grid xl:grid-cols-[1fr_360px]">
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
@@ -192,7 +195,7 @@ export default function DeputyDashboard() {
               <table className="w-full">
                 <thead className="bg-slate-50">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    <th className="px-4 py-3">Reference</th>
+                    <th className="px-4 py-3">Subject Code</th>
                     <th className="px-4 py-3">Subject</th>
                     <th className="px-4 py-3">Submitted By</th>
                     <th className="px-4 py-3">Status</th>
@@ -219,7 +222,7 @@ export default function DeputyDashboard() {
                         className="cursor-pointer hover:bg-slate-50"
                         onClick={() => navigate('/approvals')}
                       >
-                        <td className="px-4 py-4 text-sm font-semibold text-slate-800">{doc.reference_id}</td>
+                        <td className="px-4 py-4 text-sm font-semibold text-slate-800">{doc.subject_code ?? '—'}</td>
                         <td className="px-4 py-4 text-sm text-slate-600">{doc.subject}</td>
                         <td className="px-4 py-4 text-sm text-slate-500">{doc.submitter?.full_name ?? 'Unknown'}</td>
                         <td className="px-4 py-4">
@@ -236,7 +239,7 @@ export default function DeputyDashboard() {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="approval-dashboard-sidebar">
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900">Workflow Position</h2>
               <div className="mt-5 space-y-4">

@@ -5,6 +5,7 @@ import WorkflowTracker from '../components/Approvals/WorkflowTracker';
 import { approvalService } from '../services/approvalService';
 import { useAuth } from '../context/AuthContext';
 import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
+import ConfirmDialog from '../components/shared/ConfirmDialog';
 import type { ApprovableDocument } from '../types/approval';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -37,6 +38,7 @@ export default function ApprovalsPage() {
   const [isActing, setIsActing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
 
   const fetchList = useCallback(async () => {
     setIsLoading(true);
@@ -85,13 +87,18 @@ export default function ApprovalsPage() {
 
   const handleReject = async () => {
     if (!selectedDoc) return;
-    if (!confirm('Reject this document?')) return;
+    setShowRejectConfirmation(true);
+  };
+
+  const confirmReject = async () => {
+    if (!selectedDoc) return;
     setIsActing(true);
     try {
       const updated = await approvalService.reject(selectedDoc.document_id, commentText || undefined);
       setSelectedDoc(updated);
       setCommentText('');
-      fetchList();
+      setShowRejectConfirmation(false);
+      await fetchList();
     } finally {
       setIsActing(false);
     }
@@ -264,8 +271,8 @@ export default function ApprovalsPage() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-slate-400">DOCUMENT NO</p>
-                          <p className="font-semibold text-slate-900">{selectedDoc.reference_id}</p>
+                          <p className="text-slate-400">SUBJECT CODE</p>
+                          <p className="font-semibold text-slate-900">{selectedDoc.subject_code ?? '—'}</p>
                         </div>
                       </div>
 
@@ -355,6 +362,16 @@ export default function ApprovalsPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={showRejectConfirmation}
+        title={`Reject ${selectedDoc?.document_type === 'letter' ? 'letter' : 'document'}?`}
+        message={`Are you sure you want to reject ${selectedDoc?.document_type === 'letter' ? `letter ${selectedDoc.subject_code ?? selectedDoc.subject}` : selectedDoc?.subject ?? 'this document'}? The submitting officer will be notified${commentText.trim() ? ' with your current observation' : ''}.`}
+        confirmLabel={selectedDoc?.document_type === 'letter' ? 'Reject Letter' : 'Reject Document'}
+        isProcessing={isActing}
+        variant="danger"
+        onConfirm={confirmReject}
+        onCancel={() => setShowRejectConfirmation(false)}
+      />
     </DashboardLayout>
   );
 }

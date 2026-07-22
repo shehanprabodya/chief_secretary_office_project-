@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ApprovableDocument;
 use App\Models\Letter;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
 class ApprovalController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     /**
      * List documents this user's role needs to see/act on,
      * plus a search by reference ID or subject.
@@ -18,6 +23,12 @@ class ApprovalController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject');
+
+        // Officers may track only the documents they personally submitted.
+        // Reviewing roles retain the shared workflow queue they need to act on.
+        if ($request->user()->hasRole('officer')) {
+            $query->where('submitted_by', $request->user()->user_id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -42,10 +53,15 @@ class ApprovalController extends Controller
         return response()->json(['documents' => $documents]);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
         $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
             ->findOrFail($id);
+
+        if ($request->user()->hasRole('officer')
+            && (int) $document->submitted_by !== (int) $request->user()->user_id) {
+            return response()->json(['message' => 'You can only view documents you submitted.'], 403);
+        }
 
         return response()->json(['document' => $this->withSubjectCode($document)]);
     }
@@ -104,6 +120,8 @@ class ApprovalController extends Controller
                         Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
                     }
 
+                    $this->notifyCurrentReviewer($existingDocument, $request->user()->user_id, true);
+
                     return response()->json([
                         'message' => 'Revised approved document submitted for approval',
                         'document' => $this->withSubjectCode(
@@ -128,6 +146,8 @@ class ApprovalController extends Controller
                     if ($existingDocument->document_type === 'letter' && $existingDocument->source_id) {
                         Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
                     }
+
+                    $this->notifyCurrentReviewer($existingDocument, $request->user()->user_id, true);
 
                     return response()->json([
                         'message' => 'Rejected document resubmitted for approval',
@@ -162,6 +182,8 @@ class ApprovalController extends Controller
         ]);
 
         $document->initializeWorkflow();
+
+        $this->notifyCurrentReviewer($document, $request->user()->user_id);
 
         if ($document->document_type === 'letter' && $document->source_id) {
             Letter::where('letter_id', $document->source_id)->update(['status' => 'pending_approval']);
@@ -232,6 +254,39 @@ class ApprovalController extends Controller
             ]);
         }
 
+        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
+            [$entityName, $entityCode] = $this->notificationIdentity($document);
+            $actionDate = now()->format('d M Y, h:i A');
+            $this->notifications->sendToUser(
+                $document->submitted_by,
+                'approval_step_approved',
+                $nextStep ? "{$entityName} approved and forwarded" : "{$entityName} approved",
+                $nextStep
+                    ? "{$entityName} {$entityCode} was approved by {$request->user()->full_name} on {$actionDate} and forwarded to {$this->roleLabel($nextStep->required_role)}."
+                    : "{$entityName} {$entityCode} received final approval from {$request->user()->full_name} on {$actionDate}.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+                'important',
+            );
+        }
+
+        if ($nextStep) {
+            [$entityName, $entityCode] = $this->notificationIdentity($document);
+            $actionDate = now()->format('d M Y, h:i A');
+            $this->notifications->sendToRole(
+                $nextStep->required_role,
+                'approval_action_required',
+                "{$entityName} awaiting your approval",
+                "{$entityName} {$entityCode} was forwarded by {$request->user()->full_name} on {$actionDate} and is ready for your review.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+                'important',
+                $request->user()->user_id,
+            );
+        }
+
         return response()->json([
             'message' => 'Approved',
             'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
@@ -260,6 +315,21 @@ class ApprovalController extends Controller
                 'user_id' => $request->user()->user_id,
                 'comment' => $request->notes,
             ]);
+        }
+
+        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
+            [$entityName, $entityCode] = $this->notificationIdentity($document);
+            $actionDate = now()->format('d M Y, h:i A');
+            $this->notifications->sendToUser(
+                $document->submitted_by,
+                'approval_rejected',
+                "{$entityName} rejected",
+                "{$entityName} {$entityCode} was rejected by {$request->user()->full_name} on {$actionDate}.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+                'urgent',
+            );
         }
 
         return response()->json([
@@ -294,6 +364,68 @@ class ApprovalController extends Controller
             'comment' => $request->comment,
         ]);
 
+        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
+            [$entityName, $entityCode] = $this->notificationIdentity($document);
+            $actionDate = now()->format('d M Y, h:i A');
+            $this->notifications->sendToUser(
+                $document->submitted_by,
+                'approval_comment_added',
+                "New comment on {$entityName}",
+                "{$request->user()->full_name} added a comment to {$entityName} {$entityCode} on {$actionDate}.",
+                '/approvals',
+                'approval_document',
+                $document->document_id,
+            );
+        }
+
         return response()->json(['comment' => $comment->load('user')], 201);
+    }
+
+    private function notifyCurrentReviewer(ApprovableDocument $document, int $actorUserId, bool $resubmitted = false): void
+    {
+        $document->loadMissing('steps', 'submitter', 'sourceLetter.subject');
+        $currentStep = $document->steps->firstWhere('step_order', $document->current_step_order);
+
+        if (!$currentStep) {
+            return;
+        }
+
+        [$entityName, $entityCode] = $this->notificationIdentity($document);
+        $submittedAt = now()->format('d M Y, h:i A');
+        $submitterName = $document->submitter?->full_name ?? 'An officer';
+
+        $this->notifications->sendToRole(
+            $currentStep->required_role,
+            'approval_action_required',
+            $resubmitted ? "{$entityName} resubmitted for approval" : "New {$entityName} awaiting approval",
+            "{$entityName} {$entityCode} was " . ($resubmitted ? 'resubmitted' : 'submitted') . " by {$submitterName} on {$submittedAt} and is ready for your review.",
+            '/approvals',
+            'approval_document',
+            $document->document_id,
+            'important',
+            $actorUserId,
+        );
+    }
+
+    /** @return array{0: string, 1: string} */
+    private function notificationIdentity(ApprovableDocument $document): array
+    {
+        $document->loadMissing('sourceLetter.subject');
+        $entityName = ucfirst(str_replace('_', ' ', $document->document_type));
+        $entityCode = $document->document_type === 'letter'
+            ? ($document->sourceLetter?->subject?->code ?: $document->subject)
+            : $document->subject;
+
+        return [$entityName, $entityCode];
+    }
+
+    private function roleLabel(string $role): string
+    {
+        return match ($role) {
+            'dept_head' => 'the Department Head',
+            'deputy' => 'the Deputy Secretary',
+            'chief_secretary' => 'the Chief Secretary',
+            default => ucfirst(str_replace('_', ' ', $role)),
+        };
     }
 }

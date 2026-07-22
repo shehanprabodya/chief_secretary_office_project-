@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\Letter;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
 class MeetingController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     /**
      * List meetings with subject and date filters.
      */
@@ -174,6 +179,8 @@ class MeetingController extends Controller
             $meeting->attendees()->attach($request->attendee_ids);
         }
 
+        $this->notifyMeetingAttendees($meeting->load('attendees.role'), 'meeting_assigned', 'New meeting assigned');
+
         return response()->json([
             'message' => 'Meeting created successfully',
             'meeting' => $meeting->load('attendees'),
@@ -226,18 +233,68 @@ class MeetingController extends Controller
             $meeting->attendees()->sync($request->attendee_ids);
         }
 
+        $this->notifyMeetingAttendees($meeting->load('attendees.role'), 'meeting_updated', 'Meeting details updated');
+
         return response()->json([
             'message' => 'Meeting updated successfully',
             'meeting' => $meeting->load('attendees'),
         ]);
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
-        $meeting = Meeting::findOrFail($id);
+        $meeting = Meeting::with('attendees.role')->findOrFail($id);
+
+        if ((int) $meeting->created_by !== (int) $request->user()->user_id) {
+            return response()->json(['message' => 'Only the creator can cancel this meeting.'], 403);
+        }
+
         $meeting->update(['status' => 'cancelled']);
 
+        $this->notifyMeetingAttendees($meeting, 'meeting_cancelled', 'Meeting cancelled', 'urgent');
+
         return response()->json(['message' => 'Meeting cancelled']);
+    }
+
+    private function notifyMeetingAttendees(
+        Meeting $meeting,
+        string $type,
+        string $title,
+        string $priority = 'important',
+    ): void {
+        $meetingCode = $meeting->meeting_code ?: "Meeting {$meeting->meeting_id}";
+        $scheduledAt = \Carbon\Carbon::parse("{$meeting->meeting_date} {$meeting->start_time}")
+            ->format('d M Y, h:i A');
+        $changedAt = now()->format('d M Y, h:i A');
+        $location = $meeting->location ?: 'a venue to be confirmed';
+
+        $message = match ($type) {
+            'meeting_assigned' => "You were assigned to meeting {$meetingCode}, “{$meeting->title}”, scheduled for {$scheduledAt} at {$location}.",
+            'meeting_updated' => "Meeting {$meetingCode}, “{$meeting->title}”, was updated on {$changedAt}. It is scheduled for {$scheduledAt} at {$location}.",
+            'meeting_cancelled' => "Meeting {$meetingCode}, “{$meeting->title}”, scheduled for {$scheduledAt}, was cancelled on {$changedAt}.",
+            default => "Meeting {$meetingCode}, “{$meeting->title}”, has a new update dated {$changedAt}.",
+        };
+
+        foreach ($meeting->attendees as $attendee) {
+            if ((int) $attendee->user_id === (int) $meeting->created_by) {
+                continue;
+            }
+
+            $actionUrl = $attendee->role?->role_name === 'external_officer'
+                ? '/dashboard/external-officer#meetings'
+                : "/meetings/{$meeting->meeting_id}";
+
+            $this->notifications->sendToUser(
+                $attendee->user_id,
+                $type,
+                "{$title}: {$meetingCode}",
+                $message,
+                $actionUrl,
+                'meeting',
+                $meeting->meeting_id,
+                $priority,
+            );
+        }
     }
 }
 

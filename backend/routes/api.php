@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\ApprovalController;
 use App\Http\Controllers\Api\MinuteController;
 use App\Http\Controllers\Api\ExternalOfficerController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\admin\AdminDashboardController;
 use App\Http\Controllers\Api\admin\UserManagementController;
 use App\Http\Controllers\Api\admin\SubjectManagementController;
@@ -17,6 +18,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markRead']);
 
     // Meeting creation is shared by the officer and admin meeting workflow.
     Route::post('/meetings', [MeetingController::class, 'store'])
