@@ -77,13 +77,15 @@ export default function DeptHeadDashboard() {
   return (
     <DashboardLayout pageTitle="Department Head Dashboard">
       <div className="approval-dashboard-sections">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <section className="relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
+          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Approval Desk</p>
-            <h1 className="mt-1 text-3xl font-bold text-slate-900">
-              Welcome, <span className="text-[var(--color-primary)]">{user?.full_name ?? 'Department Head'}</span>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Approval Desk</p>
+            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
+              Welcome, {user?.full_name ?? 'Department Head'}
             </h1>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 max-w-2xl text-sm text-blue-100">
               Review department submissions, record observations, and move approved documents to the Deputy level.
             </p>
           </div>
@@ -92,20 +94,21 @@ export default function DeptHeadDashboard() {
             <button
               onClick={loadApprovals}
               disabled={isLoading}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
             <button
               onClick={() => navigate('/approvals')}
-              className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[var(--color-primary)] hover:bg-blue-50"
             >
               <Inbox className="h-4 w-4" />
               Open Approval Queue
             </button>
           </div>
-        </div>
+          </div>
+        </section>
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

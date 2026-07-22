@@ -101,25 +101,29 @@ export default function AdminDashboard() {
     <DashboardLayout pageTitle="Admin Dashboard">
       <div className="flex flex-col gap-6">
         {/* Welcome header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-slate-900">
-            Welcome, <span className="text-[var(--color-primary)]">{user?.full_name ?? 'Admin'}</span>
-          </h1>
-          <div className="flex gap-3">
+        <section className="relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
+          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold sm:text-3xl">Welcome, {user?.full_name ?? 'Admin'}</h1>
+              <p className="mt-2 max-w-2xl text-sm text-blue-100">Manage meetings, users, and office activity from your administration dashboard.</p>
+            </div>
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={() => navigate('/meetings')}
-              className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[var(--color-primary)] hover:bg-blue-50"
             >
               <Plus className="h-4 w-4" /> New Meeting
             </button>
             <button
               onClick={() => navigate('/admin/users')}
-              className="flex items-center gap-2 rounded-lg border-2 border-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-primary)] hover:bg-blue-50"
+              className="flex items-center gap-2 rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
             >
               <UserPlus className="h-4 w-4" /> Add User
             </button>
           </div>
-        </div>
+          </div>
+        </section>
 
         {/* KPI Cards */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

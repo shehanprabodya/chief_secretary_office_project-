@@ -44,13 +44,13 @@ export default function WelcomeSection() {
   }
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/40">
-      <h1 className="text-2xl font-bold text-blue-950 dark:text-blue-100">
+    <div className="relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-6 py-7 text-white shadow-sm sm:px-8">
+      <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[36px] border-white/5" />
+      <h1 className="relative text-2xl font-bold sm:text-3xl">
         Welcome back, {user?.full_name}
       </h1>
-      
-      
-      <p className="mt-1 text-blue-700 dark:text-blue-300">
+
+      <p className="relative mt-2 max-w-2xl text-sm text-blue-100">
         {scheduleMessage}
       </p>
     </div>
