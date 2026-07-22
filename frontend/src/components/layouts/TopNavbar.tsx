@@ -6,8 +6,8 @@ import logo from '../../assets/logo.svg';
 
 interface TopNavbarProps {
   onMenuClick: () => void;
-  
   pageTitle?: string;
+  showMenuButton?: boolean;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -19,7 +19,7 @@ const ROLE_LABELS: Record<string, string> = {
   external_officer: 'External Officer',
 };
 
-export default function TopNavbar({ onMenuClick, pageTitle = 'Development Division' }: TopNavbarProps) {
+export default function TopNavbar({ onMenuClick, pageTitle = 'Development Division', showMenuButton = true }: TopNavbarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [language, setLanguage] = useState<'si' | 'en'>('en');
@@ -57,13 +57,13 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
       <div className="flex h-full items-center justify-between px-4 lg:px-8">
         {/* Left - Menu Button (mobile) + Page Title */}
         <div className="flex items-center gap-3">
-          <button
+          {showMenuButton && <button
             onClick={onMenuClick}
             className="rounded-lg p-2 text-white transition hover:bg-white/10 lg:hidden"
             aria-label="Open sidebar menu"
           >
             <Menu className="h-6 w-6" />
-          </button>
+          </button>}
           <img
             src={logo}
             alt="Sri Lanka Emblem"

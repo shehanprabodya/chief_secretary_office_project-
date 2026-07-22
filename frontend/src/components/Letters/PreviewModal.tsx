@@ -75,7 +75,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
       <div
         className="relative z-10 flex w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         style={{
-          width: 'min(calc(8.5in + 4rem), calc(100vw - 2rem))',
+          width: 'min(96rem, calc(100vw - 2rem))',
           height: 'min(calc(11in + 5rem), 95vh)',
         }}
       >

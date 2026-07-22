@@ -3,7 +3,7 @@ import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import {
   Save, Eye, Printer, Play, Send,
   Download, History, Trash2,
-  CalendarDays, CheckCircle, Clock, FileText, MapPin, XCircle,
+  ArrowLeft, CalendarDays, CheckCircle, Clock, FileText, MapPin, XCircle,
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import RichTextEditor from '../components/Letters/RichTextEditor';
@@ -491,20 +491,31 @@ export default function GenerateLetterPage() {
   };
 
   return (
-    <DashboardLayout pageTitle="Generate Meeting Letter">
+    <DashboardLayout pageTitle="Generate Meeting Letter" hideSidebar>
       <div className="space-y-4">
         {/* Breadcrumb + Header */}
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+              aria-label="Go back"
+              title="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Meetings &nbsp;›&nbsp;
               <span className="font-bold text-slate-700">Generate Letter</span>
             </p>
             <h1 className="mt-1 text-2xl font-bold text-slate-900">Generate Meeting Letter</h1>
+            </div>
           </div>
 
           {/* Top Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canEditLetter && (
               <button
                 onClick={() => handleSaveDraft()}
@@ -582,7 +593,7 @@ export default function GenerateLetterPage() {
           </p>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
           {/* Main Form  */}
           <div className="flex flex-col gap-6 rounded-xl border border-slate-200 bg-white p-6">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
@@ -726,7 +737,7 @@ export default function GenerateLetterPage() {
           </div>
 
           {/* Right Sidebar */}
-          <div className="space-y-4">
+          <aside className="space-y-4">
             {/* Execution Card */}
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -814,7 +825,7 @@ export default function GenerateLetterPage() {
                 ))}
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
 
