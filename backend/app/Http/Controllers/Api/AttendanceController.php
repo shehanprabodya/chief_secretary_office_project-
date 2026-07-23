@@ -9,6 +9,9 @@ use App\Models\Meeting;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\Process\Process;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class AttendanceController extends Controller
 {
@@ -351,6 +354,165 @@ class AttendanceController extends Controller
             ->update(['is_draft' => false]);
 
         return response()->json(['message' => 'Attendance submitted and synced']);
+    }
+
+    /**
+     * Export the attendance rows currently displayed by the client as a PDF.
+     */
+    public function exportPdf(Request $request, int $meetingId): Response
+    {
+        $validator = Validator::make($request->all(), [
+            'letter_id' => 'required|exists:letters,letter_id',
+            'records' => 'required|array|max:1000',
+            'records.*.full_name' => 'required|string|max:255',
+            'records.*.department' => 'nullable|string|max:255',
+            'records.*.role' => 'nullable|string|max:255',
+            'records.*.status' => 'required|in:present,absent,excused',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'The attendance report could not be prepared.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $meeting = Meeting::findOrFail($meetingId);
+        $letter = Letter::where('letter_id', $request->integer('letter_id'))
+            ->where('status', 'approved')
+            ->where(function ($query) use ($meeting) {
+                $query->where('meeting_id', $meeting->meeting_id)
+                    ->orWhere('meeting_code', $meeting->meeting_code);
+            })
+            ->firstOrFail();
+
+        $records = collect($validator->validated()['records']);
+        $statistics = [
+            'total' => $records->count(),
+            'present' => $records->where('status', 'present')->count(),
+            'absent' => $records->where('status', 'absent')->count(),
+            'excused' => $records->where('status', 'excused')->count(),
+        ];
+        $statistics['percentage'] = $statistics['total'] > 0
+            ? round(($statistics['present'] / $statistics['total']) * 100)
+            : 0;
+
+        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
+        $fontUrl = is_file($fontPath) ? 'file://' . $fontPath : null;
+        $html = view('attendance.report', compact('meeting', 'letter', 'records', 'statistics', 'fontUrl'))->render();
+        $options = new \Dompdf\Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'Iskoola Pota');
+        $options->setChroot([base_path(), dirname($fontPath)]);
+
+        // Use a writable, persistent cache so Dompdf can embed the Sinhala
+        // typeface in every downloaded attendance report.
+        $dompdfFontDir = storage_path('app/dompdf-fonts');
+        if (!is_dir($dompdfFontDir)) {
+            mkdir($dompdfFontDir, 0775, true);
+        }
+        $options->set('fontDir', $dompdfFontDir);
+        $options->set('fontCache', $dompdfFontDir);
+
+        $dompdf = new \Dompdf\Dompdf($options);
+        if (is_file($fontPath)) {
+            $dompdf->getFontMetrics()->registerFont([
+                'family' => 'Iskoola Pota',
+                'weight' => 'normal',
+                'style' => 'normal',
+            ], 'file://' . $fontPath);
+        }
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        $safeReference = preg_replace('/[^A-Za-z0-9_-]+/', '-', $meeting->meeting_code ?: (string) $meeting->meeting_id);
+        $filename = 'attendance-' . trim($safeReference, '-') . '-' . now()->format('Ymd') . '.pdf';
+
+        // LibreOffice uses a full text-shaping engine, which is required for
+        // Sinhala vowel signs and conjunct characters to be positioned
+        // correctly. Dompdf remains the fallback for servers without it.
+        try {
+            $path = $this->convertAttendanceHtmlWithLibreOffice($html);
+
+            return response()->download($path, $filename, [
+                'Content-Type' => 'application/pdf',
+            ])->deleteFileAfterSend(true);
+        } catch (Throwable) {
+            // Continue with the Dompdf output prepared above.
+        }
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    private function convertAttendanceHtmlWithLibreOffice(string $html): string
+    {
+        $binary = collect(['/usr/bin/libreoffice', '/usr/bin/soffice'])
+            ->first(fn (string $path) => is_executable($path));
+
+        if (!$binary) {
+            throw new \RuntimeException('LibreOffice is not installed.');
+        }
+
+        $workDir = sys_get_temp_dir() . '/attendance-export-' . uniqid('', true);
+        $profileDir = $workDir . '/lo-profile';
+        $runtimeDir = $workDir . '/runtime';
+        $fontCacheDir = $workDir . '/font-cache';
+        mkdir($workDir, 0775, true);
+        mkdir($profileDir, 0775, true);
+        mkdir($runtimeDir, 0700, true);
+        mkdir($fontCacheDir, 0775, true);
+
+        $htmlPath = $workDir . '/attendance.html';
+        file_put_contents($htmlPath, $html);
+
+        $fontDir = base_path('../frontend/public/fonts');
+        $escapeXml = static fn (string $value): string => htmlspecialchars(
+            $value,
+            ENT_XML1 | ENT_QUOTES,
+            'UTF-8'
+        );
+        $fontConfigPath = $workDir . '/fonts.conf';
+        file_put_contents(
+            $fontConfigPath,
+            '<?xml version="1.0"?>'
+            . '<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">'
+            . '<fontconfig><dir>' . $escapeXml($fontDir) . '</dir>'
+            . '<cachedir>' . $escapeXml($fontCacheDir) . '</cachedir>'
+            . '<config><rescan><int>0</int></rescan></config></fontconfig>'
+        );
+
+        $process = new Process([
+            $binary,
+            '--headless',
+            '-env:UserInstallation=file://' . $profileDir,
+            '--convert-to',
+            'pdf:writer_pdf_Export',
+            '--outdir',
+            $workDir,
+            $htmlPath,
+        ]);
+        $process->setEnv([
+            'HOME' => $workDir,
+            'XDG_RUNTIME_DIR' => $runtimeDir,
+            'FONTCONFIG_FILE' => $fontConfigPath,
+            'FONTCONFIG_PATH' => $workDir,
+            'SAL_FONTPATH' => $fontDir,
+            'LANG' => 'en_US.UTF-8',
+        ]);
+        $process->setTimeout(60);
+        $process->run();
+
+        $outputPath = $workDir . '/attendance.pdf';
+        if (!is_file($outputPath)) {
+            throw new \RuntimeException(trim($process->getErrorOutput() . "\n" . $process->getOutput()));
+        }
+
+        return $outputPath;
     }
 
     /**
