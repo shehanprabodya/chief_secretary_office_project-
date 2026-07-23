@@ -104,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/meetings/{meetingId}/attendance', [AttendanceController::class, 'show']);
         Route::post('/meetings/{meetingId}/attendance/draft', [AttendanceController::class, 'saveDraft']);
         Route::post('/meetings/{meetingId}/attendance/submit', [AttendanceController::class, 'submit']);
+        Route::post('/meetings/{meetingId}/attendance/export/pdf', [AttendanceController::class, 'exportPdf']);
         Route::get('/meetings/{meetingId}/attendance/search', [AttendanceController::class, 'search']);
 
         //minutes

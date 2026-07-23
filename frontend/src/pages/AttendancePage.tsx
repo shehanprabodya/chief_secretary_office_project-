@@ -35,6 +35,7 @@ export default function AttendancePage() {
   const [attendanceError, setAttendanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: ActionMessageType; text: string } | null>(null);
   const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
@@ -179,6 +180,27 @@ export default function AttendancePage() {
       p.role?.toLowerCase().includes(term)
     );
   });
+
+  const handleExportPdf = async () => {
+    if (!activeMeetingId || !activeLetterId || filteredParticipants.length === 0) return;
+    setIsExporting(true);
+    setActionMessage(null);
+    try {
+      await attendanceService.exportPdf(
+        activeMeetingId,
+        activeLetterId,
+        filteredParticipants.map(({ full_name, department, role, status }) => ({ full_name, department, role, status }))
+      );
+      setActionMessage({ type: 'success', text: 'Attendance PDF downloaded successfully.' });
+    } catch (error) {
+      const message = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : null;
+      setActionMessage({ type: 'error', text: message ?? 'Unable to export the attendance PDF. Please try again.' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Live stats recalculated from current local state (not just server snapshot)
   const present = participants.filter((p) => p.status === 'present').length;
@@ -333,9 +355,14 @@ export default function AttendancePage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <button className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={isExporting || !activeMeetingId || !activeLetterId || filteredParticipants.length === 0}
+                className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 <Download className="h-4 w-4" />
-                Export
+                {isExporting ? 'Exporting...' : 'Export PDF'}
               </button>
             </div>
           </div>
@@ -412,8 +439,11 @@ export default function AttendancePage() {
           </table>
 
           {isViewOnly ? (
-            <div className="border-t border-slate-200 p-4 text-xs text-slate-400">
-              Attendance records are view-only in this mode.
+            <div className="border-t border-slate-200 p-4">
+              {actionMessage && (
+                <ActionMessage type={actionMessage.type} message={actionMessage.text} onDismiss={() => setActionMessage(null)} className="mb-3" />
+              )}
+              <p className="text-xs text-slate-400">Attendance records are view-only in this mode.</p>
             </div>
           ) : (
             <div className="border-t border-slate-200 p-4">
