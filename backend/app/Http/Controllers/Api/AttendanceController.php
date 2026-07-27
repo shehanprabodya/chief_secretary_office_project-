@@ -318,8 +318,9 @@ class AttendanceController extends Controller
         $validator = Validator::make($request->all(), [
             'letter_id' => 'required|exists:letters,letter_id',
             'records' => 'required|array',
-            'records.*.user_id' => 'nullable|exists:users,user_id|required_without:records.*.letter_recipient_id',
-            'records.*.letter_recipient_id' => 'nullable|exists:letter_recipients,letter_recipient_id|required_without:records.*.user_id',
+            'records.*.user_id' => 'nullable|exists:users,user_id|required_without_all:records.*.letter_recipient_id,records.*.additional_attendee_id',
+            'records.*.letter_recipient_id' => 'nullable|exists:letter_recipients,letter_recipient_id|required_without_all:records.*.user_id,records.*.additional_attendee_id',
+            'records.*.additional_attendee_id' => 'nullable|exists:additional_attendees,additional_attendee_id|required_without_all:records.*.user_id,records.*.letter_recipient_id',
             'records.*.status' => 'required|in:present,absent,excused',
         ]);
 
@@ -337,17 +338,52 @@ class AttendanceController extends Controller
         }
 
         $validRecipientIds = $letter->recipients()->pluck('letter_recipient_id');
+        $validAdditionalAttendeeIds = AdditionalAttendee::where('meeting_id', $meetingId)
+            ->where('letter_id', $letter->letter_id)
+            ->pluck('additional_attendee_id');
 
         foreach ($request->records as $record) {
+            $identityCount = collect([
+                $record['user_id'] ?? null,
+                $record['letter_recipient_id'] ?? null,
+                $record['additional_attendee_id'] ?? null,
+            ])->filter(fn ($value) => $value !== null && $value !== '')->count();
+
+            if ($identityCount !== 1) {
+                return response()->json([
+                    'message' => 'Each attendance row must identify exactly one participant.',
+                ], 422);
+            }
+
             if (!empty($record['letter_recipient_id']) && !$validRecipientIds->contains((int) $record['letter_recipient_id'])) {
                 return response()->json(['message' => 'An attendance recipient does not belong to this meeting letter.'], 422);
+            }
+
+            if (!empty($record['additional_attendee_id'])
+                && !$validAdditionalAttendeeIds->contains((int) $record['additional_attendee_id'])) {
+                return response()->json([
+                    'message' => 'An additional attendee does not belong to this meeting letter.',
+                ], 422);
             }
         }
 
         foreach ($request->records as $record) {
-            $identity = !empty($record['user_id'])
-                ? ['letter_id' => $letter->letter_id, 'user_id' => $record['user_id']]
-                : ['letter_id' => $letter->letter_id, 'letter_recipient_id' => $record['letter_recipient_id']];
+            if (!empty($record['user_id'])) {
+                $identity = [
+                    'letter_id' => $letter->letter_id,
+                    'user_id' => $record['user_id'],
+                ];
+            } elseif (!empty($record['letter_recipient_id'])) {
+                $identity = [
+                    'letter_id' => $letter->letter_id,
+                    'letter_recipient_id' => $record['letter_recipient_id'],
+                ];
+            } else {
+                $identity = [
+                    'letter_id' => $letter->letter_id,
+                    'additional_attendee_id' => $record['additional_attendee_id'],
+                ];
+            }
 
             AttendanceRecord::updateOrCreate(
                 $identity,
@@ -355,6 +391,7 @@ class AttendanceController extends Controller
                     'meeting_id' => $meetingId,
                     'user_id' => $record['user_id'] ?? null,
                     'letter_recipient_id' => $record['letter_recipient_id'] ?? null,
+                    'additional_attendee_id' => $record['additional_attendee_id'] ?? null,
                     'status' => $record['status'],
                     'is_draft' => true,
                     'recorded_by' => $request->user()->user_id,
