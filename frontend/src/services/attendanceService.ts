@@ -3,6 +3,8 @@ import type {
   ApprovedMeetingLetter,
   AttendanceSheet,
   AttendanceStatus,
+  AdditionalAttendeeForm,
+  AdditionalAttendeeResponse,
   OrganizerExcuseRequest,
 } from '../types/attendance';
 
@@ -35,8 +37,41 @@ export const attendanceService = {
     return data;
   },
 
-  async saveDraft(meetingId: number, letterId: number, records: { user_id: number | null; letter_recipient_id: number | null; status: AttendanceStatus }[]): Promise<void> {
+  async saveDraft(meetingId: number, letterId: number, records: { user_id: number | null; letter_recipient_id: number | null; additional_attendee_id: number | null; status: AttendanceStatus }[]): Promise<void> {
     await api.post(`/officer/meetings/${meetingId}/attendance/draft`, { letter_id: letterId, records });
+  },
+
+  async createAdditionalAttendee(
+    meetingId: number,
+    form: AdditionalAttendeeForm,
+  ): Promise<AdditionalAttendeeResponse> {
+    const { data } = await api.post<AdditionalAttendeeResponse>(
+      `/officer/meetings/${meetingId}/additional-attendees`,
+      form,
+    );
+    return data;
+  },
+
+  async updateAdditionalAttendee(
+    meetingId: number,
+    additionalAttendeeId: number,
+    form: AdditionalAttendeeForm,
+  ): Promise<AdditionalAttendeeResponse> {
+    const { data } = await api.put<AdditionalAttendeeResponse>(
+      `/officer/meetings/${meetingId}/additional-attendees/${additionalAttendeeId}`,
+      form,
+    );
+    return data;
+  },
+
+  async deleteAdditionalAttendee(
+    meetingId: number,
+    additionalAttendeeId: number,
+  ): Promise<string> {
+    const { data } = await api.delete<{ message: string }>(
+      `/officer/meetings/${meetingId}/additional-attendees/${additionalAttendeeId}`,
+    );
+    return data.message;
   },
 
   async submit(meetingId: number, letterId: number, confirmPendingExcuses = false): Promise<void> {
@@ -69,7 +104,7 @@ export const attendanceService = {
   async exportPdf(
     meetingId: number,
     letterId: number,
-    records: Array<{ user_id: number | null; full_name: string; department: string | null; role: string | null; status: AttendanceStatus }>
+    records: Array<{ user_id: number | null; additional_attendee_id: number | null; participant_type: 'invited' | 'additional'; full_name: string; department: string | null; role: string | null; status: AttendanceStatus }>
   ): Promise<void> {
     const response = await api.post(
       `/officer/meetings/${meetingId}/attendance/export/pdf`,

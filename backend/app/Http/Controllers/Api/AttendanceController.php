@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdditionalAttendee;
 use App\Models\ApprovableDocument;
 use App\Models\AttendanceExcuseRequest;
 use App\Models\AttendanceRecord;
@@ -196,6 +197,9 @@ class AttendanceController extends Controller
 
         $recordsByUser = $existingRecords->whereNotNull('user_id')->keyBy('user_id');
         $recordsByRecipient = $existingRecords->whereNotNull('letter_recipient_id')->keyBy('letter_recipient_id');
+        $recordsByAdditional = $existingRecords
+            ->whereNotNull('additional_attendee_id')
+            ->keyBy('additional_attendee_id');
 
         $recipientParticipants = $approvedLetter->recipients
             ->map(function ($recipient) use ($recordsByUser, $recordsByRecipient) {
@@ -212,6 +216,8 @@ class AttendanceController extends Controller
                     : $recordsByRecipient->get($recipient->letter_recipient_id);
 
                 return [
+                    'participant_type' => 'invited',
+                    'additional_attendee_id' => null,
                     'user_id' => $user?->user_id,
                     'letter_recipient_id' => $user ? null : $recipient->letter_recipient_id,
                     'full_name' => $user?->full_name
@@ -224,12 +230,15 @@ class AttendanceController extends Controller
                     'role' => $user?->designation
                         ?? $recipient->recipient_label
                         ?? 'Organization representative',
+                    'addition_reason' => null,
                     'status' => $record?->status ?? 'absent',
                 ];
             })
             ->unique(fn ($participant) => $participant['user_id']
                 ? 'user-'.$participant['user_id']
-                : 'recipient-'.$participant['letter_recipient_id']);
+                : ($participant['additional_attendee_id']
+                    ? 'additional-'.$participant['additional_attendee_id']
+                    : 'recipient-'.$participant['letter_recipient_id']));
 
         // Keep previously saved people visible even if the letter recipients are edited later.
         $savedParticipants = $existingRecords
@@ -238,21 +247,49 @@ class AttendanceController extends Controller
                 $user = $record->user;
 
                 return [
+                    'participant_type' => 'invited',
+                    'additional_attendee_id' => null,
                     'user_id' => $user->user_id,
                     'letter_recipient_id' => null,
                     'full_name' => $user->full_name,
                     'email' => $user->email,
                     'department' => $user->organization?->organization_name,
                     'role' => $user->designation ?? $user->role?->role_name,
+                    'addition_reason' => null,
                     'status' => $record->status,
+                ];
+            });
+
+        $additionalParticipants = AdditionalAttendee::where('meeting_id', $meeting->meeting_id)
+            ->where('letter_id', $approvedLetter->letter_id)
+            ->orderBy('created_at')
+            ->get()
+            ->map(function (AdditionalAttendee $additionalAttendee) use ($recordsByAdditional) {
+                $record = $recordsByAdditional->get($additionalAttendee->additional_attendee_id);
+
+                return [
+                    'participant_type' => 'additional',
+                    'additional_attendee_id' => $additionalAttendee->additional_attendee_id,
+                    'registered_user_id' => $additionalAttendee->user_id,
+                    'user_id' => null,
+                    'letter_recipient_id' => null,
+                    'full_name' => $additionalAttendee->full_name,
+                    'email' => $additionalAttendee->email ?? '',
+                    'department' => $additionalAttendee->organization,
+                    'role' => $additionalAttendee->designation,
+                    'addition_reason' => $additionalAttendee->addition_reason,
+                    'status' => $record?->status ?? 'absent',
                 ];
             });
 
         $participants = $recipientParticipants
             ->concat($savedParticipants)
+            ->concat($additionalParticipants)
             ->unique(fn ($participant) => $participant['user_id']
                 ? 'user-'.$participant['user_id']
-                : 'recipient-'.$participant['letter_recipient_id'])
+                : ($participant['additional_attendee_id']
+                    ? 'additional-'.$participant['additional_attendee_id']
+                    : 'recipient-'.$participant['letter_recipient_id']))
             ->values();
 
         $present = $participants->where('status', 'present')->count();
@@ -263,6 +300,7 @@ class AttendanceController extends Controller
         return response()->json([
             'meeting' => $meeting,
             'letter_id' => $approvedLetter->letter_id,
+            'is_finalized' => $existingRecords->contains(fn ($record) => !$record->is_draft),
             'participants' => $participants->values(),
             'statistics' => [
                 'attendance_percentage' => $total > 0 ? round(($present / $total) * 100) : 0,
@@ -281,8 +319,9 @@ class AttendanceController extends Controller
         $validator = Validator::make($request->all(), [
             'letter_id' => 'required|exists:letters,letter_id',
             'records' => 'required|array',
-            'records.*.user_id' => 'nullable|exists:users,user_id|required_without:records.*.letter_recipient_id',
-            'records.*.letter_recipient_id' => 'nullable|exists:letter_recipients,letter_recipient_id|required_without:records.*.user_id',
+            'records.*.user_id' => 'nullable|exists:users,user_id|required_without_all:records.*.letter_recipient_id,records.*.additional_attendee_id',
+            'records.*.letter_recipient_id' => 'nullable|exists:letter_recipients,letter_recipient_id|required_without_all:records.*.user_id,records.*.additional_attendee_id',
+            'records.*.additional_attendee_id' => 'nullable|exists:additional_attendees,additional_attendee_id|required_without_all:records.*.user_id,records.*.letter_recipient_id',
             'records.*.status' => 'required|in:present,absent,excused',
         ]);
 
@@ -300,17 +339,52 @@ class AttendanceController extends Controller
         }
 
         $validRecipientIds = $letter->recipients()->pluck('letter_recipient_id');
+        $validAdditionalAttendeeIds = AdditionalAttendee::where('meeting_id', $meetingId)
+            ->where('letter_id', $letter->letter_id)
+            ->pluck('additional_attendee_id');
 
         foreach ($request->records as $record) {
+            $identityCount = collect([
+                $record['user_id'] ?? null,
+                $record['letter_recipient_id'] ?? null,
+                $record['additional_attendee_id'] ?? null,
+            ])->filter(fn ($value) => $value !== null && $value !== '')->count();
+
+            if ($identityCount !== 1) {
+                return response()->json([
+                    'message' => 'Each attendance row must identify exactly one participant.',
+                ], 422);
+            }
+
             if (!empty($record['letter_recipient_id']) && !$validRecipientIds->contains((int) $record['letter_recipient_id'])) {
                 return response()->json(['message' => 'An attendance recipient does not belong to this meeting letter.'], 422);
+            }
+
+            if (!empty($record['additional_attendee_id'])
+                && !$validAdditionalAttendeeIds->contains((int) $record['additional_attendee_id'])) {
+                return response()->json([
+                    'message' => 'An additional attendee does not belong to this meeting letter.',
+                ], 422);
             }
         }
 
         foreach ($request->records as $record) {
-            $identity = !empty($record['user_id'])
-                ? ['letter_id' => $letter->letter_id, 'user_id' => $record['user_id']]
-                : ['letter_id' => $letter->letter_id, 'letter_recipient_id' => $record['letter_recipient_id']];
+            if (!empty($record['user_id'])) {
+                $identity = [
+                    'letter_id' => $letter->letter_id,
+                    'user_id' => $record['user_id'],
+                ];
+            } elseif (!empty($record['letter_recipient_id'])) {
+                $identity = [
+                    'letter_id' => $letter->letter_id,
+                    'letter_recipient_id' => $record['letter_recipient_id'],
+                ];
+            } else {
+                $identity = [
+                    'letter_id' => $letter->letter_id,
+                    'additional_attendee_id' => $record['additional_attendee_id'],
+                ];
+            }
 
             AttendanceRecord::updateOrCreate(
                 $identity,
@@ -318,6 +392,7 @@ class AttendanceController extends Controller
                     'meeting_id' => $meetingId,
                     'user_id' => $record['user_id'] ?? null,
                     'letter_recipient_id' => $record['letter_recipient_id'] ?? null,
+                    'additional_attendee_id' => $record['additional_attendee_id'] ?? null,
                     'status' => $record['status'],
                     'is_draft' => true,
                     'recorded_by' => $request->user()->user_id,
@@ -378,6 +453,8 @@ class AttendanceController extends Controller
             'letter_id' => 'required|exists:letters,letter_id',
             'records' => 'required|array|max:1000',
             'records.*.user_id' => 'nullable|integer|exists:users,user_id',
+            'records.*.additional_attendee_id' => 'nullable|integer|exists:additional_attendees,additional_attendee_id',
+            'records.*.participant_type' => 'required|in:invited,additional',
             'records.*.full_name' => 'required|string|max:255',
             'records.*.department' => 'nullable|string|max:255',
             'records.*.role' => 'nullable|string|max:255',
@@ -400,6 +477,19 @@ class AttendanceController extends Controller
             })
             ->firstOrFail();
 
+        $validAdditionalAttendeeIds = AdditionalAttendee::where('meeting_id', $meeting->meeting_id)
+            ->where('letter_id', $letter->letter_id)
+            ->pluck('additional_attendee_id');
+
+        foreach ($validator->validated()['records'] as $record) {
+            if (!empty($record['additional_attendee_id'])
+                && !$validAdditionalAttendeeIds->contains((int) $record['additional_attendee_id'])) {
+                return response()->json([
+                    'message' => 'The attendance report contains an additional attendee from another meeting letter.',
+                ], 422);
+            }
+        }
+
         $canIncludeExcuseReasons = (int) $meeting->created_by === (int) $request->user()->user_id
             || (int) $letter->created_by === (int) $request->user()->user_id;
         $approvedExcuses = $canIncludeExcuseReasons
@@ -410,7 +500,11 @@ class AttendanceController extends Controller
             : collect();
 
         $records = collect($validator->validated()['records'])
-            ->map(function (array $record) use ($approvedExcuses) {
+            ->map(function (array $record) use ($approvedExcuses, $validAdditionalAttendeeIds) {
+                $record['participant_type'] = !empty($record['additional_attendee_id'])
+                    && $validAdditionalAttendeeIds->contains((int) $record['additional_attendee_id'])
+                    ? 'additional'
+                    : 'invited';
                 $record['excuse_reason'] = null;
 
                 if ($record['status'] !== 'excused' || empty($record['user_id'])) {

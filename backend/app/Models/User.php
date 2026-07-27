@@ -70,6 +70,16 @@ class User extends Authenticatable
         return $this->hasMany(AttendanceExcuseRequest::class, 'reviewed_by', 'user_id');
     }
 
+    public function additionalAttendanceEntries(): HasMany
+    {
+        return $this->hasMany(AdditionalAttendee::class, 'user_id', 'user_id');
+    }
+
+    public function addedAttendanceEntries(): HasMany
+    {
+        return $this->hasMany(AdditionalAttendee::class, 'added_by', 'user_id');
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'ACTIVE';

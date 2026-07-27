@@ -35,4 +35,9 @@ class Letter extends Model
     {
         return $this->hasMany(LetterRecipient::class, 'letter_id', 'letter_id');
     }
+
+    public function additionalAttendees(): HasMany
+    {
+        return $this->hasMany(AdditionalAttendee::class, 'letter_id', 'letter_id');
+    }
 }

@@ -20,18 +20,16 @@
         @endif
         @page { size: A4 landscape; margin: 30px 34px; }
         body { color: #1e293b; font-family: "Iskoola Pota", "DejaVu Sans", sans-serif; font-size: 10px; }
-        h1 { margin: 0; color: #0f172a; font-size: 21px; }
-        .subtitle { margin-top: 4px; color: #64748b; font-size: 10px; }
-        .details { margin: 18px 0 12px; width: 100%; }
-        .details td { padding: 5px 12px 5px 0; vertical-align: top; }
+        .report-tag { margin: 0; color: #0f172a; font-size: 12pt; font-weight: bold; text-align: left; }
+        .meeting-title { margin: 16px 0 0; color: #0f172a; font-size: 13pt; font-weight: bold; text-align: center; text-decoration: underline; }
+        .meeting-meta { margin: 8px 0 16px; width: 100%; border-collapse: collapse; font-size: 12pt; }
+        .meeting-meta td { padding: 3px 10px; text-align: center; vertical-align: top; }
+        .meeting-meta td + td { border-left: 1px solid #64748b; }
         .label { color: #64748b; font-size: 8px; font-weight: bold; text-transform: uppercase; }
         .value { margin-top: 3px; color: #0f172a; font-size: 10px; font-weight: bold; }
-        .summary { margin: 0 0 16px; width: 100%; border-collapse: separate; border-spacing: 6px 0; }
-        .summary td { padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; }
-        .summary .number { color: #0f172a; font-size: 16px; font-weight: bold; }
-        .records { width: 100%; border-collapse: collapse; }
-        .records th { padding: 8px; border: 1px solid #cbd5e1; background: #1e3a5f; color: white; font-size: 8px; text-align: left; text-transform: uppercase; }
-        .records td { padding: 8px; border: 1px solid #dbe3ec; vertical-align: top; }
+        .records { width: 100%; border: 1.5pt solid #000000 !important; border-collapse: collapse !important; border-spacing: 0; }
+        .records th { padding: 8px; border: 1.5pt solid #000000 !important; background: #1e3a5f; color: white; font-size: 8px; text-align: center; text-transform: uppercase; vertical-align: middle; }
+        .records td { padding: 8px; border: 1.5pt solid #000000 !important; text-align: center; vertical-align: middle; }
         .records tr:nth-child(even) td { background: #f8fafc; }
         .status { font-weight: bold; text-transform: capitalize; }
         .present { color: #15803d; }
@@ -41,60 +39,39 @@
     </style>
 </head>
 <body>
-    <h1>Attendance Report</h1>
-    <div class="subtitle">Chief Secretary's Office</div>
+    <div class="report-tag">Attendance Report</div>
+    <div class="meeting-title">{{ $meeting->title }}</div>
 
-    <table class="details">
+    <table class="meeting-meta">
         <tr>
-            <td width="40%">
-                <div class="label">Meeting</div>
-                <div class="value">{{ $meeting->title }}</div>
-            </td>
-            <td width="20%">
-                <div class="label">Date</div>
-                <div class="value">{{ optional($meeting->meeting_date)->format('d M Y') ?? 'Not assigned' }}</div>
-            </td>
-            <td width="20%">
-                <div class="label">Time</div>
-                <div class="value">{{ $meeting->start_time ? substr($meeting->start_time, 0, 5) : '--:--' }} - {{ $meeting->end_time ? substr($meeting->end_time, 0, 5) : '--:--' }}</div>
-            </td>
-            <td width="20%">
-                <div class="label">Venue</div>
-                <div class="value">{{ $meeting->location ?: 'Not assigned' }}</div>
-            </td>
+            <td width="30%"><strong>Date:</strong> {{ optional($meeting->meeting_date)->format('d M Y') ?? 'Not assigned' }}</td>
+            <td width="30%"><strong>Time:</strong> {{ $meeting->start_time ? substr($meeting->start_time, 0, 5) : '--:--' }} - {{ $meeting->end_time ? substr($meeting->end_time, 0, 5) : '--:--' }}</td>
+            <td width="40%"><strong>Venue:</strong> {{ $meeting->location ?: 'Not assigned' }}</td>
         </tr>
     </table>
 
-    <table class="summary">
-        <tr>
-            <td><span class="label">Attendance</span><br><span class="number">{{ $statistics['percentage'] }}%</span></td>
-            <td><span class="label">Total</span><br><span class="number">{{ $statistics['total'] }}</span></td>
-            <td><span class="label">Present</span><br><span class="number">{{ $statistics['present'] }}</span></td>
-            <td><span class="label">Absent</span><br><span class="number">{{ $statistics['absent'] }}</span></td>
-            <td><span class="label">Excused</span><br><span class="number">{{ $statistics['excused'] }}</span></td>
-        </tr>
-    </table>
-
-    <table class="records">
+    <table class="records" border="1" cellspacing="0" cellpadding="0" rules="all" style="width: 100%; border: 1.5pt solid #000000; border-collapse: collapse;">
         <thead>
             <tr>
-                <th width="5%">No.</th>
-                <th width="22%">Participant</th>
-                <th width="20%">Organization</th>
-                <th width="17%">Designation</th>
-                <th width="11%">Status</th>
-                <th width="25%">Excuse Reason</th>
+                <th width="4%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">No.</th>
+                <th width="19%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Participant</th>
+                <th width="17%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Organization</th>
+                <th width="14%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Designation</th>
+                <th width="12%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Participant Type</th>
+                <th width="10%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Status</th>
+                <th width="24%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Excuse Reason</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($records as $record)
                 <tr>
-                    <td>{{ $loop->iteration }}</td>
-                    <td>{{ $record['full_name'] }}</td>
-                    <td>{{ $record['department'] ?: '—' }}</td>
-                    <td>{{ $record['role'] ?: '—' }}</td>
-                    <td class="status {{ $record['status'] }}">{{ $record['status'] }}</td>
-                    <td>{{ $record['status'] === 'excused' && $record['excuse_reason'] ? $record['excuse_reason'] : '—' }}</td>
+                    <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $loop->iteration }}</td>
+                    <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['full_name'] }}</td>
+                    <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['department'] ?: '—' }}</td>
+                    <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['role'] ?: '—' }}</td>
+                    <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle; text-transform: capitalize;">{{ $record['participant_type'] }}</td>
+                    <td align="center" valign="middle" class="status {{ $record['status'] }}" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['status'] }}</td>
+                    <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['status'] === 'excused' && $record['excuse_reason'] ? $record['excuse_reason'] : '—' }}</td>
                 </tr>
             @endforeach
         </tbody>
