@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -58,6 +59,17 @@ class User extends Authenticatable
         'organization_id'
     );
     }
+
+    public function attendanceExcuseRequests(): HasMany
+    {
+        return $this->hasMany(AttendanceExcuseRequest::class, 'user_id', 'user_id');
+    }
+
+    public function reviewedAttendanceExcuseRequests(): HasMany
+    {
+        return $this->hasMany(AttendanceExcuseRequest::class, 'reviewed_by', 'user_id');
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'ACTIVE';

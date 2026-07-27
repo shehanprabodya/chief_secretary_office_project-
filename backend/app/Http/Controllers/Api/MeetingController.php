@@ -263,8 +263,11 @@ class MeetingController extends Controller
         string $priority = 'important',
     ): void {
         $meetingCode = $meeting->meeting_code ?: "Meeting {$meeting->meeting_id}";
-        $scheduledAt = \Carbon\Carbon::parse("{$meeting->meeting_date} {$meeting->start_time}")
-            ->format('d M Y, h:i A');
+        $scheduledDateTime = $meeting->meeting_date->copy();
+        if ($meeting->start_time) {
+            $scheduledDateTime->setTimeFromTimeString($meeting->start_time);
+        }
+        $scheduledAt = $scheduledDateTime->format('d M Y, h:i A');
         $changedAt = now()->format('d M Y, h:i A');
         $location = $meeting->location ?: 'a venue to be confirmed';
 

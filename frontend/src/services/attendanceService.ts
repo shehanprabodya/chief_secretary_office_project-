@@ -1,5 +1,10 @@
 import { api } from '../lib/axios';
-import type { ApprovedMeetingLetter, AttendanceSheet, AttendanceStatus } from '../types/attendance';
+import type {
+  ApprovedMeetingLetter,
+  AttendanceSheet,
+  AttendanceStatus,
+  OrganizerExcuseRequest,
+} from '../types/attendance';
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = window.URL.createObjectURL(blob);
@@ -34,14 +39,37 @@ export const attendanceService = {
     await api.post(`/officer/meetings/${meetingId}/attendance/draft`, { letter_id: letterId, records });
   },
 
-  async submit(meetingId: number, letterId: number): Promise<void> {
-    await api.post(`/officer/meetings/${meetingId}/attendance/submit`, { letter_id: letterId });
+  async submit(meetingId: number, letterId: number, confirmPendingExcuses = false): Promise<void> {
+    await api.post(`/officer/meetings/${meetingId}/attendance/submit`, {
+      letter_id: letterId,
+      confirm_pending_excuses: confirmPendingExcuses,
+    });
+  },
+
+  async getExcuseRequests(meetingId: number): Promise<OrganizerExcuseRequest[]> {
+    const { data } = await api.get<{ excuse_requests: OrganizerExcuseRequest[] }>(
+      `/officer/meetings/${meetingId}/excuse-requests`,
+    );
+    return data.excuse_requests;
+  },
+
+  async reviewExcuseRequest(
+    meetingId: number,
+    requestId: number,
+    decision: 'approve' | 'reject',
+    reviewComment: string,
+  ): Promise<OrganizerExcuseRequest> {
+    const { data } = await api.post<{ excuse_request: OrganizerExcuseRequest }>(
+      `/officer/meetings/${meetingId}/excuse-requests/${requestId}/${decision}`,
+      { review_comment: reviewComment.trim() || null },
+    );
+    return data.excuse_request;
   },
 
   async exportPdf(
     meetingId: number,
     letterId: number,
-    records: Array<{ full_name: string; department: string | null; role: string | null; status: AttendanceStatus }>
+    records: Array<{ user_id: number | null; full_name: string; department: string | null; role: string | null; status: AttendanceStatus }>
   ): Promise<void> {
     const response = await api.post(
       `/officer/meetings/${meetingId}/attendance/export/pdf`,

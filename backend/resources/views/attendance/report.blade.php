@@ -79,10 +79,11 @@
         <thead>
             <tr>
                 <th width="5%">No.</th>
-                <th width="30%">Participant</th>
-                <th width="27%">Organization</th>
-                <th width="23%">Designation</th>
-                <th width="15%">Status</th>
+                <th width="22%">Participant</th>
+                <th width="20%">Organization</th>
+                <th width="17%">Designation</th>
+                <th width="11%">Status</th>
+                <th width="25%">Excuse Reason</th>
             </tr>
         </thead>
         <tbody>
@@ -93,6 +94,7 @@
                     <td>{{ $record['department'] ?: '—' }}</td>
                     <td>{{ $record['role'] ?: '—' }}</td>
                     <td class="status {{ $record['status'] }}">{{ $record['status'] }}</td>
+                    <td>{{ $record['status'] === 'excused' && $record['excuse_reason'] ? $record['excuse_reason'] : '—' }}</td>
                 </tr>
             @endforeach
         </tbody>
