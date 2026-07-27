@@ -37,7 +37,7 @@ export const attendanceService = {
     return data;
   },
 
-  async saveDraft(meetingId: number, letterId: number, records: { user_id: number | null; letter_recipient_id: number | null; additional_attendee_id?: number | null; status: AttendanceStatus }[]): Promise<void> {
+  async saveDraft(meetingId: number, letterId: number, records: { user_id: number | null; letter_recipient_id: number | null; additional_attendee_id: number | null; status: AttendanceStatus }[]): Promise<void> {
     await api.post(`/officer/meetings/${meetingId}/attendance/draft`, { letter_id: letterId, records });
   },
 

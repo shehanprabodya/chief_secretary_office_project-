@@ -392,13 +392,26 @@ export default function AttendancePage() {
 
   const handleSaveDraft = async () => {
     if (!activeMeetingId || !activeLetterId || isViewOnly) return;
+    if (participants.some((participant) =>
+      participant.participant_type === 'additional' && !participant.additional_attendee_id)) {
+      setActionMessage({
+        type: 'error',
+        text: 'An additional attendee is missing its attendance identity. Reload the attendance sheet and try again.',
+      });
+      return;
+    }
     setIsSaving(true);
     setActionMessage(null);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
         activeLetterId,
-        participants.map((participant) => ({ user_id: participant.user_id, letter_recipient_id: participant.letter_recipient_id, status: participant.status }))
+        participants.map((participant) => ({
+          user_id: participant.user_id,
+          letter_recipient_id: participant.letter_recipient_id,
+          additional_attendee_id: participant.additional_attendee_id,
+          status: participant.status,
+        }))
       );
       setActionMessage({
         type: 'success',
@@ -417,13 +430,26 @@ export default function AttendancePage() {
   const handleSubmitAttendance = async () => {
     if (!activeMeetingId || !activeLetterId || isViewOnly) return;
     setShowSubmitConfirmation(false);
+    if (participants.some((participant) =>
+      participant.participant_type === 'additional' && !participant.additional_attendee_id)) {
+      setActionMessage({
+        type: 'error',
+        text: 'An additional attendee is missing its attendance identity. Reload the attendance sheet and try again.',
+      });
+      return;
+    }
     setIsSubmitting(true);
     setActionMessage(null);
     try {
       await attendanceService.saveDraft(
         activeMeetingId,
         activeLetterId,
-        participants.map((participant) => ({ user_id: participant.user_id, letter_recipient_id: participant.letter_recipient_id, status: participant.status }))
+        participants.map((participant) => ({
+          user_id: participant.user_id,
+          letter_recipient_id: participant.letter_recipient_id,
+          additional_attendee_id: participant.additional_attendee_id,
+          status: participant.status,
+        }))
       );
       await attendanceService.submit(activeMeetingId, activeLetterId, pendingExcuseCount > 0);
       await fetchSheet();
