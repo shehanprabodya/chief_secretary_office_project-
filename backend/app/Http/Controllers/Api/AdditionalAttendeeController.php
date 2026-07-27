@@ -214,7 +214,7 @@ class AdditionalAttendeeController extends Controller
             'user_id' => $additionalAttendee->user_id,
             'letter_recipient_id' => null,
             'full_name' => $additionalAttendee->full_name,
-            'email' => $additionalAttendee->email,
+            'email' => $additionalAttendee->email ?? '',
             'department' => $additionalAttendee->organization,
             'role' => $additionalAttendee->designation,
             'addition_reason' => $additionalAttendee->addition_reason,

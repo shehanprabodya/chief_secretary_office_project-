@@ -1,18 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Download, BarChart3, Info, ChevronDown, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Download, BarChart3, Info, ChevronDown, CheckCircle2, XCircle, UserPlus, X } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import ActionMessage, { type ActionMessageType } from '../components/shared/ActionMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { attendanceService } from '../services/attendanceService';
+import { letterService } from '../services/letterService';
 import type {
   AttendanceSheet,
   AttendanceStatus,
   AttendanceParticipant,
   ApprovedMeetingLetter,
   OrganizerExcuseRequest,
+  AdditionalAttendeeForm,
 } from '../types/attendance';
+import type { Organization as LetterOrganization } from '../types/letter';
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; activeClasses: string;}> = {
   present: { label: 'Present', activeClasses: 'bg-green-500 text-white border-green-500 ' },
@@ -25,6 +28,17 @@ const EXCUSE_REASON_LABELS: Record<OrganizerExcuseRequest['reason_category'], st
   medical: 'Medical reason',
   schedule_conflict: 'Schedule conflict',
   other: 'Other',
+};
+
+const EMPTY_ADDITIONAL_ATTENDEE_FORM: AdditionalAttendeeForm = {
+  letter_id: 0,
+  user_id: null,
+  full_name: '',
+  organization: '',
+  designation: '',
+  email: '',
+  addition_reason: '',
+  attendance_status: 'present',
 };
 
 function getInitials(name: string) {
@@ -56,6 +70,13 @@ export default function AttendancePage() {
   const [reviewDecision, setReviewDecision] = useState<'approve' | 'reject'>('approve');
   const [reviewComment, setReviewComment] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
+  const [showAdditionalAttendeeForm, setShowAdditionalAttendeeForm] = useState(false);
+  const [additionalAttendeeMode, setAdditionalAttendeeMode] = useState<'registered' | 'manual'>('manual');
+  const [additionalAttendeeForm, setAdditionalAttendeeForm] = useState<AdditionalAttendeeForm>(EMPTY_ADDITIONAL_ATTENDEE_FORM);
+  const [additionalAttendeeErrors, setAdditionalAttendeeErrors] = useState<Record<string, string>>({});
+  const [isAddingAttendee, setIsAddingAttendee] = useState(false);
+  const [recipientOrganizations, setRecipientOrganizations] = useState<LetterOrganization[]>([]);
+  const [isLoadingRegisteredUsers, setIsLoadingRegisteredUsers] = useState(false);
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
   const isViewOnly = searchParams.get('mode') === 'view';
   const showLetterSelector = !canLoadAttendance || isViewOnly;
@@ -193,6 +214,108 @@ export default function AttendancePage() {
       setReviewRequest(null);
     } finally {
       setIsReviewing(false);
+    }
+  };
+
+  const openAdditionalAttendeeForm = async () => {
+    if (!activeLetterId) return;
+    setAdditionalAttendeeMode('manual');
+    setAdditionalAttendeeForm({ ...EMPTY_ADDITIONAL_ATTENDEE_FORM, letter_id: activeLetterId });
+    setAdditionalAttendeeErrors({});
+    setShowAdditionalAttendeeForm(true);
+
+    if (recipientOrganizations.length === 0) {
+      setIsLoadingRegisteredUsers(true);
+      try {
+        setRecipientOrganizations(await letterService.getOrganizations());
+      } catch (error) {
+        console.error('Failed to load registered officers:', error);
+        setAdditionalAttendeeErrors({ registered_user: 'Unable to load registered officers.' });
+      } finally {
+        setIsLoadingRegisteredUsers(false);
+      }
+    }
+  };
+
+  const updateAdditionalAttendeeField = <K extends keyof AdditionalAttendeeForm>(
+    field: K,
+    value: AdditionalAttendeeForm[K],
+  ) => {
+    setAdditionalAttendeeForm((current) => ({ ...current, [field]: value }));
+    setAdditionalAttendeeErrors((current) => ({ ...current, [field]: '' }));
+  };
+
+  const selectRegisteredOfficer = (value: string) => {
+    if (!value) {
+      setAdditionalAttendeeForm((current) => ({ ...current, user_id: null, full_name: '', organization: '', designation: '', email: '' }));
+      return;
+    }
+
+    const userId = Number(value);
+    const organization = recipientOrganizations.find((item) =>
+      item.officers?.some((officer) => officer.user_id === userId));
+    const officer = organization?.officers?.find((item) => item.user_id === userId);
+    if (!organization || !officer) return;
+
+    setAdditionalAttendeeForm((current) => ({
+      ...current,
+      user_id: officer.user_id,
+      full_name: officer.full_name,
+      organization: organization.organization_name,
+      designation: officer.designation ?? '',
+      email: '',
+    }));
+    setAdditionalAttendeeErrors({});
+  };
+
+  const validateAdditionalAttendee = () => {
+    const errors: Record<string, string> = {};
+    if (additionalAttendeeMode === 'registered' && !additionalAttendeeForm.user_id) {
+      errors.registered_user = 'Select a registered officer.';
+    }
+    if (!additionalAttendeeForm.full_name.trim()) errors.full_name = 'Full name is required.';
+    if (!additionalAttendeeForm.organization.trim()) errors.organization = 'Organization is required.';
+    if (!additionalAttendeeForm.designation.trim()) errors.designation = 'Designation is required.';
+    if (additionalAttendeeForm.email && !/^\S+@\S+\.\S+$/.test(additionalAttendeeForm.email)) {
+      errors.email = 'Enter a valid email address.';
+    }
+    if (additionalAttendeeForm.addition_reason.trim().length < 5) {
+      errors.addition_reason = 'Provide at least 5 characters explaining why this participant is being added.';
+    }
+    setAdditionalAttendeeErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreateAdditionalAttendee = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeMeetingId || !activeLetterId || !validateAdditionalAttendee()) return;
+
+    setIsAddingAttendee(true);
+    setActionMessage(null);
+    try {
+      const response = await attendanceService.createAdditionalAttendee(activeMeetingId, {
+        ...additionalAttendeeForm,
+        letter_id: activeLetterId,
+        user_id: additionalAttendeeMode === 'registered' ? additionalAttendeeForm.user_id : null,
+      });
+      setParticipants((current) => [...current, response.participant]);
+      setShowAdditionalAttendeeForm(false);
+      setActionMessage({ type: 'success', text: response.message });
+    } catch (error) {
+      if (axios.isAxiosError<{ message?: string; errors?: Record<string, string[]> }>(error)) {
+        const responseErrors = error.response?.data.errors;
+        if (responseErrors) {
+          setAdditionalAttendeeErrors(Object.fromEntries(
+            Object.entries(responseErrors).map(([field, messages]) => [field, messages[0]]),
+          ));
+        } else {
+          setAdditionalAttendeeErrors({ form: error.response?.data.message ?? 'Unable to add the participant.' });
+        }
+      } else {
+        setAdditionalAttendeeErrors({ form: 'Unable to add the participant.' });
+      }
+    } finally {
+      setIsAddingAttendee(false);
     }
   };
 
@@ -474,6 +597,17 @@ export default function AttendancePage() {
               />
             </div>
             <div className="flex items-center gap-2">
+              {!isViewOnly && (
+                <button
+                  type="button"
+                  onClick={openAdditionalAttendeeForm}
+                  disabled={!activeMeetingId || !activeLetterId || isLoadingSheet}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Add Additional Attendee
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleExportPdf}
@@ -633,6 +767,84 @@ export default function AttendancePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {showAdditionalAttendeeForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !isAddingAttendee) setShowAdditionalAttendeeForm(false); }}>
+          <form onSubmit={handleCreateAdditionalAttendee} noValidate className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="additional-attendee-title">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 id="additional-attendee-title" className="text-lg font-bold text-slate-900">Add Additional Attendee</h2>
+                <p className="mt-1 text-sm text-slate-500">Add someone who was not included in the approved invitation list.</p>
+              </div>
+              <button type="button" onClick={() => setShowAdditionalAttendeeForm(false)} disabled={isAddingAttendee} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50" aria-label="Close"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="space-y-5 p-6">
+              {additionalAttendeeErrors.form && <ActionMessage type="error" message={additionalAttendeeErrors.form} />}
+
+              <div className="grid grid-cols-2 rounded-lg bg-slate-100 p-1">
+                <button type="button" onClick={() => { setAdditionalAttendeeMode('manual'); setAdditionalAttendeeForm((current) => ({ ...current, user_id: null, full_name: '', organization: '', designation: '', email: '' })); setAdditionalAttendeeErrors({}); }} className={`rounded-md px-4 py-2 text-sm font-semibold ${additionalAttendeeMode === 'manual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Manual Participant</button>
+                <button type="button" onClick={() => { setAdditionalAttendeeMode('registered'); setAdditionalAttendeeForm((current) => ({ ...current, user_id: null, full_name: '', organization: '', designation: '', email: '' })); setAdditionalAttendeeErrors({}); }} className={`rounded-md px-4 py-2 text-sm font-semibold ${additionalAttendeeMode === 'registered' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Registered Officer</button>
+              </div>
+
+              {additionalAttendeeMode === 'registered' && (
+                <div>
+                  <label htmlFor="registered-additional-officer" className="mb-1.5 block text-sm font-semibold text-slate-700">Registered officer</label>
+                  <select id="registered-additional-officer" value={additionalAttendeeForm.user_id ?? ''} onChange={(event) => selectRegisteredOfficer(event.target.value)} disabled={isLoadingRegisteredUsers || isAddingAttendee} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100">
+                    <option value="">{isLoadingRegisteredUsers ? 'Loading registered officers...' : 'Select an officer'}</option>
+                    {recipientOrganizations.flatMap((organization) => (organization.officers ?? []).map((officer) => (
+                      <option key={officer.user_id} value={officer.user_id}>{officer.full_name} — {officer.designation}, {organization.organization_name}</option>
+                    )))}
+                  </select>
+                  {additionalAttendeeErrors.registered_user && <p className="mt-1 text-xs text-red-600">{additionalAttendeeErrors.registered_user}</p>}
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="additional-full-name" className="mb-1.5 block text-sm font-semibold text-slate-700">Full name</label>
+                  <input id="additional-full-name" value={additionalAttendeeForm.full_name} onChange={(event) => updateAdditionalAttendeeField('full_name', event.target.value)} disabled={additionalAttendeeMode === 'registered' || isAddingAttendee} maxLength={255} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
+                  {additionalAttendeeErrors.full_name && <p className="mt-1 text-xs text-red-600">{additionalAttendeeErrors.full_name}</p>}
+                </div>
+                <div>
+                  <label htmlFor="additional-organization" className="mb-1.5 block text-sm font-semibold text-slate-700">Organization</label>
+                  <input id="additional-organization" value={additionalAttendeeForm.organization} onChange={(event) => updateAdditionalAttendeeField('organization', event.target.value)} disabled={additionalAttendeeMode === 'registered' || isAddingAttendee} maxLength={255} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
+                  {additionalAttendeeErrors.organization && <p className="mt-1 text-xs text-red-600">{additionalAttendeeErrors.organization}</p>}
+                </div>
+                <div>
+                  <label htmlFor="additional-designation" className="mb-1.5 block text-sm font-semibold text-slate-700">Designation</label>
+                  <input id="additional-designation" value={additionalAttendeeForm.designation} onChange={(event) => updateAdditionalAttendeeField('designation', event.target.value)} disabled={additionalAttendeeMode === 'registered' || isAddingAttendee} maxLength={150} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
+                  {additionalAttendeeErrors.designation && <p className="mt-1 text-xs text-red-600">{additionalAttendeeErrors.designation}</p>}
+                </div>
+                <div>
+                  <label htmlFor="additional-email" className="mb-1.5 block text-sm font-semibold text-slate-700">Email <span className="font-normal text-slate-400">(optional)</span></label>
+                  <input id="additional-email" type="email" value={additionalAttendeeForm.email} onChange={(event) => updateAdditionalAttendeeField('email', event.target.value)} disabled={additionalAttendeeMode === 'registered' || isAddingAttendee} maxLength={255} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
+                  {additionalAttendeeErrors.email && <p className="mt-1 text-xs text-red-600">{additionalAttendeeErrors.email}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="additional-reason" className="mb-1.5 block text-sm font-semibold text-slate-700">Reason for addition</label>
+                <textarea id="additional-reason" value={additionalAttendeeForm.addition_reason} onChange={(event) => updateAdditionalAttendeeField('addition_reason', event.target.value)} disabled={isAddingAttendee} maxLength={2000} rows={4} placeholder="For example: Attending as the invited officer's representative" className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
+                {additionalAttendeeErrors.addition_reason && <p className="mt-1 text-xs text-red-600">{additionalAttendeeErrors.addition_reason}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="additional-attendance-status" className="mb-1.5 block text-sm font-semibold text-slate-700">Initial attendance status</label>
+                <select id="additional-attendance-status" value={additionalAttendeeForm.attendance_status} onChange={(event) => updateAdditionalAttendeeField('attendance_status', event.target.value as AttendanceStatus)} disabled={isAddingAttendee} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100">
+                  <option value="present">Present</option>
+                  <option value="absent">Absent</option>
+                  <option value="excused">Excused</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button type="button" onClick={() => setShowAdditionalAttendeeForm(false)} disabled={isAddingAttendee} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={isAddingAttendee || isLoadingRegisteredUsers} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{isAddingAttendee ? 'Adding...' : 'Add Attendee'}</button>
+            </div>
+          </form>
         </div>
       )}
     </DashboardLayout>
