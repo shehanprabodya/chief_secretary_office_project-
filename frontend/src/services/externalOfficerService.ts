@@ -1,5 +1,14 @@
 import { api } from '../lib/axios';
-import type { ExternalOfficerMeeting } from '../types/externalOfficer';
+import type {
+  AttendanceExcuseRequest,
+  ExcuseReasonCategory,
+  ExternalOfficerMeeting,
+} from '../types/externalOfficer';
+
+interface ExcuseRequestResponse {
+  message: string;
+  excuse_request: AttendanceExcuseRequest;
+}
 
 export const externalOfficerService = {
   async getDashboard(): Promise<ExternalOfficerMeeting[]> {
@@ -15,5 +24,39 @@ export const externalOfficerService = {
       `/external-officer/letters/${letterId}/preview`,
     );
     return data.preview_html;
+  },
+
+  async submitExcuseRequest(
+    meetingId: number,
+    reasonCategory: ExcuseReasonCategory,
+    reasonDetails: string,
+  ): Promise<ExcuseRequestResponse> {
+    const { data } = await api.post<ExcuseRequestResponse>(
+      `/external-officer/meetings/${meetingId}/excuse-request`,
+      { reason_category: reasonCategory, reason_details: reasonDetails },
+    );
+
+    return data;
+  },
+
+  async updateExcuseRequest(
+    meetingId: number,
+    reasonCategory: ExcuseReasonCategory,
+    reasonDetails: string,
+  ): Promise<ExcuseRequestResponse> {
+    const { data } = await api.put<ExcuseRequestResponse>(
+      `/external-officer/meetings/${meetingId}/excuse-request`,
+      { reason_category: reasonCategory, reason_details: reasonDetails },
+    );
+
+    return data;
+  },
+
+  async withdrawExcuseRequest(meetingId: number): Promise<ExcuseRequestResponse> {
+    const { data } = await api.delete<ExcuseRequestResponse>(
+      `/external-officer/meetings/${meetingId}/excuse-request`,
+    );
+
+    return data;
   },
 };

@@ -11,6 +11,21 @@ export interface ExternalMeetingLetter {
   status: 'approved' | 'dispatched';
 }
 
+export type ExcuseReasonCategory = 'official_duty' | 'medical' | 'schedule_conflict' | 'other';
+export type ExcuseRequestStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+
+export interface AttendanceExcuseRequest {
+  excuse_request_id: number;
+  meeting_id: number;
+  reason_category: ExcuseReasonCategory;
+  reason_details: string;
+  status: ExcuseRequestStatus;
+  review_comment: string | null;
+  submitted_at: string;
+  updated_at: string;
+  reviewed_at: string | null;
+}
+
 export interface ExternalOfficerMeeting {
   meeting_id: number;
   reference_id: string | null;
@@ -27,5 +42,6 @@ export interface ExternalOfficerMeeting {
   subject: { id: number; code: string; title: string } | null;
   organizer: string | null;
   organizer_designation: string | null;
+  excuse_request: AttendanceExcuseRequest | null;
   letter: ExternalMeetingLetter | null;
 }

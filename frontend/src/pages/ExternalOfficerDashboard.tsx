@@ -1,17 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Building2, CalendarDays, CheckCircle2, ChevronRight, Clock3, Download,
-  FileText, MapPin, RefreshCw, Search, Users, Video, X,
+  AlertCircle, Building2, CalendarDays, CalendarX2, CheckCircle2, ChevronRight,
+  Clock3, Download, FileText, MapPin, Pencil, RefreshCw, Search, Users, Video, X,
 } from 'lucide-react';
+import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import PreviewModal from '../components/Letters/PreviewModal';
+import ActionMessage from '../components/shared/ActionMessage';
+import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { externalOfficerService } from '../services/externalOfficerService';
-import type { ExternalOfficerMeeting } from '../types/externalOfficer';
+import type { ExcuseReasonCategory, ExternalOfficerMeeting } from '../types/externalOfficer';
 import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
 
 type Filter = 'All' | 'Upcoming' | 'Completed';
+
+const reasonOptions: Array<{ value: ExcuseReasonCategory; label: string }> = [
+  { value: 'official_duty', label: 'Official duty' },
+  { value: 'medical', label: 'Medical reason' },
+  { value: 'schedule_conflict', label: 'Schedule conflict' },
+  { value: 'other', label: 'Other' },
+];
+
+const requestStatusStyles = {
+  pending: 'border-amber-200 bg-amber-50 text-amber-800',
+  approved: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  rejected: 'border-red-200 bg-red-50 text-red-800',
+  withdrawn: 'border-slate-200 bg-slate-50 text-slate-600',
+};
 
 const meetingState = (meeting: ExternalOfficerMeeting): Exclude<Filter, 'All'> =>
   meeting.status === 'completed' || new Date(`${meeting.meeting_date}T23:59:59`) < new Date()
@@ -50,6 +67,13 @@ export default function ExternalOfficerDashboard() {
   const [filter, setFilter] = useState<Filter>('All');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [excuseMeeting, setExcuseMeeting] = useState<ExternalOfficerMeeting | null>(null);
+  const [reasonCategory, setReasonCategory] = useState<ExcuseReasonCategory>('official_duty');
+  const [reasonDetails, setReasonDetails] = useState('');
+  const [reasonError, setReasonError] = useState('');
+  const [isExcuseProcessing, setIsExcuseProcessing] = useState(false);
+  const [showWithdrawConfirmation, setShowWithdrawConfirmation] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadDashboard = async () => {
     setIsLoading(true);
@@ -103,6 +127,121 @@ export default function ExternalOfficerDashboard() {
     }
   };
 
+  const updateMeetingRequest = (meetingId: number, excuseRequest: ExternalOfficerMeeting['excuse_request']) => {
+    setMeetings((current) => current.map((meeting) => meeting.meeting_id === meetingId
+      ? { ...meeting, excuse_request: excuseRequest }
+      : meeting));
+  };
+
+  const openExcuseDialog = (meeting: ExternalOfficerMeeting) => {
+    setExcuseMeeting(meeting);
+    setReasonCategory(meeting.excuse_request?.reason_category ?? 'official_duty');
+    setReasonDetails(meeting.excuse_request?.reason_details ?? '');
+    setReasonError('');
+    setActionMessage(null);
+  };
+
+  const handleSaveExcuseRequest = async () => {
+    if (!excuseMeeting) return;
+
+    const details = reasonDetails.trim();
+    if (details.length < 5) {
+      setReasonError('Please provide at least 5 characters explaining why you cannot attend.');
+      return;
+    }
+
+    setIsExcuseProcessing(true);
+    setReasonError('');
+    try {
+      const isEditing = excuseMeeting.excuse_request?.status === 'pending';
+      const response = isEditing
+        ? await externalOfficerService.updateExcuseRequest(excuseMeeting.meeting_id, reasonCategory, details)
+        : await externalOfficerService.submitExcuseRequest(excuseMeeting.meeting_id, reasonCategory, details);
+      updateMeetingRequest(excuseMeeting.meeting_id, response.excuse_request);
+      setExcuseMeeting(null);
+      setActionMessage({ type: 'success', text: response.message });
+    } catch (err) {
+      const message = axios.isAxiosError<{ message?: string }>(err)
+        ? err.response?.data.message
+        : null;
+      setReasonError(message ?? 'Unable to save your excuse request. Please try again.');
+    } finally {
+      setIsExcuseProcessing(false);
+    }
+  };
+
+  const handleWithdrawExcuseRequest = async () => {
+    if (!selected) return;
+
+    setIsExcuseProcessing(true);
+    try {
+      const response = await externalOfficerService.withdrawExcuseRequest(selected.meeting_id);
+      updateMeetingRequest(selected.meeting_id, response.excuse_request);
+      setShowWithdrawConfirmation(false);
+      setActionMessage({ type: 'success', text: response.message });
+    } catch (err) {
+      const message = axios.isAxiosError<{ message?: string }>(err)
+        ? err.response?.data.message
+        : null;
+      setShowWithdrawConfirmation(false);
+      setActionMessage({ type: 'error', text: message ?? 'Unable to withdraw your excuse request.' });
+    } finally {
+      setIsExcuseProcessing(false);
+    }
+  };
+
+  const excusePanel = selected ? (() => {
+    const request = selected.excuse_request;
+    const canSubmit = meetingState(selected) === 'Upcoming';
+    const categoryLabel = request
+      ? reasonOptions.find((option) => option.value === request.reason_category)?.label
+      : null;
+
+    if (!request || request.status === 'withdrawn') {
+      return canSubmit ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <CalendarX2 className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-slate-900">Unable to attend?</h3>
+              <p className="mt-1 text-sm leading-5 text-slate-600">Send the meeting organizer your reason for review.</p>
+              <button type="button" onClick={() => openExcuseDialog(selected)} className="mt-3 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800">
+                Unable to Attend
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null;
+    }
+
+    return (
+      <div className={`rounded-xl border p-4 ${requestStatusStyles[request.status]}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide">
+              {request.status === 'pending' ? 'Pending review' : request.status === 'approved' ? 'Excused' : 'Request rejected'}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-slate-800">{categoryLabel}</p>
+            <p className="mt-1 whitespace-pre-line text-sm leading-5 text-slate-700">{request.reason_details}</p>
+            {request.review_comment && (
+              <p className="mt-3 border-t border-current/15 pt-3 text-sm"><span className="font-semibold">Organizer comment:</span> {request.review_comment}</p>
+            )}
+          </div>
+          {request.status === 'pending' && canSubmit && (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => openExcuseDialog(selected)} className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100">
+                <Pencil className="h-3.5 w-3.5" />Edit
+              </button>
+              <button type="button" onClick={() => setShowWithdrawConfirmation(true)} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">
+                Withdraw
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  })() : null;
+
   return (
     <DashboardLayout pageTitle="External Officer Portal">
       <div
@@ -134,6 +273,7 @@ export default function ExternalOfficerDashboard() {
         </section>}
 
         {error && <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span><button onClick={loadDashboard} className="font-semibold underline">Retry</button></div>}
+        {actionMessage && <ActionMessage type={actionMessage.type} message={actionMessage.text} onDismiss={() => setActionMessage(null)} />}
 
         {!isMeetingsView && <section className="grid gap-5 sm:grid-cols-3">
           {[
@@ -170,10 +310,55 @@ export default function ExternalOfficerDashboard() {
             { icon: Users, label: 'Expected attendees', value: `${selected.attendees_count} participants` },
             { icon: Building2, label: 'Organised by', value: selected.organizer ?? '—' },
             { icon: CheckCircle2, label: 'Subject', value: selected.subject?.title ?? selected.meeting_code ?? '—' },
-          ].map((detail) => <div key={detail.label} className="flex gap-3 rounded-lg bg-slate-50 p-3"><detail.icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" /><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{detail.label}</p><p className="mt-0.5 text-sm font-medium text-slate-700">{detail.value}</p></div></div>)}</div><div><h3 className="text-sm font-bold text-slate-900">Meeting description</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{selected.description || 'No additional meeting description has been provided.'}</p></div>{selected.letter ? <button id="letters" onClick={() => openLetterPreview(selected)} disabled={isLetterLoading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"><FileText className="h-4 w-4" />{isLetterLoading ? 'Loading letter...' : 'View approved meeting letter'}</button> : <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">The approved meeting letter is not available yet.</div>}</div></div> : <div className="self-start rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Select a meeting to view its details.</div>}
+          ].map((detail) => <div key={detail.label} className="flex gap-3 rounded-lg bg-slate-50 p-3"><detail.icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" /><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{detail.label}</p><p className="mt-0.5 text-sm font-medium text-slate-700">{detail.value}</p></div></div>)}</div><div><h3 className="text-sm font-bold text-slate-900">Meeting description</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{selected.description || 'No additional meeting description has been provided.'}</p></div>{excusePanel}{selected.letter ? <button id="letters" onClick={() => openLetterPreview(selected)} disabled={isLetterLoading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"><FileText className="h-4 w-4" />{isLetterLoading ? 'Loading letter...' : 'View approved meeting letter'}</button> : <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">The approved meeting letter is not available yet.</div>}</div></div> : <div className="self-start rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Select a meeting to view its details.</div>}
         </section>
         </>}
       </div>
+
+      {excuseMeeting && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !isExcuseProcessing) setExcuseMeeting(null); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="excuse-dialog-title" className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="excuse-dialog-title" className="text-lg font-bold text-slate-900">{excuseMeeting.excuse_request?.status === 'pending' ? 'Edit excuse request' : 'Unable to attend'}</h2>
+                <p className="mt-1 text-sm text-slate-500">{excuseMeeting.title}</p>
+              </div>
+              <button type="button" onClick={() => setExcuseMeeting(null)} disabled={isExcuseProcessing} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50" aria-label="Close"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="excuse-reason-category" className="mb-1.5 block text-sm font-semibold text-slate-700">Reason category</label>
+                <select id="excuse-reason-category" value={reasonCategory} onChange={(event) => setReasonCategory(event.target.value as ExcuseReasonCategory)} disabled={isExcuseProcessing} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100">
+                  {reasonOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="excuse-reason-details" className="mb-1.5 block text-sm font-semibold text-slate-700">Explanation</label>
+                <textarea id="excuse-reason-details" value={reasonDetails} onChange={(event) => { setReasonDetails(event.target.value); setReasonError(''); }} maxLength={2000} rows={5} disabled={isExcuseProcessing} placeholder="Explain why you cannot attend this meeting..." className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" />
+                <div className="mt-1 flex items-start justify-between gap-3">
+                  {reasonError ? <p className="flex gap-1.5 text-sm text-red-600"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{reasonError}</p> : <span />}
+                  <span className="shrink-0 text-xs text-slate-400">{reasonDetails.length}/2000</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setExcuseMeeting(null)} disabled={isExcuseProcessing} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={handleSaveExcuseRequest} disabled={isExcuseProcessing || reasonDetails.trim().length < 5} className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{isExcuseProcessing ? 'Saving...' : excuseMeeting.excuse_request?.status === 'pending' ? 'Update Request' : 'Submit Request'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={showWithdrawConfirmation}
+        title="Withdraw excuse request?"
+        message={`Your pending request for ${selected?.title ?? 'this meeting'} will be withdrawn. You can submit a new request before the meeting begins.`}
+        confirmLabel="Withdraw Request"
+        variant="danger"
+        isProcessing={isExcuseProcessing}
+        onConfirm={handleWithdrawExcuseRequest}
+        onCancel={() => setShowWithdrawConfirmation(false)}
+      />
 
       {previewLetterId !== null && (
         <PreviewModal
