@@ -2,8 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AdditionalAttendee;
+use App\Models\LetterRecipient;
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class AdditionalAttendeeRequest extends FormRequest
 {
@@ -71,5 +75,119 @@ class AdditionalAttendeeRequest extends FormRequest
             'addition_reason.required' => 'Please explain why this participant is being added.',
             'addition_reason.min' => 'The addition reason must contain at least 5 characters.',
         ];
+    }
+
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->has('letter_id')) {
+                    return;
+                }
+
+                $letterId = (int) $this->input('letter_id');
+                $additionalAttendeeId = (int) ($this->route('additionalAttendeeId')
+                    ?? $this->route('id')
+                    ?? 0);
+                $userId = $this->filled('user_id') ? (int) $this->input('user_id') : null;
+
+                if ($userId) {
+                    if ($validator->errors()->has('user_id')) {
+                        return;
+                    }
+
+                    $this->validateRegisteredUserDuplicate(
+                        $validator,
+                        $letterId,
+                        $userId,
+                        $additionalAttendeeId
+                    );
+
+                    return;
+                }
+
+                $this->validateGuestDuplicate($validator, $letterId, $additionalAttendeeId);
+            },
+        ];
+    }
+
+    private function validateRegisteredUserDuplicate(
+        Validator $validator,
+        int $letterId,
+        int $userId,
+        int $additionalAttendeeId
+    ): void {
+        $user = User::find($userId);
+
+        if (!$user) {
+            return;
+        }
+
+        $isLetterRecipient = LetterRecipient::where('letter_id', $letterId)
+            ->where(function ($query) use ($user) {
+                $query->where('user_id', $user->user_id);
+
+                if ($user->organization_id) {
+                    $query->orWhere(function ($organizationQuery) use ($user) {
+                        $organizationQuery->whereNull('user_id')
+                            ->where('organization_id', $user->organization_id);
+                    });
+                }
+            })
+            ->exists();
+
+        if ($isLetterRecipient) {
+            $validator->errors()->add(
+                'user_id',
+                'This registered user is already represented in the approved meeting letter.'
+            );
+
+            return;
+        }
+
+        $alreadyAdded = AdditionalAttendee::where('letter_id', $letterId)
+            ->where('user_id', $userId)
+            ->when(
+                $additionalAttendeeId,
+                fn ($query) => $query->where('additional_attendee_id', '!=', $additionalAttendeeId)
+            )
+            ->exists();
+
+        if ($alreadyAdded) {
+            $validator->errors()->add(
+                'user_id',
+                'This registered user has already been added to the attendance record.'
+            );
+        }
+    }
+
+    private function validateGuestDuplicate(
+        Validator $validator,
+        int $letterId,
+        int $additionalAttendeeId
+    ): void {
+        if (!$this->filled('full_name') || !$this->filled('organization')) {
+            return;
+        }
+
+        $normalizedName = mb_strtolower(trim((string) $this->input('full_name')));
+        $normalizedOrganization = mb_strtolower(trim((string) $this->input('organization')));
+
+        $alreadyAdded = AdditionalAttendee::where('letter_id', $letterId)
+            ->whereNull('user_id')
+            ->whereRaw('LOWER(TRIM(full_name)) = ?', [$normalizedName])
+            ->whereRaw('LOWER(TRIM(organization)) = ?', [$normalizedOrganization])
+            ->when(
+                $additionalAttendeeId,
+                fn ($query) => $query->where('additional_attendee_id', '!=', $additionalAttendeeId)
+            )
+            ->exists();
+
+        if ($alreadyAdded) {
+            $validator->errors()->add(
+                'full_name',
+                'A participant with this name and organization has already been added.'
+            );
+        }
     }
 }
