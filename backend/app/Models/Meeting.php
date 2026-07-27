@@ -41,6 +41,11 @@ class Meeting extends Model
         return $this->hasMany(Letter::class, 'meeting_id', 'meeting_id');
     }
 
+    public function attendanceExcuseRequests(): HasMany
+    {
+        return $this->hasMany(AttendanceExcuseRequest::class, 'meeting_id', 'meeting_id');
+    }
+
     /**
      * Auto-generate reference like SPC-MTG-2024-089
      */
