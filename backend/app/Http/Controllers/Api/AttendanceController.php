@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdditionalAttendee;
 use App\Models\ApprovableDocument;
 use App\Models\AttendanceExcuseRequest;
 use App\Models\AttendanceRecord;
@@ -196,6 +197,9 @@ class AttendanceController extends Controller
 
         $recordsByUser = $existingRecords->whereNotNull('user_id')->keyBy('user_id');
         $recordsByRecipient = $existingRecords->whereNotNull('letter_recipient_id')->keyBy('letter_recipient_id');
+        $recordsByAdditional = $existingRecords
+            ->whereNotNull('additional_attendee_id')
+            ->keyBy('additional_attendee_id');
 
         $recipientParticipants = $approvedLetter->recipients
             ->map(function ($recipient) use ($recordsByUser, $recordsByRecipient) {
@@ -212,6 +216,8 @@ class AttendanceController extends Controller
                     : $recordsByRecipient->get($recipient->letter_recipient_id);
 
                 return [
+                    'participant_type' => 'invited',
+                    'additional_attendee_id' => null,
                     'user_id' => $user?->user_id,
                     'letter_recipient_id' => $user ? null : $recipient->letter_recipient_id,
                     'full_name' => $user?->full_name
@@ -224,12 +230,15 @@ class AttendanceController extends Controller
                     'role' => $user?->designation
                         ?? $recipient->recipient_label
                         ?? 'Organization representative',
+                    'addition_reason' => null,
                     'status' => $record?->status ?? 'absent',
                 ];
             })
             ->unique(fn ($participant) => $participant['user_id']
                 ? 'user-'.$participant['user_id']
-                : 'recipient-'.$participant['letter_recipient_id']);
+                : ($participant['additional_attendee_id']
+                    ? 'additional-'.$participant['additional_attendee_id']
+                    : 'recipient-'.$participant['letter_recipient_id']));
 
         // Keep previously saved people visible even if the letter recipients are edited later.
         $savedParticipants = $existingRecords
@@ -238,21 +247,49 @@ class AttendanceController extends Controller
                 $user = $record->user;
 
                 return [
+                    'participant_type' => 'invited',
+                    'additional_attendee_id' => null,
                     'user_id' => $user->user_id,
                     'letter_recipient_id' => null,
                     'full_name' => $user->full_name,
                     'email' => $user->email,
                     'department' => $user->organization?->organization_name,
                     'role' => $user->designation ?? $user->role?->role_name,
+                    'addition_reason' => null,
                     'status' => $record->status,
+                ];
+            });
+
+        $additionalParticipants = AdditionalAttendee::where('meeting_id', $meeting->meeting_id)
+            ->where('letter_id', $approvedLetter->letter_id)
+            ->orderBy('created_at')
+            ->get()
+            ->map(function (AdditionalAttendee $additionalAttendee) use ($recordsByAdditional) {
+                $record = $recordsByAdditional->get($additionalAttendee->additional_attendee_id);
+
+                return [
+                    'participant_type' => 'additional',
+                    'additional_attendee_id' => $additionalAttendee->additional_attendee_id,
+                    'registered_user_id' => $additionalAttendee->user_id,
+                    'user_id' => null,
+                    'letter_recipient_id' => null,
+                    'full_name' => $additionalAttendee->full_name,
+                    'email' => $additionalAttendee->email ?? '',
+                    'department' => $additionalAttendee->organization,
+                    'role' => $additionalAttendee->designation,
+                    'addition_reason' => $additionalAttendee->addition_reason,
+                    'status' => $record?->status ?? 'absent',
                 ];
             });
 
         $participants = $recipientParticipants
             ->concat($savedParticipants)
+            ->concat($additionalParticipants)
             ->unique(fn ($participant) => $participant['user_id']
                 ? 'user-'.$participant['user_id']
-                : 'recipient-'.$participant['letter_recipient_id'])
+                : ($participant['additional_attendee_id']
+                    ? 'additional-'.$participant['additional_attendee_id']
+                    : 'recipient-'.$participant['letter_recipient_id']))
             ->values();
 
         $present = $participants->where('status', 'present')->count();
