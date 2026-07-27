@@ -25,6 +25,8 @@ class ExternalOfficerController extends Controller
             ->with([
                 'subject:id,code,title',
                 'creator:user_id,full_name,designation',
+                'attendanceExcuseRequests' => fn ($query) => $query
+                    ->where('user_id', $userId),
                 'letters' => fn ($query) => $query
                     ->whereIn('status', ['approved', 'dispatched'])
                     ->latest('letter_id')
@@ -51,6 +53,7 @@ class ExternalOfficerController extends Controller
             ->get()
             ->map(function (Meeting $meeting) {
                 $letter = $meeting->letters->first();
+                $excuseRequest = $meeting->attendanceExcuseRequests->first();
 
                 return [
                     'meeting_id' => $meeting->meeting_id,
@@ -68,6 +71,9 @@ class ExternalOfficerController extends Controller
                     'subject' => $meeting->subject,
                     'organizer' => $meeting->creator?->full_name,
                     'organizer_designation' => $meeting->creator?->designation,
+                    'excuse_request' => $excuseRequest
+                        ? $this->excuseRequestData($excuseRequest)
+                        : null,
                     'letter' => $letter ? [
                         'letter_id' => $letter->letter_id,
                         'sender_name' => $letter->sender_name,
