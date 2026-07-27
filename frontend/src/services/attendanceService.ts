@@ -1,5 +1,10 @@
 import { api } from '../lib/axios';
-import type { ApprovedMeetingLetter, AttendanceSheet, AttendanceStatus } from '../types/attendance';
+import type {
+  ApprovedMeetingLetter,
+  AttendanceSheet,
+  AttendanceStatus,
+  OrganizerExcuseRequest,
+} from '../types/attendance';
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = window.URL.createObjectURL(blob);
@@ -36,6 +41,26 @@ export const attendanceService = {
 
   async submit(meetingId: number, letterId: number): Promise<void> {
     await api.post(`/officer/meetings/${meetingId}/attendance/submit`, { letter_id: letterId });
+  },
+
+  async getExcuseRequests(meetingId: number): Promise<OrganizerExcuseRequest[]> {
+    const { data } = await api.get<{ excuse_requests: OrganizerExcuseRequest[] }>(
+      `/officer/meetings/${meetingId}/excuse-requests`,
+    );
+    return data.excuse_requests;
+  },
+
+  async reviewExcuseRequest(
+    meetingId: number,
+    requestId: number,
+    decision: 'approve' | 'reject',
+    reviewComment: string,
+  ): Promise<OrganizerExcuseRequest> {
+    const { data } = await api.post<{ excuse_request: OrganizerExcuseRequest }>(
+      `/officer/meetings/${meetingId}/excuse-requests/${requestId}/${decision}`,
+      { review_comment: reviewComment.trim() || null },
+    );
+    return data.excuse_request;
   },
 
   async exportPdf(

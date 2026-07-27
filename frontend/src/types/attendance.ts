@@ -1,4 +1,29 @@
 export type AttendanceStatus = 'present' | 'absent' | 'excused';
+export type ExcuseRequestStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+
+export interface OrganizerExcuseRequest {
+  excuse_request_id: number;
+  meeting_id: number;
+  reason_category: 'official_duty' | 'medical' | 'schedule_conflict' | 'other';
+  reason_details: string;
+  status: ExcuseRequestStatus;
+  review_comment: string | null;
+  submitted_at: string;
+  updated_at: string;
+  reviewed_at: string | null;
+  external_officer: {
+    user_id: number;
+    full_name: string;
+    email: string;
+    designation: string | null;
+    organization: string | null;
+  } | null;
+  reviewer: {
+    user_id: number;
+    full_name: string;
+    designation: string | null;
+  } | null;
+}
 
 export interface AttendanceParticipant {
   user_id: number | null;
