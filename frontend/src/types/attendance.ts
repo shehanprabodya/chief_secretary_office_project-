@@ -26,13 +26,33 @@ export interface OrganizerExcuseRequest {
 }
 
 export interface AttendanceParticipant {
+  participant_type: 'invited' | 'additional';
+  additional_attendee_id: number | null;
+  registered_user_id?: number | null;
   user_id: number | null;
   letter_recipient_id: number | null;
   full_name: string;
   email: string;
   department: string | null;
   role: string | null;
+  addition_reason: string | null;
   status: AttendanceStatus;
+}
+
+export interface AdditionalAttendeeForm {
+  letter_id: number;
+  user_id: number | null;
+  full_name: string;
+  organization: string;
+  designation: string;
+  email: string;
+  addition_reason: string;
+  attendance_status: AttendanceStatus;
+}
+
+export interface AdditionalAttendeeResponse {
+  message: string;
+  participant: AttendanceParticipant;
 }
 
 export interface ApprovedMeetingLetter {
