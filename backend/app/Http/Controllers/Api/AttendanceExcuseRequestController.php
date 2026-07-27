@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceExcuseRequest;
+use App\Models\AttendanceRecord;
+use App\Models\Letter;
 use App\Models\Meeting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class AttendanceExcuseRequestController extends Controller
@@ -88,12 +91,67 @@ class AttendanceExcuseRequestController extends Controller
             ], 409);
         }
 
-        $excuseRequest->update([
-            'status' => $decision,
-            'reviewed_by' => $request->user()->user_id,
-            'review_comment' => $validator->validated()['review_comment'] ?? null,
-            'reviewed_at' => now(),
-        ]);
+        $letter = null;
+        if ($decision === 'approved') {
+            $letter = $this->approvedLetterFor($meeting, $excuseRequest);
+
+            if (!$letter) {
+                return response()->json([
+                    'message' => 'This request cannot be approved until the external officer has an approved meeting letter.',
+                ], 422);
+            }
+        }
+
+        [$excuseRequest, $attendanceRecord, $wasReviewed] = DB::transaction(function () use (
+            $request,
+            $meeting,
+            $excuseRequest,
+            $letter,
+            $decision,
+            $validator
+        ) {
+            $lockedRequest = AttendanceExcuseRequest::where(
+                'excuse_request_id',
+                $excuseRequest->excuse_request_id
+            )->lockForUpdate()->firstOrFail();
+
+            if ($lockedRequest->status !== 'pending') {
+                return [$lockedRequest, null, false];
+            }
+
+            $attendanceRecord = null;
+            if ($decision === 'approved' && $letter) {
+                $attendanceRecord = AttendanceRecord::firstOrNew([
+                    'letter_id' => $letter->letter_id,
+                    'user_id' => $lockedRequest->user_id,
+                ]);
+                $attendanceRecord->meeting_id = $meeting->meeting_id;
+                $attendanceRecord->letter_recipient_id = null;
+                $attendanceRecord->status = 'excused';
+                $attendanceRecord->recorded_by = $request->user()->user_id;
+
+                if (!$attendanceRecord->exists) {
+                    $attendanceRecord->is_draft = true;
+                }
+
+                $attendanceRecord->save();
+            }
+
+            $lockedRequest->update([
+                'status' => $decision,
+                'reviewed_by' => $request->user()->user_id,
+                'review_comment' => $validator->validated()['review_comment'] ?? null,
+                'reviewed_at' => now(),
+            ]);
+
+            return [$lockedRequest, $attendanceRecord, true];
+        });
+
+        if (!$wasReviewed) {
+            return response()->json([
+                'message' => 'This excuse request has already been reviewed.',
+            ], 409);
+        }
 
         $excuseRequest->load([
             'externalOfficer:user_id,full_name,email,designation,organization_id',
@@ -106,7 +164,41 @@ class AttendanceExcuseRequestController extends Controller
                 ? 'The excuse request has been approved.'
                 : 'The excuse request has been rejected.',
             'excuse_request' => $this->requestData($excuseRequest),
+            'attendance_record' => $attendanceRecord ? [
+                'attendance_id' => $attendanceRecord->attendance_id,
+                'meeting_id' => $attendanceRecord->meeting_id,
+                'letter_id' => $attendanceRecord->letter_id,
+                'user_id' => $attendanceRecord->user_id,
+                'status' => $attendanceRecord->status,
+                'is_draft' => $attendanceRecord->is_draft,
+            ] : null,
         ]);
+    }
+
+    private function approvedLetterFor(
+        Meeting $meeting,
+        AttendanceExcuseRequest $excuseRequest
+    ): ?Letter {
+        $externalOfficer = $excuseRequest->externalOfficer()->first();
+
+        if (!$externalOfficer) {
+            return null;
+        }
+
+        return $meeting->letters()
+            ->where('status', 'approved')
+            ->whereHas('recipients', function ($query) use ($externalOfficer) {
+                $query->where('user_id', $externalOfficer->user_id);
+
+                if ($externalOfficer->organization_id) {
+                    $query->orWhere(function ($organizationQuery) use ($externalOfficer) {
+                        $organizationQuery->whereNull('user_id')
+                            ->where('organization_id', $externalOfficer->organization_id);
+                    });
+                }
+            })
+            ->latest('letter_id')
+            ->first();
     }
 
     private function isOrganizer(Request $request, Meeting $meeting): bool
