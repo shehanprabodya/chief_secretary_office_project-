@@ -4,7 +4,10 @@ namespace App\Http\Requests;
 
 use App\Models\AdditionalAttendee;
 use App\Models\LetterRecipient;
+use App\Models\Meeting;
 use App\Models\User;
+use App\Services\AdditionalAttendeeAuthorizationService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -13,8 +16,27 @@ class AdditionalAttendeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Organizer authorization is enforced by the controller in Step 6.
-        return true;
+        $user = $this->user();
+        $meetingId = (int) $this->route('meetingId');
+
+        if (!$user || !$meetingId) {
+            return false;
+        }
+
+        $meeting = Meeting::find($meetingId);
+        if (!$meeting) {
+            return false;
+        }
+
+        return app(AdditionalAttendeeAuthorizationService::class)
+            ->canManage($user, $meeting);
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException(
+            'Only the meeting creator or a linked meeting-letter creator can manage additional attendees.'
+        );
     }
 
     protected function prepareForValidation(): void
