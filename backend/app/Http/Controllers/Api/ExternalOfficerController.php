@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceExcuseRequest;
 use App\Models\AttendanceRecord;
 use App\Models\Meeting;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,10 @@ use Illuminate\Support\Facades\Validator;
 
 class ExternalOfficerController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     /**
      * Return only meetings assigned to the authenticated external officer.
      * Letters are limited to approved/dispatched documents so workflow drafts
@@ -152,6 +157,8 @@ class ExternalOfficerController extends Controller
                 'user_id' => $request->user()->user_id,
             ]);
         }
+
+        $this->notifyOrganizers($meeting, $excuseRequest->fresh(), $request);
 
         return response()->json([
             'message' => 'Your excuse request has been submitted for review.',
@@ -310,5 +317,37 @@ class ExternalOfficerController extends Controller
             'updated_at' => $excuseRequest->updated_at?->toISOString(),
             'reviewed_at' => $excuseRequest->reviewed_at?->toISOString(),
         ];
+    }
+
+    private function notifyOrganizers(
+        Meeting $meeting,
+        AttendanceExcuseRequest $excuseRequest,
+        Request $request
+    ): void {
+        $organizerIds = $meeting->letters()
+            ->whereIn('status', ['approved', 'dispatched'])
+            ->pluck('created_by')
+            ->push($meeting->created_by)
+            ->filter()
+            ->unique();
+        $meetingReference = $meeting->meeting_code ?: "Meeting {$meeting->meeting_id}";
+        $officerName = $request->user()->full_name;
+
+        foreach ($organizerIds as $organizerId) {
+            if ((int) $organizerId === (int) $request->user()->user_id) {
+                continue;
+            }
+
+            $this->notifications->sendToUser(
+                (int) $organizerId,
+                'attendance_excuse_submitted',
+                "Excuse request: {$meetingReference}",
+                "{$officerName} submitted an unable-to-attend request for “{$meeting->title}”.",
+                "/attendance?meeting_id={$meeting->meeting_id}",
+                'attendance_excuse_request',
+                $excuseRequest->excuse_request_id,
+                'important',
+            );
+        }
     }
 }

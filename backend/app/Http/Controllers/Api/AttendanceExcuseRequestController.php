@@ -7,6 +7,7 @@ use App\Models\AttendanceExcuseRequest;
 use App\Models\AttendanceRecord;
 use App\Models\Letter;
 use App\Models\Meeting;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\Validator;
 
 class AttendanceExcuseRequestController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     public function index(Request $request, int $meetingId): JsonResponse
     {
         $meeting = Meeting::findOrFail($meetingId);
@@ -158,6 +163,19 @@ class AttendanceExcuseRequestController extends Controller
             'externalOfficer.organization:organization_id,organization_name',
             'reviewer:user_id,full_name,designation',
         ]);
+
+        $meetingReference = $meeting->meeting_code ?: "Meeting {$meeting->meeting_id}";
+        $decisionLabel = $decision === 'approved' ? 'approved' : 'rejected';
+        $this->notifications->sendToUser(
+            $excuseRequest->user_id,
+            "attendance_excuse_{$decision}",
+            "Excuse request {$decisionLabel}: {$meetingReference}",
+            "Your unable-to-attend request for “{$meeting->title}” was {$decisionLabel}.",
+            '/dashboard/external-officer#meetings',
+            'attendance_excuse_request',
+            $excuseRequest->excuse_request_id,
+            'important',
+        );
 
         return response()->json([
             'message' => $decision === 'approved'
