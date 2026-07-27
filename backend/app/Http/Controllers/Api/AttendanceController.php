@@ -453,6 +453,8 @@ class AttendanceController extends Controller
             'letter_id' => 'required|exists:letters,letter_id',
             'records' => 'required|array|max:1000',
             'records.*.user_id' => 'nullable|integer|exists:users,user_id',
+            'records.*.additional_attendee_id' => 'nullable|integer|exists:additional_attendees,additional_attendee_id',
+            'records.*.participant_type' => 'required|in:invited,additional',
             'records.*.full_name' => 'required|string|max:255',
             'records.*.department' => 'nullable|string|max:255',
             'records.*.role' => 'nullable|string|max:255',
@@ -475,6 +477,19 @@ class AttendanceController extends Controller
             })
             ->firstOrFail();
 
+        $validAdditionalAttendeeIds = AdditionalAttendee::where('meeting_id', $meeting->meeting_id)
+            ->where('letter_id', $letter->letter_id)
+            ->pluck('additional_attendee_id');
+
+        foreach ($validator->validated()['records'] as $record) {
+            if (!empty($record['additional_attendee_id'])
+                && !$validAdditionalAttendeeIds->contains((int) $record['additional_attendee_id'])) {
+                return response()->json([
+                    'message' => 'The attendance report contains an additional attendee from another meeting letter.',
+                ], 422);
+            }
+        }
+
         $canIncludeExcuseReasons = (int) $meeting->created_by === (int) $request->user()->user_id
             || (int) $letter->created_by === (int) $request->user()->user_id;
         $approvedExcuses = $canIncludeExcuseReasons
@@ -485,7 +500,11 @@ class AttendanceController extends Controller
             : collect();
 
         $records = collect($validator->validated()['records'])
-            ->map(function (array $record) use ($approvedExcuses) {
+            ->map(function (array $record) use ($approvedExcuses, $validAdditionalAttendeeIds) {
+                $record['participant_type'] = !empty($record['additional_attendee_id'])
+                    && $validAdditionalAttendeeIds->contains((int) $record['additional_attendee_id'])
+                    ? 'additional'
+                    : 'invited';
                 $record['excuse_reason'] = null;
 
                 if ($record['status'] !== 'excused' || empty($record['user_id'])) {

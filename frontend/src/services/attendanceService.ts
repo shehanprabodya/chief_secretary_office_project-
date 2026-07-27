@@ -104,7 +104,7 @@ export const attendanceService = {
   async exportPdf(
     meetingId: number,
     letterId: number,
-    records: Array<{ user_id: number | null; full_name: string; department: string | null; role: string | null; status: AttendanceStatus }>
+    records: Array<{ user_id: number | null; additional_attendee_id: number | null; participant_type: 'invited' | 'additional'; full_name: string; department: string | null; role: string | null; status: AttendanceStatus }>
   ): Promise<void> {
     const response = await api.post(
       `/officer/meetings/${meetingId}/attendance/export/pdf`,

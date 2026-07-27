@@ -484,7 +484,15 @@ export default function AttendancePage() {
       await attendanceService.exportPdf(
         activeMeetingId,
         activeLetterId,
-        filteredParticipants.map(({ user_id, full_name, department, role, status }) => ({ user_id, full_name, department, role, status }))
+        filteredParticipants.map(({ user_id, additional_attendee_id, participant_type, full_name, department, role, status }) => ({
+          user_id,
+          additional_attendee_id,
+          participant_type,
+          full_name,
+          department,
+          role,
+          status,
+        }))
       );
       setActionMessage({ type: 'success', text: 'Attendance PDF downloaded successfully.' });
     } catch (error) {

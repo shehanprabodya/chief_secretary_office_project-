@@ -53,12 +53,13 @@
     <table class="records" border="1" cellspacing="0" cellpadding="0" rules="all" style="width: 100%; border: 1.5pt solid #000000; border-collapse: collapse;">
         <thead>
             <tr>
-                <th width="5%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">No.</th>
-                <th width="22%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Participant</th>
-                <th width="20%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Organization</th>
-                <th width="17%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Designation</th>
-                <th width="11%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Status</th>
-                <th width="25%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Excuse Reason</th>
+                <th width="4%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">No.</th>
+                <th width="19%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Participant</th>
+                <th width="17%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Organization</th>
+                <th width="14%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Designation</th>
+                <th width="12%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Participant Type</th>
+                <th width="10%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Status</th>
+                <th width="24%" align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">Excuse Reason</th>
             </tr>
         </thead>
         <tbody>
@@ -68,6 +69,7 @@
                     <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['full_name'] }}</td>
                     <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['department'] ?: '—' }}</td>
                     <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['role'] ?: '—' }}</td>
+                    <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle; text-transform: capitalize;">{{ $record['participant_type'] }}</td>
                     <td align="center" valign="middle" class="status {{ $record['status'] }}" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['status'] }}</td>
                     <td align="center" valign="middle" style="border: 1.5pt solid #000000; text-align: center; vertical-align: middle;">{{ $record['status'] === 'excused' && $record['excuse_reason'] ? $record['excuse_reason'] : '—' }}</td>
                 </tr>
