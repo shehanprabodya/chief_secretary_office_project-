@@ -377,6 +377,7 @@ class AttendanceController extends Controller
         $validator = Validator::make($request->all(), [
             'letter_id' => 'required|exists:letters,letter_id',
             'records' => 'required|array|max:1000',
+            'records.*.user_id' => 'nullable|integer|exists:users,user_id',
             'records.*.full_name' => 'required|string|max:255',
             'records.*.department' => 'nullable|string|max:255',
             'records.*.role' => 'nullable|string|max:255',
@@ -399,7 +400,38 @@ class AttendanceController extends Controller
             })
             ->firstOrFail();
 
-        $records = collect($validator->validated()['records']);
+        $canIncludeExcuseReasons = (int) $meeting->created_by === (int) $request->user()->user_id
+            || (int) $letter->created_by === (int) $request->user()->user_id;
+        $approvedExcuses = $canIncludeExcuseReasons
+            ? AttendanceExcuseRequest::where('meeting_id', $meeting->meeting_id)
+                ->where('status', 'approved')
+                ->get()
+                ->keyBy('user_id')
+            : collect();
+
+        $records = collect($validator->validated()['records'])
+            ->map(function (array $record) use ($approvedExcuses) {
+                $record['excuse_reason'] = null;
+
+                if ($record['status'] !== 'excused' || empty($record['user_id'])) {
+                    return $record;
+                }
+
+                $excuseRequest = $approvedExcuses->get((int) $record['user_id']);
+                if (!$excuseRequest) {
+                    return $record;
+                }
+
+                $category = match ($excuseRequest->reason_category) {
+                    'official_duty' => 'Official duty',
+                    'medical' => 'Medical reason',
+                    'schedule_conflict' => 'Schedule conflict',
+                    default => 'Other',
+                };
+                $record['excuse_reason'] = $category . ': ' . $excuseRequest->reason_details;
+
+                return $record;
+            });
         $statistics = [
             'total' => $records->count(),
             'present' => $records->where('status', 'present')->count(),
