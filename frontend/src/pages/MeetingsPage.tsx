@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   List, Grid3x3, Plus,
-  Eye, Funnel, ClipboardCheck
+  Eye, ClipboardCheck
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import PreviewModal from '../components/Letters/PreviewModal';
@@ -150,7 +150,7 @@ export default function MeetingsPage() {
 
         {/* Filters */}
         <div className=" rounded-lg border border-slate-200 bg-white p-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">Subject Code</label>
               <select
@@ -214,19 +214,6 @@ export default function MeetingsPage() {
               </div>
             </div>
 
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentPage(1);
-                  loadLetters();
-                }}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-500 text-sm font-medium text-white hover:bg-blue-800"
-              >
-               <Funnel className='h-4 w-4 shrink-0' />
-                Apply Filters
-              </button>
-            </div>
           </div>
         </div>
 
