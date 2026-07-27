@@ -129,6 +129,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:external_officer')->prefix('external-officer')->group(function () {
         Route::get('/dashboard', [ExternalOfficerController::class, 'dashboard']);
         Route::get('/letters/{id}/preview', [LetterController::class, 'externalPreview']);
+        Route::post('/meetings/{meetingId}/excuse-request', [ExternalOfficerController::class, 'submitExcuseRequest']);
+        Route::put('/meetings/{meetingId}/excuse-request', [ExternalOfficerController::class, 'updateExcuseRequest']);
+        Route::delete('/meetings/{meetingId}/excuse-request', [ExternalOfficerController::class, 'withdrawExcuseRequest']);
     });
     
 });
