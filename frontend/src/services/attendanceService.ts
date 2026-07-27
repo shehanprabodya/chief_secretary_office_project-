@@ -39,8 +39,11 @@ export const attendanceService = {
     await api.post(`/officer/meetings/${meetingId}/attendance/draft`, { letter_id: letterId, records });
   },
 
-  async submit(meetingId: number, letterId: number): Promise<void> {
-    await api.post(`/officer/meetings/${meetingId}/attendance/submit`, { letter_id: letterId });
+  async submit(meetingId: number, letterId: number, confirmPendingExcuses = false): Promise<void> {
+    await api.post(`/officer/meetings/${meetingId}/attendance/submit`, {
+      letter_id: letterId,
+      confirm_pending_excuses: confirmPendingExcuses,
+    });
   },
 
   async getExcuseRequests(meetingId: number): Promise<OrganizerExcuseRequest[]> {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceExcuseRequest;
+use App\Models\AttendanceRecord;
 use App\Models\Meeting;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -111,6 +112,12 @@ class ExternalOfficerController extends Controller
             ], 403);
         }
 
+        if ($this->attendanceIsFinalized($meeting)) {
+            return response()->json([
+                'message' => 'Attendance has already been finalized for this meeting.',
+            ], 409);
+        }
+
         if (!$this->canRequestExcuse($meeting)) {
             return response()->json([
                 'message' => 'Excuse requests can only be submitted before an upcoming meeting begins.',
@@ -169,6 +176,12 @@ class ExternalOfficerController extends Controller
             return response()->json(['message' => 'You are not assigned to this meeting.'], 403);
         }
 
+        if ($this->attendanceIsFinalized($meeting)) {
+            return response()->json([
+                'message' => 'This request cannot be changed because attendance has been finalized.',
+            ], 409);
+        }
+
         if (!$this->canRequestExcuse($meeting)) {
             return response()->json([
                 'message' => 'Excuse requests cannot be changed after the meeting begins.',
@@ -203,6 +216,12 @@ class ExternalOfficerController extends Controller
 
         if (!$meeting) {
             return response()->json(['message' => 'You are not assigned to this meeting.'], 403);
+        }
+
+        if ($this->attendanceIsFinalized($meeting)) {
+            return response()->json([
+                'message' => 'This request cannot be withdrawn because attendance has been finalized.',
+            ], 409);
         }
 
         if (!$this->canRequestExcuse($meeting)) {
@@ -269,6 +288,13 @@ class ExternalOfficerController extends Controller
         }
 
         return true;
+    }
+
+    private function attendanceIsFinalized(Meeting $meeting): bool
+    {
+        return AttendanceRecord::where('meeting_id', $meeting->meeting_id)
+            ->where('is_draft', false)
+            ->exists();
     }
 
     private function excuseRequestData(AttendanceExcuseRequest $excuseRequest): array

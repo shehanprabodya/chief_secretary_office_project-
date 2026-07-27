@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApprovableDocument;
+use App\Models\AttendanceExcuseRequest;
 use App\Models\AttendanceRecord;
 use App\Models\Letter;
 use App\Models\Meeting;
@@ -334,6 +335,7 @@ class AttendanceController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'letter_id' => 'required|exists:letters,letter_id',
+            'confirm_pending_excuses' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -347,6 +349,17 @@ class AttendanceController extends Controller
 
         if (!$letter) {
             return response()->json(['message' => 'Only the meeting letter creator can submit attendance.'], 403);
+        }
+
+        $pendingExcuseCount = AttendanceExcuseRequest::where('meeting_id', $meetingId)
+            ->where('status', 'pending')
+            ->count();
+
+        if ($pendingExcuseCount > 0 && !$request->boolean('confirm_pending_excuses')) {
+            return response()->json([
+                'message' => 'Pending excuse requests must be reviewed or explicitly confirmed before attendance is submitted.',
+                'pending_excuse_count' => $pendingExcuseCount,
+            ], 409);
         }
 
         AttendanceRecord::where('meeting_id', $meetingId)

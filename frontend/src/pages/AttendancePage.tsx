@@ -231,7 +231,7 @@ export default function AttendancePage() {
         activeLetterId,
         participants.map((participant) => ({ user_id: participant.user_id, letter_recipient_id: participant.letter_recipient_id, status: participant.status }))
       );
-      await attendanceService.submit(activeMeetingId, activeLetterId);
+      await attendanceService.submit(activeMeetingId, activeLetterId, pendingExcuseCount > 0);
       await fetchSheet();
       setActionMessage({
         type: 'success',
@@ -283,6 +283,7 @@ export default function AttendancePage() {
   const excused = participants.filter((p) => p.status === 'excused').length;
   const total = participants.length;
   const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+  const pendingExcuseCount = excuseRequests.filter((request) => request.status === 'pending').length;
 
   const renderExcuseRequest = (participant: AttendanceParticipant) => {
     const request = excuseRequests.find((item) =>
@@ -601,9 +602,12 @@ export default function AttendancePage() {
       </div>
       <ConfirmDialog
         open={showSubmitConfirmation}
-        title="Submit Attendance"
-        message="Please confirm that every participant status is correct. Submitted attendance will be recorded for this meeting letter."
-        confirmLabel="Submit Attendance"
+        title={pendingExcuseCount > 0 ? 'Pending excuse requests' : 'Submit Attendance'}
+        message={pendingExcuseCount > 0
+          ? `${pendingExcuseCount} excuse request${pendingExcuseCount === 1 ? ' is' : 's are'} still pending review. If you continue, verify those participants' attendance statuses before final submission.`
+          : 'Please confirm that every participant status is correct. Submitted attendance will be recorded for this meeting letter.'}
+        confirmLabel={pendingExcuseCount > 0 ? 'Continue and Submit' : 'Submit Attendance'}
+        variant={pendingExcuseCount > 0 ? 'danger' : 'default'}
         isProcessing={isSubmitting}
         onConfirm={handleSubmitAttendance}
         onCancel={() => setShowSubmitConfirmation(false)}
