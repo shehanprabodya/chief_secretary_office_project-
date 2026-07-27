@@ -77,11 +77,15 @@ export default function AttendancePage() {
   const [isAddingAttendee, setIsAddingAttendee] = useState(false);
   const [recipientOrganizations, setRecipientOrganizations] = useState<LetterOrganization[]>([]);
   const [isLoadingRegisteredUsers, setIsLoadingRegisteredUsers] = useState(false);
+  const [editingAdditionalAttendeeId, setEditingAdditionalAttendeeId] = useState<number | null>(null);
+  const [additionalAttendeeToDelete, setAdditionalAttendeeToDelete] = useState<AttendanceParticipant | null>(null);
+  const [isDeletingAttendee, setIsDeletingAttendee] = useState(false);
   const canLoadAttendance = Boolean(selectedMeetingId || selectedLetterId);
   const isViewOnly = searchParams.get('mode') === 'view';
   const showLetterSelector = !canLoadAttendance || isViewOnly;
   const activeMeetingId = selectedMeetingId ?? sheet?.meeting.meeting_id ?? null;
   const activeLetterId = selectedLetterId ?? sheet?.letter_id ?? null;
+  const isAttendanceFinalized = sheet?.is_finalized ?? false;
   const matchingLetters = letters.filter((letter) => {
     const term = letterSearch.trim().toLowerCase();
     if (!term) return true;
@@ -160,7 +164,11 @@ export default function AttendancePage() {
   }, [isViewOnly, letters, selectedLetterId]);
 
   const participantKey = (participant: AttendanceParticipant) =>
-    participant.user_id ? `user-${participant.user_id}` : `recipient-${participant.letter_recipient_id}`;
+    participant.additional_attendee_id
+      ? `additional-${participant.additional_attendee_id}`
+      : participant.user_id
+        ? `user-${participant.user_id}`
+        : `recipient-${participant.letter_recipient_id}`;
 
   const handleStatusChange = (key: string, status: AttendanceStatus) => {
     if (isViewOnly) return;
@@ -220,11 +228,42 @@ export default function AttendancePage() {
   const openAdditionalAttendeeForm = async () => {
     if (!activeLetterId) return;
     setAdditionalAttendeeMode('manual');
+    setEditingAdditionalAttendeeId(null);
     setAdditionalAttendeeForm({ ...EMPTY_ADDITIONAL_ATTENDEE_FORM, letter_id: activeLetterId });
     setAdditionalAttendeeErrors({});
     setShowAdditionalAttendeeForm(true);
 
     if (recipientOrganizations.length === 0) {
+      setIsLoadingRegisteredUsers(true);
+      try {
+        setRecipientOrganizations(await letterService.getOrganizations());
+      } catch (error) {
+        console.error('Failed to load registered officers:', error);
+        setAdditionalAttendeeErrors({ registered_user: 'Unable to load registered officers.' });
+      } finally {
+        setIsLoadingRegisteredUsers(false);
+      }
+    }
+  };
+
+  const openEditAdditionalAttendeeForm = async (participant: AttendanceParticipant) => {
+    if (!activeLetterId || !participant.additional_attendee_id) return;
+    setEditingAdditionalAttendeeId(participant.additional_attendee_id);
+    setAdditionalAttendeeMode(participant.registered_user_id ? 'registered' : 'manual');
+    setAdditionalAttendeeForm({
+      letter_id: activeLetterId,
+      user_id: participant.registered_user_id ?? null,
+      full_name: participant.full_name,
+      organization: participant.department ?? '',
+      designation: participant.role ?? '',
+      email: participant.email ?? '',
+      addition_reason: participant.addition_reason ?? '',
+      attendance_status: participant.status,
+    });
+    setAdditionalAttendeeErrors({});
+    setShowAdditionalAttendeeForm(true);
+
+    if (participant.registered_user_id && recipientOrganizations.length === 0) {
       setIsLoadingRegisteredUsers(true);
       try {
         setRecipientOrganizations(await letterService.getOrganizations());
@@ -293,13 +332,21 @@ export default function AttendancePage() {
     setIsAddingAttendee(true);
     setActionMessage(null);
     try {
-      const response = await attendanceService.createAdditionalAttendee(activeMeetingId, {
+      const payload = {
         ...additionalAttendeeForm,
         letter_id: activeLetterId,
         user_id: additionalAttendeeMode === 'registered' ? additionalAttendeeForm.user_id : null,
-      });
-      setParticipants((current) => [...current, response.participant]);
+      };
+      const response = editingAdditionalAttendeeId
+        ? await attendanceService.updateAdditionalAttendee(activeMeetingId, editingAdditionalAttendeeId, payload)
+        : await attendanceService.createAdditionalAttendee(activeMeetingId, payload);
+      setParticipants((current) => editingAdditionalAttendeeId
+        ? current.map((participant) => participant.additional_attendee_id === editingAdditionalAttendeeId
+          ? response.participant
+          : participant)
+        : [...current, response.participant]);
       setShowAdditionalAttendeeForm(false);
+      setEditingAdditionalAttendeeId(null);
       setActionMessage({ type: 'success', text: response.message });
     } catch (error) {
       if (axios.isAxiosError<{ message?: string; errors?: Record<string, string[]> }>(error)) {
@@ -316,6 +363,30 @@ export default function AttendancePage() {
       }
     } finally {
       setIsAddingAttendee(false);
+    }
+  };
+
+  const handleDeleteAdditionalAttendee = async () => {
+    if (!activeMeetingId || !additionalAttendeeToDelete?.additional_attendee_id) return;
+
+    setIsDeletingAttendee(true);
+    try {
+      const message = await attendanceService.deleteAdditionalAttendee(
+        activeMeetingId,
+        additionalAttendeeToDelete.additional_attendee_id,
+      );
+      setParticipants((current) => current.filter((participant) =>
+        participant.additional_attendee_id !== additionalAttendeeToDelete.additional_attendee_id));
+      setAdditionalAttendeeToDelete(null);
+      setActionMessage({ type: 'success', text: message });
+    } catch (error) {
+      const message = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data.message
+        : null;
+      setAdditionalAttendeeToDelete(null);
+      setActionMessage({ type: 'error', text: message ?? 'Unable to remove the additional attendee.' });
+    } finally {
+      setIsDeletingAttendee(false);
     }
   };
 
@@ -601,7 +672,7 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   onClick={openAdditionalAttendeeForm}
-                  disabled={!activeMeetingId || !activeLetterId || isLoadingSheet}
+                  disabled={!activeMeetingId || !activeLetterId || isLoadingSheet || isAttendanceFinalized}
                   className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <UserPlus className="h-4 w-4" />
@@ -650,7 +721,23 @@ export default function AttendancePage() {
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700">
                         {getInitials(p.full_name)}
                       </div>
-                      <p className="font-semibold text-slate-900">{p.full_name}</p>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-900">{p.full_name}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${p.participant_type === 'additional' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {p.participant_type === 'additional' ? 'Additional' : 'Invited'}
+                          </span>
+                        </div>
+                        {p.participant_type === 'additional' && p.addition_reason && (
+                          <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500"><span className="font-semibold">Reason:</span> {p.addition_reason}</p>
+                        )}
+                        {p.participant_type === 'additional' && !isViewOnly && (
+                          <div className="mt-2 flex gap-2">
+                            <button type="button" onClick={() => openEditAdditionalAttendeeForm(p)} disabled={isAttendanceFinalized} className="text-xs font-semibold text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline">Edit</button>
+                            <button type="button" onClick={() => setAdditionalAttendeeToDelete(p)} disabled={isAttendanceFinalized} className="text-xs font-semibold text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline">Remove</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">{p.department ?? '—'}</td>
@@ -774,8 +861,8 @@ export default function AttendancePage() {
           <form onSubmit={handleCreateAdditionalAttendee} noValidate className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="additional-attendee-title">
             <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 id="additional-attendee-title" className="text-lg font-bold text-slate-900">Add Additional Attendee</h2>
-                <p className="mt-1 text-sm text-slate-500">Add someone who was not included in the approved invitation list.</p>
+                <h2 id="additional-attendee-title" className="text-lg font-bold text-slate-900">{editingAdditionalAttendeeId ? 'Edit Additional Attendee' : 'Add Additional Attendee'}</h2>
+                <p className="mt-1 text-sm text-slate-500">{editingAdditionalAttendeeId ? 'Update this participant and their attendance status.' : 'Add someone who was not included in the approved invitation list.'}</p>
               </div>
               <button type="button" onClick={() => setShowAdditionalAttendeeForm(false)} disabled={isAddingAttendee} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
@@ -842,11 +929,21 @@ export default function AttendancePage() {
 
             <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
               <button type="button" onClick={() => setShowAdditionalAttendeeForm(false)} disabled={isAddingAttendee} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Cancel</button>
-              <button type="submit" disabled={isAddingAttendee || isLoadingRegisteredUsers} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{isAddingAttendee ? 'Adding...' : 'Add Attendee'}</button>
+              <button type="submit" disabled={isAddingAttendee || isLoadingRegisteredUsers} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{isAddingAttendee ? 'Saving...' : editingAdditionalAttendeeId ? 'Save Changes' : 'Add Attendee'}</button>
             </div>
           </form>
         </div>
       )}
+      <ConfirmDialog
+        open={additionalAttendeeToDelete !== null}
+        title="Remove additional attendee?"
+        message={`${additionalAttendeeToDelete?.full_name ?? 'This participant'} and their draft attendance record will be removed.`}
+        confirmLabel="Remove Attendee"
+        variant="danger"
+        isProcessing={isDeletingAttendee}
+        onConfirm={handleDeleteAdditionalAttendee}
+        onCancel={() => setAdditionalAttendeeToDelete(null)}
+      />
     </DashboardLayout>
   );
 }

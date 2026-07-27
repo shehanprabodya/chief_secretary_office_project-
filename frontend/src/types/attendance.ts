@@ -78,6 +78,7 @@ export interface AttendanceStatistics {
 
 export interface AttendanceSheet {
   letter_id: number;
+  is_finalized: boolean;
   meeting: {
     meeting_id: number;
     title: string;

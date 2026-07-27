@@ -300,6 +300,7 @@ class AttendanceController extends Controller
         return response()->json([
             'meeting' => $meeting,
             'letter_id' => $approvedLetter->letter_id,
+            'is_finalized' => $existingRecords->contains(fn ($record) => !$record->is_draft),
             'participants' => $participants->values(),
             'statistics' => [
                 'attendance_percentage' => $total > 0 ? round(($present / $total) * 100) : 0,
