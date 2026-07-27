@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\AttendanceExcuseRequestController;
 use App\Http\Controllers\Api\ApprovalController;
 use App\Http\Controllers\Api\MinuteController;
 use App\Http\Controllers\Api\ExternalOfficerController;
@@ -106,6 +107,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/meetings/{meetingId}/attendance/submit', [AttendanceController::class, 'submit']);
         Route::post('/meetings/{meetingId}/attendance/export/pdf', [AttendanceController::class, 'exportPdf']);
         Route::get('/meetings/{meetingId}/attendance/search', [AttendanceController::class, 'search']);
+        Route::get('/meetings/{meetingId}/excuse-requests', [AttendanceExcuseRequestController::class, 'index']);
+        Route::post('/meetings/{meetingId}/excuse-requests/{requestId}/approve', [AttendanceExcuseRequestController::class, 'approve']);
+        Route::post('/meetings/{meetingId}/excuse-requests/{requestId}/reject', [AttendanceExcuseRequestController::class, 'reject']);
 
         //minutes
         Route::get('/minutes', [MinuteController::class, 'index']);
