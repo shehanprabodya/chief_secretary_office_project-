@@ -9,7 +9,7 @@ administration, and role-based dashboards.
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
 - **Backend:** Laravel 13, PHP 8.3+, Laravel Sanctum
-- **Database:** SQLite by default
+- **Database:** mySql
 - **Document generation:** Dompdf
 
 ## Prerequisites
