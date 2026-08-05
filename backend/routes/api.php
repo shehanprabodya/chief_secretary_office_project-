@@ -136,10 +136,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/letters', [DepartmentHeadRecordController::class, 'letters']);
         Route::get('/letters/{letter}', [DepartmentHeadRecordController::class, 'showLetter']);
-        Route::get('/letters/{id}/preview', [LetterController::class, 'preview']);
+        Route::get('/letters/{letter}/preview', [DepartmentHeadRecordController::class, 'previewLetter']);
 
         Route::get('/attendance', [DepartmentHeadRecordController::class, 'attendance']);
-        Route::get('/meetings/{meetingId}/attendance', [AttendanceController::class, 'show']);
+        Route::get('/meetings/{meetingId}/attendance', [DepartmentHeadRecordController::class, 'showAttendance']);
 
         Route::get('/minutes', [DepartmentHeadRecordController::class, 'minutes']);
         Route::get('/minutes/{minute}', [DepartmentHeadRecordController::class, 'showMinutes']);

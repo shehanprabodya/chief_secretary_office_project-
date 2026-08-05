@@ -11,12 +11,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class DepartmentHeadRecordController extends Controller
 {
     public function officers(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Letter::class);
+
         $search = trim((string) $request->query('search', ''));
 
         $officers = User::query()
@@ -36,7 +39,8 @@ class DepartmentHeadRecordController extends Controller
 
     public function letters(Request $request): JsonResponse
     {
-        $filters = $this->filters($request);
+        $this->authorize('viewAny', Letter::class);
+        $filters = $this->filters($request, ['draft', 'pending_approval', 'approved', 'rejected', 'dispatched']);
 
         $letters = Letter::query()
             ->with([
@@ -47,6 +51,9 @@ class DepartmentHeadRecordController extends Controller
             ])
             ->withCount('recipients')
             ->when($filters['officer_id'], fn (Builder $query, int $officerId) => $query->where('created_by', $officerId))
+            ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate('created_at', '>=', $date))
+            ->when($filters['date_to'], fn (Builder $query, string $date) => $query->whereDate('created_at', '<=', $date))
             ->when($filters['search'] !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($filters) {
                 $search = $filters['search'];
                 $query->where('title', 'like', "%{$search}%")
@@ -76,9 +83,17 @@ class DepartmentHeadRecordController extends Controller
         ]);
     }
 
+    public function previewLetter(Letter $letter, LetterController $letterController): JsonResponse
+    {
+        $this->authorize('view', $letter);
+
+        return $letterController->preview($letter->letter_id);
+    }
+
     public function attendance(Request $request): JsonResponse
     {
-        $filters = $this->filters($request);
+        $this->authorize('viewAny', AttendanceRecord::class);
+        $filters = $this->filters($request, ['draft', 'finalized']);
 
         $sheets = Letter::query()
             ->select('letters.*')
@@ -98,6 +113,13 @@ class DepartmentHeadRecordController extends Controller
             ])
             ->when($filters['officer_id'], fn (Builder $query, int $officerId) => $query
                 ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('recorded_by', $officerId)))
+            ->when($filters['status'] === 'draft', fn (Builder $query) => $query
+                ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('is_draft', true))
+                ->whereDoesntHave('attendanceRecords', fn (Builder $records) => $records->where('is_draft', false)))
+            ->when($filters['status'] === 'finalized', fn (Builder $query) => $query
+                ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('is_draft', false)))
+            ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate('updated_at', '>=', $date))
+            ->when($filters['date_to'], fn (Builder $query, string $date) => $query->whereDate('updated_at', '<=', $date))
             ->when($filters['search'] !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($filters) {
                 $search = $filters['search'];
                 $query->where('title', 'like', "%{$search}%")
@@ -123,9 +145,20 @@ class DepartmentHeadRecordController extends Controller
         return response()->json($sheets);
     }
 
+    public function showAttendance(
+        Request $request,
+        int $meetingId,
+        AttendanceController $attendanceController,
+    ): JsonResponse {
+        $this->authorize('viewAny', AttendanceRecord::class);
+
+        return $attendanceController->show($request, $meetingId);
+    }
+
     public function minutes(Request $request): JsonResponse
     {
-        $filters = $this->filters($request);
+        $this->authorize('viewAny', MeetingMinute::class);
+        $filters = $this->filters($request, ['draft', 'pending_approval', 'approved']);
 
         $minutes = MeetingMinute::query()
             ->with([
@@ -135,6 +168,9 @@ class DepartmentHeadRecordController extends Controller
             ])
             ->withCount(['decisions', 'actionItems'])
             ->when($filters['officer_id'], fn (Builder $query, int $officerId) => $query->where('created_by', $officerId))
+            ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate('created_at', '>=', $date))
+            ->when($filters['date_to'], fn (Builder $query, string $date) => $query->whereDate('created_at', '<=', $date))
             ->when($filters['search'] !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($filters) {
                 $search = $filters['search'];
                 $query->where('discussion_summary', 'like', "%{$search}%")
@@ -163,13 +199,17 @@ class DepartmentHeadRecordController extends Controller
     }
 
     /**
-     * @return array{officer_id: int|null, search: string, per_page: int}
+     * @param array<int, string> $statuses
+     * @return array{officer_id: int|null, search: string, status: string|null, date_from: string|null, date_to: string|null, per_page: int}
      */
-    private function filters(Request $request): array
+    private function filters(Request $request, array $statuses): array
     {
         $validator = Validator::make($request->query(), [
             'officer_id' => ['nullable', 'integer', 'exists:users,user_id'],
             'search' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', Rule::in($statuses)],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -187,6 +227,9 @@ class DepartmentHeadRecordController extends Controller
         return [
             'officer_id' => $officerId,
             'search' => trim((string) ($validated['search'] ?? '')),
+            'status' => $validated['status'] ?? null,
+            'date_from' => $validated['date_from'] ?? null,
+            'date_to' => $validated['date_to'] ?? null,
             'per_page' => (int) ($validated['per_page'] ?? 15),
         ];
     }
