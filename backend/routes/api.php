@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ApprovalController;
 use App\Http\Controllers\Api\MinuteController;
 use App\Http\Controllers\Api\ExternalOfficerController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\DepartmentHeadRecordController;
 use App\Http\Controllers\Api\admin\AdminDashboardController;
 use App\Http\Controllers\Api\admin\UserManagementController;
 use App\Http\Controllers\Api\admin\SubjectManagementController;
@@ -128,6 +129,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/minutes/{minuteId}/action-items', [MinuteController::class, 'addActionItem']);
         Route::delete('/action-items/{itemId}', [MinuteController::class, 'deleteActionItem']);
 
+    });
+
+    Route::middleware('role:dept_head')->prefix('dept-head')->group(function () {
+        Route::get('/officers', [DepartmentHeadRecordController::class, 'officers']);
+
+        Route::get('/letters', [DepartmentHeadRecordController::class, 'letters']);
+        Route::get('/letters/{letter}', [DepartmentHeadRecordController::class, 'showLetter']);
+        Route::get('/letters/{id}/preview', [LetterController::class, 'preview']);
+
+        Route::get('/attendance', [DepartmentHeadRecordController::class, 'attendance']);
+        Route::get('/meetings/{meetingId}/attendance', [AttendanceController::class, 'show']);
+
+        Route::get('/minutes', [DepartmentHeadRecordController::class, 'minutes']);
+        Route::get('/minutes/{minute}', [DepartmentHeadRecordController::class, 'showMinutes']);
     });
 
     Route::middleware('role:dept_head,deputy,chief_secretary')->group(function () {
