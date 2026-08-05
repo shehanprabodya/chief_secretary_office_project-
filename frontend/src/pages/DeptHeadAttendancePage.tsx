@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { Eye, RefreshCw, Search, Users, X } from 'lucide-react';
+import { Eye, RefreshCw, Users, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import RecordFilters from '../components/DepartmentHead/RecordFilters';
+import { emptyRecordFilters } from '../components/DepartmentHead/recordFilterValues';
+import RecordPagination from '../components/DepartmentHead/RecordPagination';
 import { departmentHeadRecordService } from '../services/departmentHeadRecordService';
 import type { AttendanceSheet, AttendanceStatus } from '../types/attendance';
 import type { DepartmentHeadAttendanceSheet, DepartmentOfficer } from '../types/departmentHeadRecords';
 
-const initialFilters = { search: '', officerId: '', status: '', dateFrom: '', dateTo: '' };
+const initialFilters = emptyRecordFilters;
 const statusStyle: Record<AttendanceStatus, string> = {
   present: 'bg-emerald-50 text-emerald-700',
   absent: 'bg-red-50 text-red-700',
@@ -76,15 +79,7 @@ export default function DeptHeadAttendancePage() {
       <div className="space-y-6">
         <div><h1 className="text-2xl font-bold text-slate-900">Attendance Records</h1><p className="mt-1 text-sm text-slate-500">View submitted and draft attendance sheets across all officers.</p></div>
 
-        <form onSubmit={(event) => { event.preventDefault(); setPage(1); setApplied(filters); }} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <label className="xl:col-span-2"><span className="mb-1.5 block text-xs font-semibold uppercase text-slate-500">Search</span><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Letter, meeting, or code" className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500" /></div></label>
-            <label><span className="mb-1.5 block text-xs font-semibold uppercase text-slate-500">Officer</span><select value={filters.officerId} onChange={(event) => setFilters({ ...filters, officerId: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="">All officers</option>{officers.map((officer) => <option key={officer.user_id} value={officer.user_id}>{officer.full_name}</option>)}</select></label>
-            <label><span className="mb-1.5 block text-xs font-semibold uppercase text-slate-500">Status</span><select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="">All statuses</option><option value="draft">Draft</option><option value="finalized">Finalized</option></select></label>
-            <div className="grid grid-cols-2 gap-2"><label><span className="mb-1.5 block text-xs font-semibold uppercase text-slate-500">From</span><input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label><label><span className="mb-1.5 block text-xs font-semibold uppercase text-slate-500">To</span><input type="date" min={filters.dateFrom || undefined} value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label></div>
-          </div>
-          <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => { setFilters(initialFilters); setApplied(initialFilters); setPage(1); }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600">Reset</button><button className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white">Apply filters</button></div>
-        </form>
+        <RecordFilters values={filters} officers={officers} statuses={[{ value: 'draft', label: 'Draft' }, { value: 'finalized', label: 'Finalized' }]} searchPlaceholder="Letter, meeting, or code" onChange={setFilters} onApply={() => { setPage(1); setApplied(filters); }} onReset={() => { setFilters(initialFilters); setApplied(initialFilters); setPage(1); }} />
 
         {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
@@ -99,7 +94,7 @@ export default function DeptHeadAttendancePage() {
               <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${record.is_finalized ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>{record.is_finalized ? 'Finalized' : 'Draft'}</span></td>
               <td className="px-5 py-4 text-right"><button onClick={() => openDetail(record)} disabled={!record.meeting_id || openingId === record.letter_id} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 disabled:opacity-40"><Eye className="h-3.5 w-3.5" />{openingId === record.letter_id ? 'Opening...' : 'View'}</button></td>
             </tr>)}</tbody></table></div>
-          {lastPage > 1 && <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4 text-sm"><span className="text-slate-500">Page {page} of {lastPage}</span><div className="flex gap-2"><button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1 || isLoading} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Previous</button><button onClick={() => setPage((value) => Math.min(lastPage, value + 1))} disabled={page === lastPage || isLoading} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Next</button></div></div>}
+          <RecordPagination page={page} lastPage={lastPage} disabled={isLoading} onPageChange={setPage} />
         </section>
       </div>
 

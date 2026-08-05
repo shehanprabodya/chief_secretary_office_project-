@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { Eye, FileSearch, RefreshCw, Search } from 'lucide-react';
+import { Eye, FileSearch, RefreshCw } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import PreviewModal from '../components/Letters/PreviewModal';
+import RecordFilters from '../components/DepartmentHead/RecordFilters';
+import { emptyRecordFilters } from '../components/DepartmentHead/recordFilterValues';
+import RecordPagination from '../components/DepartmentHead/RecordPagination';
 import { departmentHeadRecordService } from '../services/departmentHeadRecordService';
 import type { LetterStatus } from '../types/letter';
 import type { DepartmentHeadLetter, DepartmentOfficer } from '../types/departmentHeadRecords';
@@ -15,13 +18,7 @@ const STATUS_STYLES: Record<LetterStatus, string> = {
   dispatched: 'bg-blue-50 text-blue-700',
 };
 
-const initialFilters = {
-  search: '',
-  officerId: '',
-  status: '',
-  dateFrom: '',
-  dateTo: '',
-};
+const initialFilters = emptyRecordFilters;
 
 export default function DeptHeadLettersPage() {
   const [letters, setLetters] = useState<DepartmentHeadLetter[]>([]);
@@ -74,8 +71,7 @@ export default function DeptHeadLettersPage() {
     loadLetters();
   }, [loadLetters]);
 
-  const applyFilters = (event: React.FormEvent) => {
-    event.preventDefault();
+  const applyFilters = () => {
     setPage(1);
     setAppliedFilters(filters);
   };
@@ -107,39 +103,7 @@ export default function DeptHeadLettersPage() {
           <p className="mt-1 text-sm text-slate-500">View all meeting letters or narrow the list to a particular officer.</p>
         </div>
 
-        <form onSubmit={applyFilters} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <label className="xl:col-span-2">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search</span>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Title, subject, or meeting code" className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500" />
-              </div>
-            </label>
-            <label>
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Officer</span>
-              <select value={filters.officerId} onChange={(event) => setFilters({ ...filters, officerId: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500">
-                <option value="">All officers</option>
-                {officers.map((officer) => <option key={officer.user_id} value={officer.user_id}>{officer.full_name}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
-              <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500">
-                <option value="">All statuses</option>
-                <option value="draft">Draft</option><option value="pending_approval">Pending approval</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="dispatched">Dispatched</option>
-              </select>
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">From</span><input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label>
-              <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">To</span><input type="date" min={filters.dateFrom || undefined} value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label>
-            </div>
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <button type="button" onClick={resetFilters} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Reset</button>
-            <button type="submit" className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Apply filters</button>
-          </div>
-        </form>
+        <RecordFilters values={filters} officers={officers} statuses={[{ value: 'draft', label: 'Draft' }, { value: 'pending_approval', label: 'Pending approval' }, { value: 'approved', label: 'Approved' }, { value: 'rejected', label: 'Rejected' }, { value: 'dispatched', label: 'Dispatched' }]} searchPlaceholder="Title, subject, or meeting code" onChange={setFilters} onApply={applyFilters} onReset={resetFilters} />
 
         {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
@@ -165,7 +129,7 @@ export default function DeptHeadLettersPage() {
               </tbody>
             </table>
           </div>
-          {lastPage > 1 && <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4 text-sm"><span className="text-slate-500">Page {page} of {lastPage}</span><div className="flex gap-2"><button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1 || isLoading} className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40">Previous</button><button onClick={() => setPage((current) => Math.min(lastPage, current + 1))} disabled={page === lastPage || isLoading} className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40">Next</button></div></div>}
+          <RecordPagination page={page} lastPage={lastPage} disabled={isLoading} onPageChange={setPage} />
         </section>
       </div>
 
