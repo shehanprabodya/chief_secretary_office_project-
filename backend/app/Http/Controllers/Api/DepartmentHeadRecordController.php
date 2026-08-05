@@ -110,34 +110,52 @@ class DepartmentHeadRecordController extends Controller
                 'attendanceRecords as absent_count' => fn (Builder $query) => $query->where('status', 'absent'),
                 'attendanceRecords as excused_count' => fn (Builder $query) => $query->where('status', 'excused'),
                 'attendanceRecords as finalized_count' => fn (Builder $query) => $query->where('is_draft', false),
+                'attendanceRecords as draft_count' => fn (Builder $query) => $query->where('is_draft', true),
             ])
-            ->when($filters['officer_id'], fn (Builder $query, int $officerId) => $query
-                ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('recorded_by', $officerId)))
+            // Attendance sheets belong to the officer who created the linked
+            // meeting letter. This keeps the filter stable even for legacy
+            // rows recorded or reviewed by another user.
+            ->when($filters['officer_id'], fn (Builder $query, int $officerId) => $query->where('created_by', $officerId))
             ->when($filters['status'] === 'draft', fn (Builder $query) => $query
-                ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('is_draft', true))
-                ->whereDoesntHave('attendanceRecords', fn (Builder $records) => $records->where('is_draft', false)))
+                ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('is_draft', true)))
             ->when($filters['status'] === 'finalized', fn (Builder $query) => $query
-                ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('is_draft', false)))
-            ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate('updated_at', '>=', $date))
-            ->when($filters['date_to'], fn (Builder $query, string $date) => $query->whereDate('updated_at', '<=', $date))
+                ->whereHas('attendanceRecords', fn (Builder $records) => $records->where('is_draft', false))
+                ->whereDoesntHave('attendanceRecords', fn (Builder $records) => $records->where('is_draft', true)))
+            ->when($filters['date_from'], fn (Builder $query, string $date) => $query
+                ->whereHas('meeting', fn (Builder $meeting) => $meeting->whereDate('meeting_date', '>=', $date)))
+            ->when($filters['date_to'], fn (Builder $query, string $date) => $query
+                ->whereHas('meeting', fn (Builder $meeting) => $meeting->whereDate('meeting_date', '<=', $date)))
             ->when($filters['search'] !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($filters) {
                 $search = $filters['search'];
                 $query->where('title', 'like', "%{$search}%")
                     ->orWhere('meeting_code', 'like', "%{$search}%")
-                    ->orWhereHas('meeting', fn (Builder $meeting) => $meeting->where('title', 'like', "%{$search}%"));
+                    ->orWhereHas('meeting', fn (Builder $meeting) => $meeting
+                        ->where('title', 'like', "%{$search}%")
+                        ->orWhere('meeting_code', 'like', "%{$search}%"))
+                    ->orWhereHas('subject', fn (Builder $subject) => $subject
+                        ->where('title', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%"));
             }))
-            ->latest('updated_at')
+            ->orderByDesc(
+                \App\Models\Meeting::select('meeting_date')
+                    ->whereColumn('meetings.meeting_id', 'letters.meeting_id')
+                    ->limit(1)
+            )
+            ->latest('letters.updated_at')
             ->paginate($filters['per_page']);
 
         $sheets->getCollection()->transform(function (Letter $letter) {
-            $letter->setAttribute('is_finalized', $letter->finalized_count > 0);
+            $letter->setAttribute(
+                'is_finalized',
+                $letter->finalized_count > 0 && $letter->draft_count === 0,
+            );
             $letter->setAttribute(
                 'attendance_percentage',
                 $letter->participant_count > 0
                     ? round(($letter->present_count / $letter->participant_count) * 100)
                     : 0,
             );
-            $letter->makeHidden('finalized_count');
+            $letter->makeHidden(['finalized_count', 'draft_count']);
 
             return $letter;
         });

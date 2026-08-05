@@ -99,24 +99,24 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
           <h2 className="text-lg font-bold text-slate-900">Letter Preview</h2>
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             {allowExports && (
               <>
                 <button
                   onClick={handleDownloadPdf}
-                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <Download className="h-4 w-4" /> Download PDF
                 </button>
                 <button
                   onClick={handleDownloadDocx}
-                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <FileText className="h-4 w-4" /> Download DOCX
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <Printer className="h-4 w-4" /> Print
                 </button>

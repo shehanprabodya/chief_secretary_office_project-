@@ -97,7 +97,7 @@ export default function DeptHeadLettersPage() {
 
   return (
     <DashboardLayout pageTitle="Meeting Letters">
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Meeting Letters</h1>
           <p className="mt-1 text-sm text-slate-500">View all meeting letters or narrow the list to a particular officer.</p>
@@ -108,7 +108,7 @@ export default function DeptHeadLettersPage() {
         {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
             <p className="text-sm font-semibold text-slate-800">{total} letter{total === 1 ? '' : 's'}</p>
             <button onClick={loadLetters} disabled={isLoading} className="flex items-center gap-2 text-sm font-medium text-blue-700 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />Refresh</button>
           </div>
@@ -123,7 +123,7 @@ export default function DeptHeadLettersPage() {
                     <td className="px-5 py-4"><p className="font-medium text-slate-700">{letter.creator?.full_name || 'Unknown'}</p><p className="text-xs text-slate-400">{letter.creator?.organization?.organization_name || letter.creator?.designation || '—'}</p></td>
                     <td className="px-5 py-4 text-slate-600">{letter.created_at ? new Date(letter.created_at).toLocaleDateString() : '—'}</td>
                     <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[letter.status]}`}>{letter.status.replace('_', ' ')}</span></td>
-                    <td className="px-5 py-4 text-right"><button onClick={() => openPreview(letter.letter_id)} disabled={previewingId === letter.letter_id} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Eye className="h-3.5 w-3.5" />{previewingId === letter.letter_id ? 'Opening...' : 'View'}</button></td>
+                    <td className="px-5 py-4 text-right"><button onClick={() => openPreview(letter.letter_id)} disabled={previewingId === letter.letter_id} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Eye className="h-3.5 w-3.5" />{previewingId === letter.letter_id ? 'Opening...' : 'View'}</button></td>
                   </tr>
                 ))}
               </tbody>
