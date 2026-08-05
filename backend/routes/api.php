@@ -26,6 +26,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markRead']);
 
+    // Shared read-only meeting calendar for internal workflow roles.
+    Route::middleware('role:officer,dept_head,deputy,chief_secretary')->prefix('calendar')->group(function () {
+        Route::get('/meetings', [MeetingController::class, 'index']);
+        Route::get('/meetings/by-date', [MeetingController::class, 'byDate']);
+    });
+
     // Meeting creation is shared by the officer and admin meeting workflow.
     Route::post('/meetings', [MeetingController::class, 'store'])
         ->middleware('role:officer,admin');
