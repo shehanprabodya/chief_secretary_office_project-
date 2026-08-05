@@ -2,11 +2,14 @@ import { api } from '../lib/axios';
 import type {
   DepartmentHeadLetter,
   DepartmentHeadAttendanceSheet,
+  DepartmentHeadMinute,
   DepartmentHeadRecordFilters,
   DepartmentOfficer,
   PaginatedResponse,
 } from '../types/departmentHeadRecords';
 import type { AttendanceSheet } from '../types/attendance';
+import type { MeetingMinute } from '../types/minute';
+import type { Meeting } from '../types/meeting';
 
 export const departmentHeadRecordService = {
   async getOfficers(search = ''): Promise<DepartmentOfficer[]> {
@@ -40,5 +43,17 @@ export const departmentHeadRecordService = {
       params: { letter_id: letterId },
     });
     return data;
+  },
+
+  async getMinutes(filters: DepartmentHeadRecordFilters): Promise<PaginatedResponse<DepartmentHeadMinute>> {
+    const { data } = await api.get<PaginatedResponse<DepartmentHeadMinute>>('/dept-head/minutes', {
+      params: filters,
+    });
+    return data;
+  },
+
+  async getMinute(minuteId: number): Promise<MeetingMinute & { meeting: Meeting }> {
+    const { data } = await api.get<{ minute: MeetingMinute & { meeting: Meeting } }>(`/dept-head/minutes/${minuteId}`);
+    return data.minute;
   },
 };

@@ -67,3 +67,21 @@ export interface DepartmentHeadAttendanceSheet {
     location: string | null;
   } | null;
 }
+
+export interface DepartmentHeadMinute {
+  minute_id: number;
+  meeting_id: number;
+  discussion_summary: string | null;
+  status: 'draft' | 'pending_approval' | 'approved';
+  created_at: string;
+  decisions_count: number;
+  action_items_count: number;
+  creator: DepartmentOfficer;
+  meeting?: {
+    meeting_id: number;
+    meeting_code: string | null;
+    title: string;
+    meeting_date: string;
+    location: string | null;
+  } | null;
+}
