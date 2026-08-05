@@ -1,0 +1,175 @@
+import { useCallback, useEffect, useState } from 'react';
+import axios from 'axios';
+import { Eye, FileSearch, RefreshCw, Search } from 'lucide-react';
+import DashboardLayout from '../components/layouts/DashboardLayout';
+import PreviewModal from '../components/Letters/PreviewModal';
+import { departmentHeadRecordService } from '../services/departmentHeadRecordService';
+import type { LetterStatus } from '../types/letter';
+import type { DepartmentHeadLetter, DepartmentOfficer } from '../types/departmentHeadRecords';
+
+const STATUS_STYLES: Record<LetterStatus, string> = {
+  draft: 'bg-slate-100 text-slate-700',
+  pending_approval: 'bg-amber-50 text-amber-700',
+  approved: 'bg-emerald-50 text-emerald-700',
+  rejected: 'bg-red-50 text-red-700',
+  dispatched: 'bg-blue-50 text-blue-700',
+};
+
+const initialFilters = {
+  search: '',
+  officerId: '',
+  status: '',
+  dateFrom: '',
+  dateTo: '',
+};
+
+export default function DeptHeadLettersPage() {
+  const [letters, setLetters] = useState<DepartmentHeadLetter[]>([]);
+  const [officers, setOfficers] = useState<DepartmentOfficer[]>([]);
+  const [filters, setFilters] = useState(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState<{ letterId: number; html: string } | null>(null);
+  const [previewingId, setPreviewingId] = useState<number | null>(null);
+
+  const loadLetters = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const result = await departmentHeadRecordService.getLetters({
+        search: appliedFilters.search.trim() || undefined,
+        officer_id: appliedFilters.officerId ? Number(appliedFilters.officerId) : undefined,
+        status: appliedFilters.status || undefined,
+        date_from: appliedFilters.dateFrom || undefined,
+        date_to: appliedFilters.dateTo || undefined,
+        page,
+        per_page: 10,
+      });
+      setLetters(result.data);
+      setLastPage(result.last_page);
+      setTotal(result.total);
+    } catch (requestError) {
+      const message = axios.isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : null;
+      setError(message || 'Unable to load meeting letters. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [appliedFilters, page]);
+
+  useEffect(() => {
+    departmentHeadRecordService.getOfficers()
+      .then(setOfficers)
+      .catch(() => setError('Unable to load the officer filter.'));
+  }, []);
+
+  useEffect(() => {
+    // The request updates loading and result state after the route/filter changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadLetters();
+  }, [loadLetters]);
+
+  const applyFilters = (event: React.FormEvent) => {
+    event.preventDefault();
+    setPage(1);
+    setAppliedFilters(filters);
+  };
+
+  const resetFilters = () => {
+    setFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setPage(1);
+  };
+
+  const openPreview = async (letterId: number) => {
+    setPreviewingId(letterId);
+    setError('');
+    try {
+      const html = await departmentHeadRecordService.previewLetter(letterId);
+      setPreview({ letterId, html });
+    } catch {
+      setError('Unable to open the meeting letter preview.');
+    } finally {
+      setPreviewingId(null);
+    }
+  };
+
+  return (
+    <DashboardLayout pageTitle="Meeting Letters">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Meeting Letters</h1>
+          <p className="mt-1 text-sm text-slate-500">View all meeting letters or narrow the list to a particular officer.</p>
+        </div>
+
+        <form onSubmit={applyFilters} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <label className="xl:col-span-2">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search</span>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Title, subject, or meeting code" className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500" />
+              </div>
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Officer</span>
+              <select value={filters.officerId} onChange={(event) => setFilters({ ...filters, officerId: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500">
+                <option value="">All officers</option>
+                {officers.map((officer) => <option key={officer.user_id} value={officer.user_id}>{officer.full_name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
+              <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500">
+                <option value="">All statuses</option>
+                <option value="draft">Draft</option><option value="pending_approval">Pending approval</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="dispatched">Dispatched</option>
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">From</span><input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label>
+              <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">To</span><input type="date" min={filters.dateFrom || undefined} value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" onClick={resetFilters} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Reset</button>
+            <button type="submit" className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Apply filters</button>
+          </div>
+        </form>
+
+        {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+            <p className="text-sm font-semibold text-slate-800">{total} letter{total === 1 ? '' : 's'}</p>
+            <button onClick={loadLetters} disabled={isLoading} className="flex items-center gap-2 text-sm font-medium text-blue-700 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />Refresh</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Letter</th><th className="px-5 py-3">Meeting</th><th className="px-5 py-3">Officer</th><th className="px-5 py-3">Date</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">Loading meeting letters...</td></tr> : letters.length === 0 ? <tr><td colSpan={6} className="px-5 py-12 text-center"><FileSearch className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-slate-500">No meeting letters match these filters.</p></td></tr> : letters.map((letter) => (
+                  <tr key={letter.letter_id} className="hover:bg-slate-50/70">
+                    <td className="px-5 py-4"><p className="max-w-xs font-semibold text-slate-900">{letter.title || 'Untitled letter'}</p><p className="mt-1 text-xs text-slate-400">{letter.subject?.code || letter.meeting_code || `Letter #${letter.letter_id}`} · {letter.recipients_count} recipient{letter.recipients_count === 1 ? '' : 's'}</p></td>
+                    <td className="px-5 py-4 text-slate-600">{letter.meeting?.title || 'Not linked'}{letter.meeting?.meeting_date && <p className="mt-1 text-xs text-slate-400">{new Date(letter.meeting.meeting_date).toLocaleDateString()}</p>}</td>
+                    <td className="px-5 py-4"><p className="font-medium text-slate-700">{letter.creator?.full_name || 'Unknown'}</p><p className="text-xs text-slate-400">{letter.creator?.organization?.organization_name || letter.creator?.designation || '—'}</p></td>
+                    <td className="px-5 py-4 text-slate-600">{letter.created_at ? new Date(letter.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[letter.status]}`}>{letter.status.replace('_', ' ')}</span></td>
+                    <td className="px-5 py-4 text-right"><button onClick={() => openPreview(letter.letter_id)} disabled={previewingId === letter.letter_id} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Eye className="h-3.5 w-3.5" />{previewingId === letter.letter_id ? 'Opening...' : 'View'}</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {lastPage > 1 && <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4 text-sm"><span className="text-slate-500">Page {page} of {lastPage}</span><div className="flex gap-2"><button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1 || isLoading} className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40">Previous</button><button onClick={() => setPage((current) => Math.min(lastPage, current + 1))} disabled={page === lastPage || isLoading} className="rounded-lg border border-slate-300 px-3 py-1.5 disabled:opacity-40">Next</button></div></div>}
+        </section>
+      </div>
+
+      {preview && <PreviewModal html={preview.html} letterId={preview.letterId} allowExports={false} onClose={() => setPreview(null)} />}
+    </DashboardLayout>
+  );
+}
