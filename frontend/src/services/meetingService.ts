@@ -12,6 +12,18 @@ export interface MeetingFilters {
 }
 
 export const meetingService = {
+  async getCalendar(filters: MeetingFilters = {}): Promise<PaginatedMeetings> {
+    const { data } = await api.get<PaginatedMeetings>('/calendar/meetings', { params: filters });
+    return data;
+  },
+
+  async getCalendarByDate(date: string): Promise<Meeting[]> {
+    const { data } = await api.get<{ meetings: Meeting[] }>('/calendar/meetings/by-date', {
+      params: { date },
+    });
+    return data.meetings;
+  },
+
   async list(filters: MeetingFilters = {}): Promise<PaginatedMeetings> {
     const { data } = await api.get<PaginatedMeetings>('/officer/meetings', { params: filters });
     return data;

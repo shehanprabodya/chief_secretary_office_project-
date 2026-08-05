@@ -20,6 +20,11 @@ class MeetingMinute extends Model
         return $this->belongsTo(Meeting::class, 'meeting_id', 'meeting_id');
     }
 
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by', 'user_id');
+    }
+
     public function decisions(): HasMany
     {
         return $this->hasMany(MinuteDecision::class, 'minute_id', 'minute_id')->orderBy('decision_order');

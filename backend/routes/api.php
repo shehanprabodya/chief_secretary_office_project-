@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ApprovalController;
 use App\Http\Controllers\Api\MinuteController;
 use App\Http\Controllers\Api\ExternalOfficerController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\DepartmentHeadRecordController;
 use App\Http\Controllers\Api\admin\AdminDashboardController;
 use App\Http\Controllers\Api\admin\UserManagementController;
 use App\Http\Controllers\Api\admin\SubjectManagementController;
@@ -24,6 +25,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+
+    // Shared read-only meeting calendar for internal workflow roles.
+    Route::middleware('role:officer,dept_head,deputy,chief_secretary')->prefix('calendar')->group(function () {
+        Route::get('/meetings', [MeetingController::class, 'index']);
+        Route::get('/meetings/by-date', [MeetingController::class, 'byDate']);
+    });
 
     // Meeting creation is shared by the officer and admin meeting workflow.
     Route::post('/meetings', [MeetingController::class, 'store'])
@@ -128,6 +135,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/minutes/{minuteId}/action-items', [MinuteController::class, 'addActionItem']);
         Route::delete('/action-items/{itemId}', [MinuteController::class, 'deleteActionItem']);
 
+    });
+
+    Route::middleware('role:dept_head')->prefix('dept-head')->group(function () {
+        Route::get('/officers', [DepartmentHeadRecordController::class, 'officers']);
+
+        Route::get('/letters', [DepartmentHeadRecordController::class, 'letters']);
+        Route::get('/letters/{letter}', [DepartmentHeadRecordController::class, 'showLetter']);
+        Route::get('/letters/{letter}/preview', [DepartmentHeadRecordController::class, 'previewLetter']);
+        Route::get('/letters/{id}/download/pdf', [LetterController::class, 'downloadPdf']);
+        Route::get('/letters/{id}/download/docx', [LetterController::class, 'downloadDocx']);
+
+        Route::get('/attendance', [DepartmentHeadRecordController::class, 'attendance']);
+        Route::get('/meetings/{meetingId}/attendance', [DepartmentHeadRecordController::class, 'showAttendance']);
+
+        Route::get('/minutes', [DepartmentHeadRecordController::class, 'minutes']);
+        Route::get('/minutes/{minute}', [DepartmentHeadRecordController::class, 'showMinutes']);
     });
 
     Route::middleware('role:dept_head,deputy,chief_secretary')->group(function () {

@@ -59,7 +59,7 @@ export default function CalendarWidget() {
       try {
         const firstDate = new Date(year, month, 1);
         const lastDate = new Date(year, month + 1, 0);
-        const response = await meetingService.list({
+        const response = await meetingService.getCalendar({
           start_date: dateKey(firstDate),
           end_date: dateKey(lastDate),
           per_page: 100,
@@ -90,7 +90,7 @@ export default function CalendarWidget() {
       setDetailsError('');
 
       try {
-        const result = await meetingService.getByDate(selectedDate);
+        const result = await meetingService.getCalendarByDate(selectedDate);
         if (!ignore) setSelectedMeetings(result);
       } catch {
         if (!ignore) {

@@ -14,6 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import CalendarWidget from '../components/Dashboard/CalendarWidget';
 import { useAuth } from '../context/AuthContext';
 import { approvalService } from '../services/approvalService';
 import type { ApprovableDocument } from '../types/approval';
@@ -242,6 +243,8 @@ export default function ChiefSecretaryDashboard() {
           </div>
 
           <div className="approval-dashboard-sidebar">
+            <CalendarWidget />
+
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900">Workflow Position</h2>
               <div className="mt-5 space-y-4">

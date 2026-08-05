@@ -18,6 +18,9 @@ import CreateMeetingPage from './pages/CreateMeetingPage';
 import MeetingDetailsPage from './pages/MeetingDetailsPage';
 import ExternalOfficerDashboard from './pages/ExternalOfficerDashboard';
 import SubjectManagementPage from './pages/SubjectManagementPage';
+import DeptHeadLettersPage from './pages/DeptHeadLettersPage';
+import DeptHeadAttendancePage from './pages/DeptHeadAttendancePage';
+import DeptHeadMinutesPage from './pages/DeptHeadMinutesPage';
 
 export default function App() {
   return (
@@ -47,6 +50,9 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['dept_head']} />}>
             <Route path="/dashboard/dept-head" element={<DeptHeadDashboard />} />
+            <Route path="/dept-head/letters" element={<DeptHeadLettersPage />} />
+            <Route path="/dept-head/attendance" element={<DeptHeadAttendancePage />} />
+            <Route path="/dept-head/minutes" element={<DeptHeadMinutesPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['deputy']} />}>
