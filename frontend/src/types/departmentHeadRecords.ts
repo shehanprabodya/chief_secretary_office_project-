@@ -45,3 +45,25 @@ export interface DepartmentHeadRecordFilters {
   page?: number;
   per_page?: number;
 }
+
+export interface DepartmentHeadAttendanceSheet {
+  letter_id: number;
+  meeting_id: number | null;
+  meeting_code: string | null;
+  title: string;
+  updated_at: string;
+  participant_count: number;
+  present_count: number;
+  absent_count: number;
+  excused_count: number;
+  attendance_percentage: number;
+  is_finalized: boolean;
+  subject?: Subject | null;
+  creator: DepartmentOfficer;
+  meeting?: {
+    meeting_id: number;
+    title: string;
+    meeting_date: string | null;
+    location: string | null;
+  } | null;
+}
