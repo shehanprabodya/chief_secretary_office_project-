@@ -11,6 +11,16 @@ import type { AttendanceSheet } from '../types/attendance';
 import type { MeetingMinute } from '../types/minute';
 import type { Meeting } from '../types/meeting';
 
+const downloadBlob = (blob: Blob, contentDisposition: string | undefined, fallback: string) => {
+  const filename = contentDisposition?.match(/filename="?([^";]+)"?/i)?.[1] ?? fallback;
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+};
+
 export const departmentHeadRecordService = {
   async getOfficers(search = ''): Promise<DepartmentOfficer[]> {
     const { data } = await api.get<{ officers: DepartmentOfficer[] }>('/dept-head/officers', {
@@ -29,6 +39,16 @@ export const departmentHeadRecordService = {
   async previewLetter(letterId: number): Promise<string> {
     const { data } = await api.get<{ preview_html: string }>(`/dept-head/letters/${letterId}/preview`);
     return data.preview_html;
+  },
+
+  async downloadLetterPdf(letterId: number): Promise<void> {
+    const response = await api.get(`/dept-head/letters/${letterId}/download/pdf`, { responseType: 'blob' });
+    downloadBlob(new Blob([response.data], { type: 'application/pdf' }), response.headers['content-disposition'], `letter-${letterId}.pdf`);
+  },
+
+  async downloadLetterDocx(letterId: number): Promise<void> {
+    const response = await api.get(`/dept-head/letters/${letterId}/download/docx`, { responseType: 'blob' });
+    downloadBlob(new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), response.headers['content-disposition'], `letter-${letterId}.docx`);
   },
 
   async getAttendance(filters: DepartmentHeadRecordFilters): Promise<PaginatedResponse<DepartmentHeadAttendanceSheet>> {

@@ -137,6 +137,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/letters', [DepartmentHeadRecordController::class, 'letters']);
         Route::get('/letters/{letter}', [DepartmentHeadRecordController::class, 'showLetter']);
         Route::get('/letters/{letter}/preview', [DepartmentHeadRecordController::class, 'previewLetter']);
+        Route::get('/letters/{id}/download/pdf', [LetterController::class, 'downloadPdf']);
+        Route::get('/letters/{id}/download/docx', [LetterController::class, 'downloadDocx']);
 
         Route::get('/attendance', [DepartmentHeadRecordController::class, 'attendance']);
         Route::get('/meetings/{meetingId}/attendance', [DepartmentHeadRecordController::class, 'showAttendance']);

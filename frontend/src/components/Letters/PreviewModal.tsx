@@ -7,9 +7,11 @@ interface PreviewModalProps {
   letterId: number;
   onClose: () => void;
   allowExports?: boolean;
+  onDownloadPdf?: () => Promise<void>;
+  onDownloadDocx?: () => Promise<void>;
 }
 
-export default function PreviewModal({ html, letterId, onClose, allowExports = true }: PreviewModalProps) {
+export default function PreviewModal({ html, letterId, onClose, allowExports = true, onDownloadPdf, onDownloadDocx }: PreviewModalProps) {
   const safeHtml = sanitizeDocumentHtml(html);
   const previewHtml = `
     <style>
@@ -46,11 +48,11 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
   `;
 
   const handleDownloadPdf = async () => {
-    await letterService.downloadPdf(letterId);
+    await (onDownloadPdf ? onDownloadPdf() : letterService.downloadPdf(letterId));
   };
 
   const handleDownloadDocx = async () => {
-    await letterService.downloadDocx(letterId);
+    await (onDownloadDocx ? onDownloadDocx() : letterService.downloadDocx(letterId));
   };
 
   const handlePrint = () => {

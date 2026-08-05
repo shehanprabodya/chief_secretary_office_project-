@@ -246,6 +246,12 @@ class LetterController extends Controller
         return (int) $letter->created_by === (int) $request->user()->user_id;
     }
 
+    private function canExportLetter(Request $request, Letter $letter): bool
+    {
+        return $this->canModifyLetter($request, $letter)
+            || $request->user()->hasRole('dept_head');
+    }
+
     /**
      * Generate the letter — builds the formatted letter HTML from stored data.
      * This is what "Generate Letter" button calls.
@@ -329,8 +335,8 @@ class LetterController extends Controller
             'creator'
         )->findOrFail($id);
 
-        if (!$this->canModifyLetter($request, $letter)) {
-            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        if (!$this->canExportLetter($request, $letter)) {
+            return response()->json(['message' => 'You do not have permission to export this letter.'], 403);
         }
 
         $html = $this->buildLetterHtml($letter, true); // true = include full page CSS
@@ -391,8 +397,8 @@ class LetterController extends Controller
             'creator'
         )->findOrFail($id);
 
-        if (!$this->canModifyLetter($request, $letter)) {
-            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        if (!$this->canExportLetter($request, $letter)) {
+            return response()->json(['message' => 'You do not have permission to export this letter.'], 403);
         }
 
         $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.docx';
