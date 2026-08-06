@@ -50,6 +50,9 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['dept_head']} />}>
             <Route path="/dashboard/dept-head" element={<DeptHeadDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['dept_head', 'deputy']} />}>
             <Route path="/dept-head/letters" element={<DeptHeadLettersPage />} />
             <Route path="/dept-head/attendance" element={<DeptHeadAttendancePage />} />
             <Route path="/dept-head/minutes" element={<DeptHeadMinutesPage />} />

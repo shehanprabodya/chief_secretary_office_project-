@@ -8,12 +8,12 @@ trait HandlesDepartmentRecordViewing
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasRole(['officer', 'dept_head']);
+        return $user->hasRole(['officer', 'dept_head', 'deputy']);
     }
 
     protected function mayViewRecord(User $user, ?int $createdBy): bool
     {
-        if ($user->hasRole('dept_head')) {
+        if ($user->hasRole(['dept_head', 'deputy'])) {
             return true;
         }
 
