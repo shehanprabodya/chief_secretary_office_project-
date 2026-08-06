@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, User as UserIcon, Lock, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -16,19 +16,17 @@ export default function LoginModal({ onClose }: LoginModalProps) {
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(
+    () => localStorage.getItem('rememberMe') === 'true',
+  );
   const [formError, setFormError] = useState<string | null>(null);
-  const [credentials, setCredentials] = useState<LoginCredentials>({
-    identifier: '',
-    password: '',
-  });
-
-  useEffect(() => {
+  const [credentials, setCredentials] = useState<LoginCredentials>(() => {
     const remembered = localStorage.getItem('rememberMe') === 'true';
-    const savedIdentifier = localStorage.getItem('rememberedIdentifier') || '';
-    setRememberMe(remembered);
-    if (remembered) setCredentials((prev) => ({ ...prev, identifier: savedIdentifier }));
-  }, []);
+    return {
+      identifier: remembered ? localStorage.getItem('rememberedIdentifier') ?? '' : '',
+      password: '',
+    };
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

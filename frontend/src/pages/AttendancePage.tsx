@@ -154,12 +154,16 @@ export default function AttendancePage() {
   }, [fetchSheet]);
 
   useEffect(() => {
+    // Loading the initial remote collection intentionally updates request state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLetters();
   }, [loadLetters]);
 
   useEffect(() => {
     if (!isViewOnly || !selectedLetterId) return;
     const selectedLetter = letters.find((letter) => letter.letter_id === selectedLetterId);
+    // Keep the selector label synchronized with a letter chosen via URL.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (selectedLetter) setLetterSearch(selectedLetter.letter_title);
   }, [isViewOnly, letters, selectedLetterId]);
 
