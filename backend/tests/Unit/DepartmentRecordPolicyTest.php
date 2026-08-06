@@ -39,6 +39,20 @@ class DepartmentRecordPolicyTest extends TestCase
     }
 
     #[DataProvider('recordPolicies')]
+    public function test_deputy_can_view_every_record(
+        string $policyClass,
+        string $modelClass,
+        string $ownerColumn,
+    ): void {
+        $deputy = $this->userWithRole(11, 'deputy');
+        $record = $this->recordOwnedBy($modelClass, $ownerColumn, 999);
+        $policy = new $policyClass();
+
+        $this->assertTrue($policy->viewAny($deputy));
+        $this->assertTrue($policy->view($deputy, $record));
+    }
+
+    #[DataProvider('recordPolicies')]
     public function test_officer_can_only_view_owned_records(
         string $policyClass,
         string $modelClass,

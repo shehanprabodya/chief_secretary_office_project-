@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Calendar, Bell, BarChart3, TrendingUp,Plus, UserPlus, History} from 'lucide-react';
+import { Users, Calendar, Bell, BarChart3, TrendingUp,Plus, UserPlus, History, type LucideProps } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import type { AdminStats, ActivityItem, UpcomingMeeting } from '../types/admin';
 import { useAuth } from '../context/AuthContext';
@@ -10,11 +10,11 @@ import DashboardLayout from '../components/layouts/DashboardLayout';
 type KPICard = {
   key: keyof AdminStats;
   label: string;
-  icon: React.ComponentType<any>;
+  icon: ComponentType<LucideProps>;
   iconBg: string;
   iconColor: string;
   borderColor: string;
-  sub: (stats: AdminStats) => JSX.Element;
+  sub: (stats: AdminStats) => ReactNode;
 };
 
 const KPI_CARDS: KPICard[] = [

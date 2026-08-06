@@ -137,7 +137,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     });
 
-    Route::middleware('role:dept_head')->prefix('dept-head')->group(function () {
+    Route::middleware('role:dept_head,deputy')->prefix('dept-head')->group(function () {
         Route::get('/officers', [DepartmentHeadRecordController::class, 'officers']);
 
         Route::get('/letters', [DepartmentHeadRecordController::class, 'letters']);

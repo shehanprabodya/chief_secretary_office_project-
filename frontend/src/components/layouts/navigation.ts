@@ -90,6 +90,21 @@ export const navigation = {
       label: "Approvals",
       href: "/approvals",
     },
+    {
+      icon: Files,
+      label: "Meeting Letters",
+      href: "/dept-head/letters",
+    },
+    {
+      icon: Users,
+      label: "Attendance",
+      href: "/dept-head/attendance",
+    },
+    {
+      icon: FileText,
+      label: "Minutes",
+      href: "/dept-head/minutes",
+    },
   ],
 
   dept_head: [

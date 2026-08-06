@@ -72,7 +72,7 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
 
     try {
       if (editUser) {
-        const updatePayload = { ...form } as any;
+        const updatePayload: Partial<CreateUserPayload> = { ...form };
         delete updatePayload.password;
         await adminService.updateUser(editUser.user_id, updatePayload);
       } else {
