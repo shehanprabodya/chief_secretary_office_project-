@@ -36,7 +36,8 @@ class MinuteController extends Controller
      */
     public function getOrCreateForMeeting(Request $request, int $meetingId): JsonResponse
     {
-        $meeting = Meeting::with('attendees')->findOrFail($meetingId);
+        $meeting = Meeting::with('attendees', 'letters.recipients.user', 'letters.recipients.organization')
+            ->findOrFail($meetingId);
 
         $minute = MeetingMinute::firstOrCreate(
             ['meeting_id' => $meetingId],
@@ -45,7 +46,23 @@ class MinuteController extends Controller
 
         $minute->load('decisions', 'actionItems.responsibleOfficer');
 
-        return response()->json(['minute' => $minute, 'meeting' => $meeting]);
+        $latestLetter = $meeting->letters->sortByDesc('letter_id')->first();
+        $letterRecipients = $latestLetter
+            ? $latestLetter->recipients->map(fn ($recipient) => [
+                'letter_recipient_id' => $recipient->letter_recipient_id,
+                'user_id' => $recipient->user_id,
+                'organization_id' => $recipient->organization_id,
+                'recipient_label' => $recipient->recipient_label,
+                'full_name' => optional($recipient->user)->full_name,
+                'organization_name' => optional($recipient->organization)->organization_name,
+            ])->values()
+            : collect();
+
+        return response()->json([
+            'minute' => $minute,
+            'meeting' => $meeting,
+            'letter_recipients' => $letterRecipients,
+        ]);
     }
 
     public function store(Request $request, int $meetingId): JsonResponse

@@ -1,9 +1,9 @@
 import { api } from '../lib/axios';
-import type { MeetingMinute, MinuteDecision, ActionItem } from '../types/minute';
+import type { MeetingMinute, MinuteDecision, ActionItem, LetterRecipientOption } from '../types/minute';
 import type { Meeting } from '../types/meeting';
 
 export const minuteService = {
-  async getOrCreateForMeeting(meetingId: number): Promise<{ minute: MeetingMinute; meeting: Meeting }> {
+  async getOrCreateForMeeting(meetingId: number): Promise<{ minute: MeetingMinute; meeting: Meeting; letter_recipients: LetterRecipientOption[] }> {
     const { data } = await api.get(`/officer/meetings/${meetingId}/minutes`);
     return data;
   },

@@ -4,16 +4,8 @@ import { AlertCircle, Save, Send, Bold, Italic, List as ListIcon, Link as LinkIc
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { minuteService } from '../services/minuteService';
 import { meetingService } from '../services/meetingService';
-import type { MeetingMinute } from '../types/minute';
+import type { LetterRecipientOption, MeetingMinute } from '../types/minute';
 import type { Meeting } from '../types/meeting';
-
-// Hardcoded officer list for the "Responsible Officer" dropdown -
-// in production, fetch this from a /users?role=officer endpoint
-const OFFICERS = [
-  { user_id: 1, full_name: 'Dir. Engineering' },
-  { user_id: 2, full_name: 'Project Manager' },
-  { user_id: 3, full_name: 'Chief Secretary' },
-];
 
 export default function CreateMinutesPage() {
   const { meetingId } = useParams();
@@ -22,6 +14,7 @@ export default function CreateMinutesPage() {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [minute, setMinute] = useState<MeetingMinute | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [letterRecipients, setLetterRecipients] = useState<LetterRecipientOption[]>([]);
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(false);
   const [meetingsError, setMeetingsError] = useState('');
   const [discussionSummary, setDiscussionSummary] = useState('');
@@ -61,13 +54,15 @@ export default function CreateMinutesPage() {
       setMeetingLoadError('');
 
       try {
-        const { minute, meeting } = await minuteService.getOrCreateForMeeting(Number(meetingId));
+        const { minute, meeting, letter_recipients } = await minuteService.getOrCreateForMeeting(Number(meetingId));
         setMinute(minute);
         setMeeting(meeting);
+        setLetterRecipients(letter_recipients ?? []);
         setDiscussionSummary(minute.discussion_summary ?? '');
       } catch {
         setMinute(null);
         setMeeting(null);
+        setLetterRecipients([]);
         setMeetingLoadError('Unable to load minutes for this meeting.');
       } finally {
         setIsLoadingMinute(false);
@@ -121,7 +116,8 @@ export default function CreateMinutesPage() {
       deadline,
     });
 
-    const officerName = OFFICERS.find((o) => o.user_id === Number(responsibleOfficerId))?.full_name ?? '';
+    const selectedRecipient = letterRecipients.find((recipient) => recipient.user_id === Number(responsibleOfficerId));
+    const officerName = selectedRecipient?.full_name ?? selectedRecipient?.recipient_label ?? 'Responsible Officer';
     setMinute((prev) => prev ? {
       ...prev,
       action_items: [{ ...item, responsible_officer: { user_id: Number(responsibleOfficerId), full_name: officerName } }, ...prev.action_items],
@@ -268,7 +264,13 @@ export default function CreateMinutesPage() {
                   {meeting.attendees?.map((a) => (
                     <span key={a.user_id} className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-slate-700">{a.full_name}</span>
                   ))}
-                  <button className="rounded-full border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900">+ Add Attendee</button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/attendance?meeting_id=${meeting.meeting_id}`)}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                  >
+                    + Add Attendee
+                  </button>
                 </div>
               </div>
             </div>
@@ -355,10 +357,26 @@ export default function CreateMinutesPage() {
                     onChange={(e) => setResponsibleOfficerId(e.target.value)}
                     className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white focus:border-cyan-400 focus:outline-none"
                   >
-                    <option value="" className="text-slate-500">Select Officer...</option>
-                    {OFFICERS.map((o) => (
-                      <option key={o.user_id} value={o.user_id}>{o.full_name}</option>
-                    ))}
+                    <option value="" className="text-slate-500">Select recipient...</option>
+                    {letterRecipients.length > 0 ? (
+                      letterRecipients.map((recipient) => {
+                        const label = recipient.full_name ?? recipient.organization_name ?? recipient.recipient_label;
+                        const value = recipient.user_id ?? recipient.letter_recipient_id;
+                        return (
+                          <option
+                            key={recipient.letter_recipient_id}
+                            value={value}
+                            disabled={!recipient.user_id}
+                          >
+                            {label}{!recipient.user_id ? ' (organization)' : ''}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      meeting.attendees?.map((attendee) => (
+                        <option key={attendee.user_id} value={attendee.user_id}>{attendee.full_name}</option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div>

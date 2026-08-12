@@ -14,6 +14,15 @@ export interface ActionItem {
   created_at?: string;
 }
 
+export interface LetterRecipientOption {
+  letter_recipient_id: number;
+  user_id?: number;
+  organization_id?: number;
+  recipient_label: string;
+  full_name?: string;
+  organization_name?: string;
+}
+
 export interface MeetingMinute {
   minute_id: number;
   meeting_id: number;
