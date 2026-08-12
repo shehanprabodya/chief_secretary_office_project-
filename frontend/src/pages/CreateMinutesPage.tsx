@@ -342,11 +342,11 @@ export default function CreateMinutesPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Task Description</label>
-                  <input
-                    type="text"
+                  <textarea
                     value={taskDescription}
                     onChange={(e) => setTaskDescription(e.target.value)}
                     placeholder="What needs to be done?"
+                    rows={4}
                     className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none"
                   />
                 </div>
