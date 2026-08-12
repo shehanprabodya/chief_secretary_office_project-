@@ -29,10 +29,7 @@ export default function DashboardPage() {
 
           {/* Draft Cards */}
           <section>
-            <div
-              className="grid grid-cols-1 md:grid-cols-2"
-              style={{ columnGap: '2.5rem', rowGap: '2.5rem' }}
-            >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <DraftMinutesCard />
               <DraftLettersCard />
             </div>
