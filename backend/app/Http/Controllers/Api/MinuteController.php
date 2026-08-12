@@ -48,6 +48,28 @@ class MinuteController extends Controller
         return response()->json(['minute' => $minute, 'meeting' => $meeting]);
     }
 
+    public function store(Request $request, int $meetingId): JsonResponse
+    {
+        $meeting = Meeting::with('attendees')->findOrFail($meetingId);
+
+        $minute = MeetingMinute::firstOrCreate(
+            ['meeting_id' => $meetingId],
+            [
+                'discussion_summary' => $request->input('discussion_summary'),
+                'status' => 'draft',
+                'created_by' => $request->user()->user_id,
+            ]
+        );
+
+        if ($request->filled('discussion_summary') && !$minute->wasRecentlyCreated) {
+            $minute->update(['discussion_summary' => $request->input('discussion_summary')]);
+        }
+
+        $minute->load('decisions', 'actionItems.responsibleOfficer');
+
+        return response()->json(['minute' => $minute, 'meeting' => $meeting], $minute->wasRecentlyCreated ? 201 : 200);
+    }
+
     public function saveDraft(Request $request, int $id): JsonResponse
     {
         $minute = MeetingMinute::findOrFail($id);

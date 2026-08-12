@@ -33,6 +33,8 @@ export default function CreateMinutesPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingMinute, setIsLoadingMinute] = useState(false);
+  const [meetingLoadError, setMeetingLoadError] = useState('');
 
   useEffect(() => {
     if (!meetingId) {
@@ -55,6 +57,9 @@ export default function CreateMinutesPage() {
     }
 
     const loadMinute = async () => {
+      setIsLoadingMinute(true);
+      setMeetingLoadError('');
+
       try {
         const { minute, meeting } = await minuteService.getOrCreateForMeeting(Number(meetingId));
         setMinute(minute);
@@ -63,6 +68,9 @@ export default function CreateMinutesPage() {
       } catch {
         setMinute(null);
         setMeeting(null);
+        setMeetingLoadError('Unable to load minutes for this meeting.');
+      } finally {
+        setIsLoadingMinute(false);
       }
     };
 
@@ -162,11 +170,29 @@ export default function CreateMinutesPage() {
     );
   }
 
-  if (!meeting || !minute) {
+  if (isLoadingMinute) {
     return (
       <DashboardLayout pageTitle="Create Meeting Minutes">
         <div className="flex h-72 items-center justify-center rounded-3xl border border-slate-200 bg-white text-slate-600 shadow-sm">
           Loading meeting details...
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (meetingLoadError || !meeting || !minute) {
+    return (
+      <DashboardLayout pageTitle="Create Meeting Minutes">
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <p className="text-lg font-semibold text-slate-900">Unable to load meeting minutes</p>
+          <p className="mt-2 text-sm text-slate-500">{meetingLoadError || 'The requested meeting could not be loaded.'}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/minutes')}
+            className="mt-6 inline-flex items-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            Back to meeting selection
+          </button>
         </div>
       </DashboardLayout>
     );
