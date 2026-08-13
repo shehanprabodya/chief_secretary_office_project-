@@ -126,6 +126,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/minutes', [MinuteController::class, 'index']);
         Route::get('/minutes/{id}', [MinuteController::class, 'show']);
         Route::get('/meetings/{meetingId}/minutes', [MinuteController::class, 'getOrCreateForMeeting']);
+        Route::post('/meetings/{meetingId}/minutes', [MinuteController::class, 'store']);
         Route::put('/minutes/{id}', [MinuteController::class, 'saveDraft']);
         Route::post('/minutes/{id}/submit', [MinuteController::class, 'submitForApproval']);
 

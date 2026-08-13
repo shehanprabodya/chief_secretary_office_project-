@@ -73,6 +73,7 @@ export default function App() {
             <Route path="/letters/new" element={<GenerateLetterPage />} />
             <Route path="/letters/:id" element={<GenerateLetterPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/meetings/:meetingId/minutes" element={<CreateMinutesPage />} />
             <Route path="/minutes" element={<CreateMinutesPage />} />
             
           
