@@ -19,6 +19,7 @@ export interface LetterRecipientOption {
   user_id?: number;
   organization_id?: number;
   recipient_label: string;
+  designation?: string | null;
   full_name?: string;
   organization_name?: string;
 }

@@ -4,6 +4,11 @@ export type LocationType = 'physical' | 'virtual' | 'not_assigned';
 export interface MeetingAttendee {
   user_id: number;
   full_name: string;
+  designation?: string | null;
+  organization?: {
+    organization_id: number;
+    organization_name: string;
+  } | null;
   pivot: { attendance_role: 'assigned' | 'observer' };
 }
 
