@@ -83,4 +83,9 @@ export const letterService = {
     const { data } = await api.get<{ subjects: Subject[] }>('/officer/subjects');
     return data.subjects;
   },
+
+  async send(id: number): Promise<any> {
+    const { data } = await api.post(`/officer/letters/${id}/send`);
+    return data;
+  },
 };

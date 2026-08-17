@@ -136,6 +136,7 @@ export default function GenerateLetterPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingApproval, setIsSendingApproval] = useState(false);
+  const [isSendingMail, setIsSendingMail] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [letterStatus, setLetterStatus] = useState<LetterStatus>('draft');
@@ -446,6 +447,27 @@ export default function GenerateLetterPage() {
     } catch (err: unknown) {
       console.error(err);
       setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to download DOCX') });
+    }
+  };
+
+  const handleSendMail = async () => {
+    if (!canEditLetter) return;
+    if (!letterId) { setActionMessage({ type: 'info', text: 'Please save the draft before sending the letter.' }); return; }
+    setIsSendingMail(true);
+    setActionMessage({ type: 'info', text: 'Sending the meeting letter to recipients. Please wait…' });
+    try {
+      const saved = await letterService.saveDraft(buildPayload());
+      setLetterId(saved.letter_id);
+      setLetterStatus(saved.status);
+
+      const res = await letterService.send(saved.letter_id);
+      setActionMessage({ type: 'success', text: String(res.message ?? 'Letter sent to recipients.') });
+      setLetterStatus('dispatched');
+    } catch (err: unknown) {
+      console.error(err);
+      setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to send letter') });
+    } finally {
+      setIsSendingMail(false);
     }
   };
 
@@ -783,11 +805,23 @@ export default function GenerateLetterPage() {
                     >
                       <FileText className="h-4 w-4" /> Download DOCX
                     </button>
-                    <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate- hover:opacity-90 disabled:opacity-50"
-                      title="Revision history - coming soon"
-                    >
-                      <History className="h-4 w-4" /> Revision History
-                    </button>
+                    {letterStatus === 'approved' && isApprovedWithoutChanges ? (
+                      <button
+                        onClick={handleSendMail}
+                        disabled={isSendingMail}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <Send className="h-4 w-4" /> {isSendingMail ? 'Sending...' : 'Send Mail'}
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        title={letterStatus === 'approved' ? 'Make no edits to match the approved revision before sending.' : 'Letter must be approved before sending.'}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 text-sm font-medium text-slate-400 cursor-not-allowed"
+                      >
+                        <Send className="h-4 w-4" /> Send Mail
+                      </button>
+                    )}
                     <button
                       onClick={() => setShowDiscardConfirmation(true)}
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400 bg-red-50 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100"

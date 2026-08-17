@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Validator;
 use Symfony\Component\Process\Process;
 use Throwable;
 use ZipArchive;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\MeetingLetterMail;
 
 class LetterController extends Controller
 {
@@ -414,6 +416,77 @@ class LetterController extends Controller
         return response()->download($path, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Send the meeting letter PDF to recipients via email and mark dispatched.
+     */
+    public function send(Request $request, int $id): JsonResponse
+    {
+        $letter = Letter::with('recipients.user', 'recipients.organization', 'subject', 'creator')
+            ->findOrFail($id);
+
+        if (!$this->canExportLetter($request, $letter)) {
+            return response()->json(['message' => 'You do not have permission to send this letter.'], 403);
+        }
+
+        if (empty($letter->content)) {
+            return response()->json(['message' => 'Letter content is empty. Please write the letter body first.'], 422);
+        }
+
+        $html = $this->buildLetterHtml($letter, true);
+        $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
+
+        try {
+            $pdfPath = $this->convertHtmlWithLibreOffice($html, 'pdf');
+        } catch (Throwable) {
+            $options = new \Dompdf\Options();
+            $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $options->set('defaultFont', 'Iskoola Pota');
+
+            $dompdf = new \Dompdf\Dompdf($options);
+            if (is_file($fontPath)) {
+                $dompdf->getFontMetrics()->registerFont([
+                    'family' => 'Iskoola Pota',
+                    'weight' => 'normal',
+                    'style' => 'normal',
+                ], 'file://' . $fontPath);
+            }
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper([0, 0, 576, 841.89], 'portrait');
+            $dompdf->render();
+
+            $pdfPath = tempnam(sys_get_temp_dir(), 'letter-') . '.pdf';
+            file_put_contents($pdfPath, $dompdf->output());
+        }
+
+        $emails = $letter->recipients->map(fn($r) => $r->user?->email)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($emails)) {
+            return response()->json(['message' => 'No recipient email addresses found.'], 422);
+        }
+
+        try {
+            Mail::to($emails)->send(new MeetingLetterMail($letter, $pdfPath, $filename));
+        } catch (Throwable $e) {
+            return response()->json(['message' => 'Failed to send email: ' . $e->getMessage()], 500);
+        }
+
+        // Mark as dispatched
+        $letter->update(['status' => 'dispatched']);
+
+        // Cleanup temporary file if created
+        if (isset($pdfPath) && is_file($pdfPath)) {
+            @unlink($pdfPath);
+        }
+
+        return response()->json(['message' => 'Letter sent to recipients', 'emails' => $emails]);
     }
 
     private function convertHtmlWithLibreOffice(string $html, string $format): string
