@@ -3,8 +3,7 @@ import WelcomeSection from '../components/Dashboard/WelcomeSection';
 import AssignedMeetingsCard from '../components/Dashboard/AssignedMeetingsCard';
 import CalendarWidget from '../components/Dashboard/CalendarWidget';
 import TimelineWidget from '../components/Dashboard/TimelineWidget';
-import DraftMinutesCard from '../components/Dashboard/DraftMinutesCard';
-import DraftLettersCard from '../components/Dashboard/DraftLettersCard';
+
 
 export default function DashboardPage() {
   return (
@@ -27,8 +26,7 @@ export default function DashboardPage() {
           {/* Draft Cards */}
           <section>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <DraftMinutesCard />
-              <DraftLettersCard />
+            
             </div>
           </section>
 
