@@ -36,7 +36,11 @@ class MinuteController extends Controller
      */
     public function getOrCreateForMeeting(Request $request, int $meetingId): JsonResponse
     {
-        $meeting = Meeting::with('attendees', 'letters.recipients.user', 'letters.recipients.organization')
+        $meeting = Meeting::with(
+                'attendees.organization',
+                'letters.recipients.user',
+                'letters.recipients.organization',
+            )
             ->findOrFail($meetingId);
 
         $minute = MeetingMinute::firstOrCreate(
@@ -53,6 +57,7 @@ class MinuteController extends Controller
                 'user_id' => $recipient->user_id,
                 'organization_id' => $recipient->organization_id,
                 'recipient_label' => $recipient->recipient_label,
+                'designation' => optional($recipient->user)->designation,
                 'full_name' => optional($recipient->user)->full_name,
                 'organization_name' => optional($recipient->organization)->organization_name,
             ])->values()

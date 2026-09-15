@@ -3,19 +3,15 @@ import WelcomeSection from '../components/Dashboard/WelcomeSection';
 import AssignedMeetingsCard from '../components/Dashboard/AssignedMeetingsCard';
 import CalendarWidget from '../components/Dashboard/CalendarWidget';
 import TimelineWidget from '../components/Dashboard/TimelineWidget';
-import DraftMinutesCard from '../components/Dashboard/DraftMinutesCard';
-import DraftLettersCard from '../components/Dashboard/DraftLettersCard';
+
 
 export default function DashboardPage() {
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
         {/* Main Content - Left Side */}
-        <div
-          className="flex flex-col lg:col-span-2"
-          style={{ gap: '2.5rem' }}
-        >
+        <div className="flex flex-col gap-10 lg:col-span-2">
           
           {/* Welcome Section */}
           <section>
@@ -30,24 +26,20 @@ export default function DashboardPage() {
           {/* Draft Cards */}
           <section>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <DraftMinutesCard />
-              <DraftLettersCard />
+            
             </div>
           </section>
 
         </div>
 
         {/* Sidebar - Right Side */}
-        <div
-          className="flex flex-col"
-          style={{ gap: '2.5rem' }}
-        >
+        <div className="flex flex-col gap-10">
           
-          <section>
+          <section className="space-y-10">
             <CalendarWidget />
           </section>
 
-          <section>
+          <section className="space-y-10">
             <TimelineWidget />
           </section>
 

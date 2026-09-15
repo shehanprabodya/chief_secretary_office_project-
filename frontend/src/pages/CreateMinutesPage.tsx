@@ -262,7 +262,12 @@ export default function CreateMinutesPage() {
                 <label className="mb-2 block text-sm font-semibold text-slate-700">Attendees List</label>
                 <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-slate-200 bg-slate-50 p-3">
                   {meeting.attendees?.map((a) => (
-                    <span key={a.user_id} className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-slate-700">{a.full_name}</span>
+                    <div key={a.user_id} className="rounded-3xl border border-slate-200 bg-blue-50 px-3 py-2 text-sm text-slate-700">
+                      <p className="font-medium">{a.full_name}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {a.designation ?? 'No designation'}{a.organization ? ` · ${a.organization.organization_name}` : ''}
+                      </p>
+                    </div>
                   ))}
                   <button
                     type="button"
@@ -295,17 +300,26 @@ export default function CreateMinutesPage() {
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between rounded-t-3xl border-b border-slate-200 bg-slate-50 px-6 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Formal Decisions</p>
-                <button
-                  onClick={() => {
-                    const text = prompt('Enter decision text:');
-                    if (text) { setNewDecisionText(text); handleAddDecision(); }
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <Plus className="h-4 w-4" /> Add Decision
-                </button>
+              <div className="space-y-4 rounded-t-3xl border-b border-slate-200 bg-slate-50 px-6 py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Formal Decisions</p>
+                  <button
+                    onClick={handleAddDecision}
+                    disabled={!newDecisionText.trim()}
+                    className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" /> Add Decision
+                  </button>
+                </div>
+                <div>
+                  <textarea
+                    value={newDecisionText}
+                    onChange={(e) => setNewDecisionText(e.target.value)}
+                    rows={3}
+                    placeholder="Enter a decision to add to the minutes"
+                    className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  />
+                </div>
               </div>
               <div className="space-y-3 px-6 py-5">
                 {minute.decisions.length === 0 ? (
@@ -360,7 +374,7 @@ export default function CreateMinutesPage() {
                     <option value="" className="text-slate-500">Select recipient...</option>
                     {letterRecipients.length > 0 ? (
                       letterRecipients.map((recipient) => {
-                        const label = recipient.full_name ?? recipient.organization_name ?? recipient.recipient_label;
+                        const label = recipient.designation ?? recipient.organization_name ?? recipient.recipient_label ?? recipient.full_name;
                         const value = recipient.user_id ?? recipient.letter_recipient_id;
                         return (
                           <option
@@ -401,21 +415,27 @@ export default function CreateMinutesPage() {
               <div className="rounded-3xl border border-slate-200 bg-slate-950 p-5 shadow-sm text-white">
                 <p className="mb-4 text-xs uppercase tracking-[0.2em] text-slate-500">Added This Session</p>
                 <div className="space-y-3">
-                  {minute.action_items.map((item) => (
-                    <div key={item.action_item_id} className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-white">{item.task_description}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {item.responsible_officer?.full_name} · {item.deadline ? new Date(item.deadline).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'No deadline'}
-                          </p>
+                  {minute.action_items.map((item) => {
+                    // responsible_officer has user_id and full_name only
+                    const officerLabel = item.responsible_officer?.full_name ?? 'Responsible Officer';
+                    const deadlineLabel = item.deadline
+                      ? new Date(item.deadline).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+                      : 'No deadline';
+
+                    return (
+                      <div key={item.action_item_id} className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-semibold text-white">{item.task_description}</p>
+                            <p className="mt-1 text-xs text-slate-500">{officerLabel} · {deadlineLabel}</p>
+                          </div>
+                          <button onClick={() => handleRemoveActionItem(item.action_item_id)} className="text-slate-400 transition hover:text-white">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
-                        <button onClick={() => handleRemoveActionItem(item.action_item_id)} className="text-slate-400 transition hover:text-white">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

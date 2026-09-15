@@ -30,7 +30,7 @@ export default function DraftLettersCard() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {draftLetters.map((letter) => (
           <div
             key={letter.id}

@@ -104,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/letters/{id}/preview',      [LetterController::class, 'preview']);
         Route::get('/letters/{id}/download/pdf', [LetterController::class, 'downloadPdf']);
         Route::get('/letters/{id}/download/docx', [LetterController::class, 'downloadDocx']);
+        Route::post('/letters/{id}/send', [LetterController::class, 'send']);
         Route::get('/letter-recipients/orgs',    [LetterController::class, 'getOrganizations']);
         Route::get('/subjects',                  [LetterController::class, 'getSubjects']);
         

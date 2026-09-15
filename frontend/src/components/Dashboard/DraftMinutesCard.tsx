@@ -30,7 +30,7 @@ export default function DraftMinutesCard() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {draftMinutes.map((minute) => (
           <div
             key={minute.id}
