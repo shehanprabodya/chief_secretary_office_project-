@@ -5,7 +5,6 @@ import {
   FileText,
   Users,
   Files,
-  BarChart3,
   BookOpen,
 } from "lucide-react";
 
@@ -54,16 +53,7 @@ export const navigation = {
       label: "Attendance",
       href: "/attendance",
     },
-    {
-      icon: Files,
-      label: "Documents",
-      href: "/documents",
-    },
-    {
-      icon: BarChart3,
-      label: "Reports",
-      href: "/reports",
-    },
+    
   ],
 
   chief_secretary: [

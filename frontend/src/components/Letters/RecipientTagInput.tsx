@@ -124,7 +124,7 @@ export default function RecipientTagInput({ organizations, recipients, onChange,
             onClick={() => setOpen(true)}
             className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600"
           >
-            Add department...
+            Add recipient...
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
         )}
