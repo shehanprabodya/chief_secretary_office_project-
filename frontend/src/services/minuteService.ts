@@ -35,5 +35,11 @@ export const minuteService = {
   async deleteActionItem(itemId: number): Promise<void> {
     await api.delete(`/officer/action-items/${itemId}`);
   },
+
+  async downloadPdf(minuteId: number): Promise<Blob> {
+  const response = await api.get(`/officer/minutes/${minuteId}/download/pdf`,{ responseType: 'blob',});
+  return response.data;
+  },
+  
 };
 

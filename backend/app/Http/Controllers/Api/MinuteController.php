@@ -177,4 +177,78 @@ class MinuteController extends Controller
         ActionItem::findOrFail($itemId)->delete();
         return response()->json(['message' => 'Action item removed']);
     }
+
+    public function downloadPdf(Request $request, int $id)
+    {
+        $minute = MeetingMinute::with([
+            'meeting.attendees.organization',
+            'decisions',
+            'actionItems.responsibleOfficer',
+        ])->findOrFail($id);
+
+        // Basic authorization
+        if (
+            (int) $minute->created_by !== (int) $request->user()->user_id
+            && !$request->user()->hasRole('dept_head')
+            && !$request->user()->hasRole('deputy')
+            && !$request->user()->hasRole('chief_secretary')
+        ) {
+            return response()->json([
+                'message' => 'You do not have permission to export these minutes.'
+            ], 403);
+        }
+
+        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
+
+        $options = new \Dompdf\Options();
+
+        $options->set([
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+            'defaultFont' => 'Iskoola Pota',
+        ]);
+        $options->setChroot([base_path(), dirname($fontPath)]);
+
+        $dompdfFontDir = storage_path('app/dompdf-fonts');
+        if (!is_dir($dompdfFontDir)) {
+            mkdir($dompdfFontDir, 0775, true);
+        }
+        $options->set('fontDir', $dompdfFontDir);
+        $options->set('fontCache', $dompdfFontDir);
+
+        $dompdf = new \Dompdf\Dompdf($options);
+        if (is_file($fontPath)) {
+            $dompdf->getFontMetrics()->registerFont([
+                'family' => 'Iskoola Pota',
+                'weight' => 'normal',
+                'style' => 'normal',
+            ], 'file://' . $fontPath);
+        }
+
+        $fontUrl = is_file($fontPath) ? 'file://' . $fontPath : null;
+
+        $html = view('minutes.pdf', [
+            'minute' => $minute,
+            'meeting' => $minute->meeting,
+            'fontUrl' => $fontUrl,
+        ])->render();
+
+        $dompdf->loadHtml($html);
+
+        // A4 Landscape
+        $dompdf->setPaper('A4', 'landscape');
+
+        $dompdf->render();
+
+        $filename = 'minutes-' .
+            ($minute->meeting->meeting_code ?? $minute->minute_id) .
+            '-' .
+            now()->format('Ymd') .
+            '.pdf';
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
 }

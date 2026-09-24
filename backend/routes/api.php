@@ -136,6 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::post('/minutes/{minuteId}/action-items', [MinuteController::class, 'addActionItem']);
         Route::delete('/action-items/{itemId}', [MinuteController::class, 'deleteActionItem']);
+        Route::get('/minutes/{id}/download/pdf',[MinuteController::class, 'downloadPdf']);
 
     });
 

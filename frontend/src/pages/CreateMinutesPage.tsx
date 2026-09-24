@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertCircle, Save, Send, Bold, Italic, List as ListIcon, Link as LinkIcon, Plus, Trash2 } from 'lucide-react';
+import { AlertCircle, Save, Send, Bold, Italic, List as ListIcon, Link as LinkIcon, Plus, Trash2, FileDown, Eye, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { minuteService } from '../services/minuteService';
 import { meetingService } from '../services/meetingService';
@@ -28,6 +28,8 @@ export default function CreateMinutesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingMinute, setIsLoadingMinute] = useState(false);
   const [meetingLoadError, setMeetingLoadError] = useState('');
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (!meetingId) {
@@ -133,6 +135,55 @@ export default function CreateMinutesPage() {
     setMinute((prev) => prev ? { ...prev, action_items: prev.action_items.filter((a) => a.action_item_id !== itemId) } : prev);
   };
 
+  const handlePreviewPdf = async () => {
+    if (!minute?.minute_id) return;
+
+    try {
+      const blob = await minuteService.downloadPdf(minute.minute_id);
+      const url = window.URL.createObjectURL(blob);
+
+      if (pdfPreviewUrl) {
+        window.URL.revokeObjectURL(pdfPreviewUrl);
+      }
+
+      setPdfPreviewUrl(url);
+      setIsPdfPreviewOpen(true);
+    } catch (error) {
+      console.error('Failed to preview minutes PDF:', error);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!minute?.minute_id) {
+      return;
+    }
+
+    try {
+      const blob = await minuteService.downloadPdf(minute.minute_id);
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `minutes-${minute.minute_id}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download minutes PDF:', error);
+    }
+  };
+
+  const closePdfPreview = () => {
+    setIsPdfPreviewOpen(false);
+    if (pdfPreviewUrl) {
+      window.URL.revokeObjectURL(pdfPreviewUrl);
+      setPdfPreviewUrl(null);
+    }
+  };
+
   // If no meetingId provided, show meeting picker
   if (!meetingId) {
     return (
@@ -196,6 +247,35 @@ export default function CreateMinutesPage() {
 
   return (
     <DashboardLayout pageTitle="Create Meeting Minutes">
+      {isPdfPreviewOpen && pdfPreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Meeting Minutes PDF Preview</h2>
+                <p className="text-sm text-slate-500">{meeting.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closePdfPreview}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <X className="h-4 w-4" />
+                Close
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-hidden bg-slate-100 p-2">
+              <iframe
+                src={pdfPreviewUrl}
+                title="Meeting Minutes PDF Preview"
+                className="h-full w-full rounded-xl border-0 bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -206,6 +286,22 @@ export default function CreateMinutesPage() {
             <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
               <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Draft Mode
             </span>
+            <button
+              type="button"
+              onClick={handlePreviewPdf}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:bg-slate-50"
+            >
+              <Eye size={18} />
+              Preview PDF
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
+            >
+              <FileDown size={18} />
+              Download PDF
+            </button>
             <button
               onClick={handleSaveDraft}
               disabled={isSaving}
