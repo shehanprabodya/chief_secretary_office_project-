@@ -28,7 +28,7 @@ export interface MeetingMinute {
   minute_id: number;
   meeting_id: number;
   discussion_summary: string | null;
-  status: 'draft' | 'pending_approval' | 'approved';
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   decisions: MinuteDecision[];
   action_items: ActionItem[];
 }

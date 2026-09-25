@@ -52,6 +52,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/approvals/{id}/reject', [ApprovalController::class, 'reject']);
     Route::post('/approvals/{id}/comments', [ApprovalController::class, 'addComment']);
 
+    Route::middleware('role:officer,dept_head,deputy,chief_secretary')->group(function () {
+        Route::get('/minutes/{id}/download/pdf', [MinuteController::class, 'downloadPdf']);
+    });
+
     Route::middleware(['role:admin'])->prefix('admin')->group(function () {
         // Dashboard
         Route::get('/stats', [AdminDashboardController::class, 'stats']);

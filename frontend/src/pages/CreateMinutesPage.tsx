@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AlertCircle, Save, Send, Bold, Italic, List as ListIcon, Link as LinkIcon, Plus, Trash2, FileDown, Eye, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { minuteService } from '../services/minuteService';
+import { approvalService } from '../services/approvalService';
 import { meetingService } from '../services/meetingService';
 import type { LetterRecipientOption, MeetingMinute } from '../types/minute';
 import type { Meeting } from '../types/meeting';
@@ -74,24 +75,40 @@ export default function CreateMinutesPage() {
     void loadMinute();
   }, [meetingId]);
 
-  const handleSaveDraft = async () => {
-    if (!minute) return;
+  const handleSaveDraft = async (): Promise<MeetingMinute> => {
+    if (!minute) {
+      throw new Error('No minute is available to save.');
+    }
+
     setIsSaving(true);
     try {
       const updated = await minuteService.saveDraft(minute.minute_id, discussionSummary);
       setMinute((prev) => (prev ? { ...prev, ...updated } : updated));
+      return updated;
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSubmitForApproval = async () => {
-    if (!minute) return;
+    if (!minute || !meeting) return;
     setIsSubmitting(true);
     try {
-      await handleSaveDraft();
-      await minuteService.submitForApproval(minute.minute_id);
-      navigate('/minutes');
+      const savedMinute = await handleSaveDraft();
+      const finalSummary = savedMinute?.discussion_summary ?? discussionSummary;
+      const approvalDoc = await approvalService.submit({
+        document_type: 'minute',
+        source_id: savedMinute.minute_id,
+        subject: meeting.title || 'Meeting Minutes',
+        description: finalSummary?.slice(0, 255) || 'Meeting minutes submitted for approval',
+        full_content: finalSummary || discussionSummary,
+      });
+
+      await minuteService.submitForApproval(savedMinute.minute_id);
+      setMinute((prev) => prev ? { ...prev, status: 'pending_approval' } : prev);
+      navigate('/approvals', { state: { selectedDocumentId: approvalDoc.document_id } });
+    } catch (error) {
+      console.error('Failed to submit minutes for approval:', error);
     } finally {
       setIsSubmitting(false);
     }

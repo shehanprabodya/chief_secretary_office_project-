@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActionItem;
+use App\Models\ApprovableDocument;
 use App\Models\Meeting;
 use App\Models\MeetingMinute;
 use App\Models\MinuteDecision;
@@ -109,12 +110,40 @@ class MinuteController extends Controller
         return response()->json(['message' => 'Saved as draft', 'minute' => $minute]);
     }
 
-    public function submitForApproval(int $id): JsonResponse
+    public function submitForApproval(Request $request, int $id): JsonResponse
     {
-        $minute = MeetingMinute::findOrFail($id);
+        $minute = MeetingMinute::with('meeting')->findOrFail($id);
+
         $minute->update(['status' => 'pending_approval']);
 
-        return response()->json(['message' => 'Minutes submitted for approval', 'minute' => $minute]);
+        $approvalDocument = ApprovableDocument::firstOrCreate(
+            [
+                'document_type' => 'minute',
+                'source_id' => $minute->minute_id,
+            ],
+            [
+                'reference_id' => ApprovableDocument::generateReferenceId('minute'),
+                'subject' => $minute->meeting?->title ?? 'Meeting Minutes',
+                'description' => (string) str($minute->discussion_summary ?? '')->limit(255),
+                'full_content' => $minute->discussion_summary,
+                'status' => 'pending',
+                'submitted_by' => $request->user()->user_id,
+                'current_step_order' => 2,
+            ]
+        );
+
+        if ($approvalDocument->wasRecentlyCreated) {
+            $approvalDocument->initializeWorkflow();
+            $approvalDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceMinute.meeting');
+        }
+
+        $approvalDocument->refresh();
+
+        return response()->json([
+            'message' => 'Minutes submitted for approval',
+            'minute' => $minute,
+            'approval_document' => $approvalDocument,
+        ]);
     }
 
     /**

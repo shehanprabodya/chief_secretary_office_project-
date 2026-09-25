@@ -37,9 +37,13 @@ export const minuteService = {
   },
 
   async downloadPdf(minuteId: number): Promise<Blob> {
-  const response = await api.get(`/officer/minutes/${minuteId}/download/pdf`,{ responseType: 'blob',});
-  return response.data;
+    try {
+      const response = await api.get(`/minutes/${minuteId}/download/pdf`, { responseType: 'blob' });
+      return response.data;
+    } catch {
+      const response = await api.get(`/officer/minutes/${minuteId}/download/pdf`, { responseType: 'blob' });
+      return response.data;
+    }
   },
-  
 };
 
