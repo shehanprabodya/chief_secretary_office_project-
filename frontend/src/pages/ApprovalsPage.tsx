@@ -115,7 +115,8 @@ export default function ApprovalsPage() {
   };
 
   useEffect(() => {
-    if (!selectedDoc || selectedDoc.document_type !== 'minute' || !selectedDoc.source_id) {
+    const sourceId = selectedDoc?.source_id;
+    if (!selectedDoc || selectedDoc.document_type !== 'minute' || sourceId == null) {
       if (minutePdfUrl) {
         URL.revokeObjectURL(minutePdfUrl);
       }
@@ -128,7 +129,7 @@ export default function ApprovalsPage() {
     const loadMinutePdf = async () => {
       setIsMinutePdfLoading(true);
       try {
-        const blob = await minuteService.downloadPdf(selectedDoc.source_id);
+        const blob = await minuteService.downloadPdf(sourceId);
         const url = URL.createObjectURL(blob);
         if (isMounted) {
           setMinutePdfUrl((current) => {

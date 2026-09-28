@@ -136,6 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/minutes/{id}/submit', [MinuteController::class, 'submitForApproval']);
 
         Route::post('/minutes/{minuteId}/decisions', [MinuteController::class, 'addDecision']);
+        Route::put('/decisions/{decisionId}', [MinuteController::class, 'updateDecision']);
         Route::delete('/decisions/{decisionId}', [MinuteController::class, 'deleteDecision']);
 
         Route::post('/minutes/{minuteId}/action-items', [MinuteController::class, 'addActionItem']);

@@ -10,5 +10,5 @@ class MinuteDecision extends Model
     protected $primaryKey = 'decision_id';
     public $timestamps = false;
 
-    protected $fillable = ['minute_id', 'decision_order', 'decision_text'];
+    protected $fillable = ['minute_id', 'decision_order', 'topic', 'decision_text', 'responsibility'];
 }

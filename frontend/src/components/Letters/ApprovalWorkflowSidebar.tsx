@@ -1,8 +1,12 @@
 import { Check, Pencil } from 'lucide-react';
-import type { ApprovalStep } from '../../types/letter';
+type LetterApprovalStep = {
+  step_id: number | string;
+  step_name: string;
+  status: 'completed' | 'current' | 'pending';
+};
 
 interface ApprovalWorkflowSidebarProps {
-  steps: ApprovalStep[];
+  steps: LetterApprovalStep[];
 }
 
 const STEP_DESCRIPTIONS: Record<string, string> = {
