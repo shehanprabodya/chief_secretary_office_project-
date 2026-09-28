@@ -85,13 +85,35 @@
         <colgroup><col width="6%"><col width="24%"><col width="46%"><col width="24%"></colgroup>
         <thead><tr><th class="item-no">අනු අංකය</th><th class="item-topic">කාරණය</th><th class="item-detail">තීරණය</th><th class="item-owner">වගකීම</th></tr></thead>
         <tbody>
-        @php($hasItems = $minute->decisions->isNotEmpty() || $minute->actionItems->isNotEmpty())
+        @php
+            $hasItems = $minute->decisions->isNotEmpty() || $minute->actionItems->isNotEmpty();
+        @endphp
         @foreach($minute->decisions as $index => $decision)
             <tr>
                 <td class="item-no">{{ sprintf('%02d', $index + 1) }}</td>
                 <td>{{ $decision->topic ?: '—' }}</td>
                 <td>{!! nl2br(e($decision->decision_text)) !!}</td>
-                <td>{{ $decision->responsibility ?: '—' }}</td>
+                <td>
+                    @php
+                        $responsibilityIds = json_decode((string) ($decision->responsibility ?? ''), true);
+                        if (!is_array($responsibilityIds)) {
+                            $legacyAttendee = collect($meeting->attendees ?? [])->first(function ($attendee) use ($decision) {
+                                $name = trim(($attendee->full_name ?? '') . ($attendee->designation ? ' — ' . $attendee->designation : ''));
+                                $labelParts = array_filter([$name, $attendee->organization?->organization_name, $attendee->organization?->address]);
+                                return implode(', ', $labelParts) === $decision->responsibility;
+                            });
+                            $responsibilityIds = $legacyAttendee ? [$legacyAttendee->user_id] : [];
+                        }
+                        $responsibleAttendees = collect($meeting->attendees ?? [])->filter(
+                            fn ($attendee) => in_array((int) $attendee->user_id, array_map('intval', $responsibilityIds), true)
+                        );
+                    @endphp
+                    @forelse($responsibleAttendees as $attendee)
+                        {{ collect([$attendee->designation, $attendee->organization?->address])->filter()->implode(', ') }}@if(!$loop->last)<br>@endif
+                    @empty
+                        —
+                    @endforelse
+                </td>
             </tr>
         @endforeach
         @foreach($minute->actionItems as $index => $item)

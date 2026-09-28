@@ -18,6 +18,32 @@ const statusStyle: Record<DepartmentHeadMinute['status'], string> = {
 };
 type MinuteDetail = MeetingMinute & { meeting: Meeting };
 
+const attendeeLabel = (attendee: NonNullable<Meeting['attendees']>[number]) => [
+  `${attendee.full_name}${attendee.designation ? ` — ${attendee.designation}` : ''}`,
+  attendee.organization?.organization_name,
+  attendee.organization?.address,
+].filter(Boolean).join(', ');
+
+const responsibilityDetails = (responsibility: string | null, attendees: NonNullable<Meeting['attendees']> = []) => {
+  if (!responsibility) return '';
+  let selectedIds: number[] = [];
+  try {
+    const parsed: unknown = JSON.parse(responsibility);
+    if (Array.isArray(parsed)) selectedIds = parsed.map(Number).filter((id) => Number.isInteger(id));
+  } catch {
+    // Older rows store a full attendee label instead of selected attendee IDs.
+  }
+  if (!selectedIds.length) {
+    const legacyAttendee = attendees.find((attendee) => attendeeLabel(attendee) === responsibility);
+    if (legacyAttendee) selectedIds = [legacyAttendee.user_id];
+  }
+  return attendees
+    .filter((attendee) => selectedIds.includes(attendee.user_id))
+    .map((attendee) => [attendee.designation, attendee.organization?.address].filter(Boolean).join(', '))
+    .filter(Boolean)
+    .join('; ');
+};
+
 export default function DeptHeadMinutesPage() {
   const [minutes, setMinutes] = useState<DepartmentHeadMinute[]>([]);
   const [officers, setOfficers] = useState<DepartmentOfficer[]>([]);
@@ -103,7 +129,7 @@ export default function DeptHeadMinutesPage() {
         <div className="grid gap-3 sm:grid-cols-3">{[{ icon: CalendarDays, label: 'Meeting date', value: new Date(detail.meeting.meeting_date).toLocaleDateString() }, { icon: ClipboardList, label: 'Decisions', value: detail.decisions.length }, { icon: CheckCircle2, label: 'Action items', value: detail.action_items.length }].map((item) => <div key={item.label} className="flex items-center gap-3 rounded-lg border bg-slate-50 p-4"><item.icon className="h-5 w-5 text-blue-700" /><div><p className="text-xs uppercase text-slate-400">{item.label}</p><p className="font-semibold text-slate-800">{item.value}</p></div></div>)}</div>
         <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Attendees</h3><div className="mt-3 overflow-hidden rounded-lg border"><table className="min-w-full divide-y text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">No.</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Designation and organization</th></tr></thead><tbody className="divide-y">{detail.meeting.attendees?.length ? detail.meeting.attendees.map((attendee, index) => <tr key={attendee.user_id}><td className="px-4 py-3 text-slate-500">{String(index + 1).padStart(2, '0')}</td><td className="px-4 py-3 font-medium text-slate-700">{attendee.full_name}</td><td className="px-4 py-3 text-slate-600">{attendee.designation || '—'}{attendee.organization ? `, ${attendee.organization.organization_name}` : ''}</td></tr>) : <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">No attendees recorded.</td></tr>}</tbody></table></div></section>
         <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Welcome and purpose</h3><p className="mt-3 whitespace-pre-line rounded-lg border bg-slate-50 p-4 text-sm leading-7 text-slate-700">{detail.discussion_summary || 'No opening summary provided.'}</p></section>
-        <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Discussion points and decisions</h3><div className="mt-3 overflow-hidden rounded-lg border"><table className="min-w-full divide-y text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-3">No.</th><th className="px-3 py-3">Topic</th><th className="px-3 py-3">Discussion and decision</th><th className="px-3 py-3">Responsibility</th></tr></thead><tbody className="divide-y">{detail.decisions.map((decision) => <tr key={`decision-${decision.decision_id}`}><td className="px-3 py-3 text-slate-500">{String(decision.decision_order).padStart(2, '0')}</td><td className="px-3 py-3 text-slate-700">{decision.topic || '—'}</td><td className="px-3 py-3 whitespace-pre-line text-slate-700">{decision.decision_text}</td><td className="px-3 py-3 text-slate-600">{decision.responsibility || '—'}</td></tr>)}{detail.action_items.map((item, index) => <tr key={`action-${item.action_item_id}`}><td className="px-3 py-3 text-slate-500">{String(detail.decisions.length + index + 1).padStart(2, '0')}</td><td className="px-3 py-3 text-slate-700">Follow-up action</td><td className="px-3 py-3 whitespace-pre-line text-slate-700">{item.task_description}</td><td className="px-3 py-3 text-slate-600">{item.responsible_officer?.full_name || 'Unassigned'}{item.deadline ? ` · Due ${new Date(item.deadline).toLocaleDateString()}` : ''}</td></tr>)}{!detail.decisions.length && !detail.action_items.length && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No discussion items recorded.</td></tr>}</tbody></table></div></section>
+        <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Discussion points and decisions</h3><div className="mt-3 overflow-hidden rounded-lg border"><table className="min-w-full divide-y text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-3">No.</th><th className="px-3 py-3">Topic</th><th className="px-3 py-3">Discussion and decision</th><th className="px-3 py-3">Responsibility</th></tr></thead><tbody className="divide-y">{detail.decisions.map((decision) => <tr key={`decision-${decision.decision_id}`}><td className="px-3 py-3 text-slate-500">{String(decision.decision_order).padStart(2, '0')}</td><td className="px-3 py-3 text-slate-700">{decision.topic || '—'}</td><td className="px-3 py-3 whitespace-pre-line text-slate-700">{decision.decision_text}</td><td className="px-3 py-3 text-slate-600">{responsibilityDetails(decision.responsibility, detail.meeting.attendees) || '—'}</td></tr>)}{detail.action_items.map((item, index) => <tr key={`action-${item.action_item_id}`}><td className="px-3 py-3 text-slate-500">{String(detail.decisions.length + index + 1).padStart(2, '0')}</td><td className="px-3 py-3 text-slate-700">Follow-up action</td><td className="px-3 py-3 whitespace-pre-line text-slate-700">{item.task_description}</td><td className="px-3 py-3 text-slate-600">{item.responsible_officer?.full_name || 'Unassigned'}{item.deadline ? ` · Due ${new Date(item.deadline).toLocaleDateString()}` : ''}</td></tr>)}{!detail.decisions.length && !detail.action_items.length && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No discussion items recorded.</td></tr>}</tbody></table></div></section>
         {detail.closing_remarks && <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Closing remarks</h3><p className="mt-3 whitespace-pre-line rounded-lg border bg-slate-50 p-4 text-sm leading-7 text-slate-700">{detail.closing_remarks}</p></section>}
         {(detail.signatory_name || detail.signatory_designation) && <section className="max-w-md border-t pt-5"><div className="h-8 text-slate-500">................................................</div><p className="font-semibold text-slate-800">{detail.signatory_name}</p><p className="text-sm text-slate-600">{detail.signatory_designation}</p></section>}
       </div></div></div>}
