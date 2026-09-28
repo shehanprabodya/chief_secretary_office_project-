@@ -8,6 +8,7 @@ export interface MeetingAttendee {
   organization?: {
     organization_id: number;
     organization_name: string;
+    address?: string | null;
   } | null;
   pivot: { attendance_role: 'assigned' | 'observer' };
 }

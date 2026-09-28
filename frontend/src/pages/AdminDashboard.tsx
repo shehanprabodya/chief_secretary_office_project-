@@ -1,6 +1,6 @@
 import { useState, useEffect, type ComponentType, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Calendar, Bell, BarChart3, TrendingUp,Plus, UserPlus, History, type LucideProps } from 'lucide-react';
+import { Users, Calendar, Bell, BarChart3, TrendingUp,UserPlus, History, type LucideProps } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import type { AdminStats, ActivityItem, UpcomingMeeting } from '../types/admin';
 import { useAuth } from '../context/AuthContext';
@@ -109,12 +109,7 @@ export default function AdminDashboard() {
               <p className="mt-2 max-w-2xl text-sm text-blue-100">Manage meetings, users, and office activity from your administration dashboard.</p>
             </div>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate('/meetings')}
-              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[var(--color-primary)] hover:bg-blue-50"
-            >
-              <Plus className="h-4 w-4" /> New Meeting
-            </button>
+           
             <button
               onClick={() => navigate('/admin/users')}
               className="flex items-center gap-2 rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"

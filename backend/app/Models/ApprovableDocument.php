@@ -25,6 +25,11 @@ class ApprovableDocument extends Model
         return $this->belongsTo(Letter::class, 'source_id', 'letter_id');
     }
 
+    public function sourceMinute(): BelongsTo
+    {
+        return $this->belongsTo(MeetingMinute::class, 'source_id', 'minute_id');
+    }
+
     public function steps(): HasMany
     {
         return $this->hasMany(ApprovalWorkflowStep::class, 'document_id', 'document_id')->orderBy('step_order');
@@ -39,6 +44,7 @@ class ApprovableDocument extends Model
     {
         $prefixMap = [
             'letter' => 'SPC/DEV',
+            'minute' => 'SPC/MIN',
             'grant' => 'SPC/DEV',
             'training_request' => 'SPC/ADMIN',
             'hr_transfer' => 'SPC/HR',

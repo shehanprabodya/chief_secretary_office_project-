@@ -3,6 +3,7 @@ import { Search, RefreshCw, Filter } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import WorkflowTracker from '../components/Approvals/WorkflowTracker';
 import { approvalService } from '../services/approvalService';
+import { minuteService } from '../services/minuteService';
 import { useAuth } from '../context/AuthContext';
 import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -39,6 +40,8 @@ export default function ApprovalsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
+  const [minutePdfUrl, setMinutePdfUrl] = useState<string | null>(null);
+  const [isMinutePdfLoading, setIsMinutePdfLoading] = useState(false);
 
   const fetchList = useCallback(async () => {
     setIsLoading(true);
@@ -110,6 +113,55 @@ export default function ApprovalsPage() {
     setSelectedDoc((prev) => prev ? { ...prev, comments: [...(prev.comments ?? []), comment] } : prev);
     setCommentText('');
   };
+
+  useEffect(() => {
+    const sourceId = selectedDoc?.source_id;
+    if (!selectedDoc || selectedDoc.document_type !== 'minute' || sourceId == null) {
+      if (minutePdfUrl) {
+        URL.revokeObjectURL(minutePdfUrl);
+      }
+      setMinutePdfUrl(null);
+      setIsMinutePdfLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const loadMinutePdf = async () => {
+      setIsMinutePdfLoading(true);
+      try {
+        const blob = await minuteService.downloadPdf(sourceId);
+        const url = URL.createObjectURL(blob);
+        if (isMounted) {
+          setMinutePdfUrl((current) => {
+            if (current) URL.revokeObjectURL(current);
+            return url;
+          });
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      } catch (err) {
+        console.error('Failed to load minute approval PDF preview:', err);
+        if (isMounted) {
+          setMinutePdfUrl(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsMinutePdfLoading(false);
+        }
+      }
+    };
+
+    void loadMinutePdf();
+
+    return () => {
+      isMounted = false;
+      setIsMinutePdfLoading(false);
+      if (minutePdfUrl) {
+        URL.revokeObjectURL(minutePdfUrl);
+      }
+      setMinutePdfUrl(null);
+    };
+  }, [selectedDoc]);
 
   return (
     <DashboardLayout pageTitle="Pending Approvals">
@@ -250,7 +302,21 @@ export default function ApprovalsPage() {
               {/* Document Preview */}
               {activeTab === 'preview' && (
                 <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-slate-200 p-6">
-                  {hasHtml(selectedDoc.full_content) ? (
+                  {selectedDoc.document_type === 'minute' ? (
+                    <div className="mx-auto h-[75vh] w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                      {isMinutePdfLoading ? (
+                        <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading PDF preview...</div>
+                      ) : minutePdfUrl ? (
+                        <iframe
+                          src={minutePdfUrl}
+                          title="Minute approval PDF preview"
+                          className="h-full w-full border-0"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm text-slate-500">The minute PDF preview is not available.</div>
+                      )}
+                    </div>
+                  ) : hasHtml(selectedDoc.full_content) ? (
                     <div
                       className="mx-auto shrink-0 box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
                       style={{ width: '8.27in', minHeight: '11.69in', fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
@@ -364,9 +430,9 @@ export default function ApprovalsPage() {
       </div>
       <ConfirmDialog
         open={showRejectConfirmation}
-        title={`Reject ${selectedDoc?.document_type === 'letter' ? 'letter' : 'document'}?`}
-        message={`Are you sure you want to reject ${selectedDoc?.document_type === 'letter' ? `letter ${selectedDoc.subject_code ?? selectedDoc.subject}` : selectedDoc?.subject ?? 'this document'}? The submitting officer will be notified${commentText.trim() ? ' with your current observation' : ''}.`}
-        confirmLabel={selectedDoc?.document_type === 'letter' ? 'Reject Letter' : 'Reject Document'}
+        title={`Reject ${selectedDoc?.document_type === 'letter' ? 'letter' : selectedDoc?.document_type === 'minute' ? 'minute' : 'document'}?`}
+        message={`Are you sure you want to reject ${selectedDoc?.document_type === 'letter' ? `letter ${selectedDoc.subject_code ?? selectedDoc.subject}` : selectedDoc?.document_type === 'minute' ? `minute ${selectedDoc.subject_code ?? selectedDoc.subject}` : selectedDoc?.subject ?? 'this document'}? The submitting officer will be notified${commentText.trim() ? ' with your current observation' : ''}.`}
+        confirmLabel={selectedDoc?.document_type === 'letter' ? 'Reject Letter' : selectedDoc?.document_type === 'minute' ? 'Reject Minute' : 'Reject Document'}
         isProcessing={isActing}
         variant="danger"
         onConfirm={confirmReject}

@@ -8,8 +8,8 @@ export const minuteService = {
     return data;
   },
 
-  async saveDraft(minuteId: number, discussion_summary: string): Promise<MeetingMinute> {
-    const { data } = await api.put<{ minute: MeetingMinute }>(`/officer/minutes/${minuteId}`, { discussion_summary });
+  async saveDraft(minuteId: number, payload: Pick<MeetingMinute, 'discussion_summary' | 'closing_remarks' | 'signatory_name' | 'signatory_designation'>): Promise<MeetingMinute> {
+    const { data } = await api.put<{ minute: MeetingMinute }>(`/officer/minutes/${minuteId}`, payload);
     return data.minute;
   },
 
@@ -18,8 +18,13 @@ export const minuteService = {
     return data.minute;
   },
 
-  async addDecision(minuteId: number, decision_text: string): Promise<MinuteDecision> {
-    const { data } = await api.post<{ decision: MinuteDecision }>(`/officer/minutes/${minuteId}/decisions`, { decision_text });
+  async addDecision(minuteId: number, payload: Pick<MinuteDecision, 'topic' | 'decision_text' | 'responsibility'>): Promise<MinuteDecision> {
+    const { data } = await api.post<{ decision: MinuteDecision }>(`/officer/minutes/${minuteId}/decisions`, payload);
+    return data.decision;
+  },
+
+  async updateDecision(decisionId: number, payload: Pick<MinuteDecision, 'topic' | 'decision_text' | 'responsibility'>): Promise<MinuteDecision> {
+    const { data } = await api.put<{ decision: MinuteDecision }>(`/officer/decisions/${decisionId}`, payload);
     return data.decision;
   },
 
@@ -34,6 +39,16 @@ export const minuteService = {
 
   async deleteActionItem(itemId: number): Promise<void> {
     await api.delete(`/officer/action-items/${itemId}`);
+  },
+
+  async downloadPdf(minuteId: number): Promise<Blob> {
+    try {
+      const response = await api.get(`/minutes/${minuteId}/download/pdf`, { responseType: 'blob' });
+      return response.data;
+    } catch {
+      const response = await api.get(`/officer/minutes/${minuteId}/download/pdf`, { responseType: 'blob' });
+      return response.data;
+    }
   },
 };
 

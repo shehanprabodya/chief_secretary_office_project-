@@ -2,7 +2,7 @@ import { api } from '../lib/axios';
 import type { ApprovableDocument, ApprovalComment } from '../types/approval';
 
 export interface SubmitApprovalPayload {
-  document_type: 'letter' | 'grant' | 'training_request' | 'hr_transfer';
+  document_type: 'letter' | 'minute' | 'grant' | 'training_request' | 'hr_transfer';
   source_id?: number;
   subject: string;
   description?: string;

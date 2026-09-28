@@ -52,6 +52,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/approvals/{id}/reject', [ApprovalController::class, 'reject']);
     Route::post('/approvals/{id}/comments', [ApprovalController::class, 'addComment']);
 
+    Route::middleware('role:officer,dept_head,deputy,chief_secretary')->group(function () {
+        Route::get('/minutes/{id}/download/pdf', [MinuteController::class, 'downloadPdf']);
+    });
+
     Route::middleware(['role:admin'])->prefix('admin')->group(function () {
         // Dashboard
         Route::get('/stats', [AdminDashboardController::class, 'stats']);
@@ -132,10 +136,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/minutes/{id}/submit', [MinuteController::class, 'submitForApproval']);
 
         Route::post('/minutes/{minuteId}/decisions', [MinuteController::class, 'addDecision']);
+        Route::put('/decisions/{decisionId}', [MinuteController::class, 'updateDecision']);
         Route::delete('/decisions/{decisionId}', [MinuteController::class, 'deleteDecision']);
 
         Route::post('/minutes/{minuteId}/action-items', [MinuteController::class, 'addActionItem']);
         Route::delete('/action-items/{itemId}', [MinuteController::class, 'deleteActionItem']);
+        Route::get('/minutes/{id}/download/pdf',[MinuteController::class, 'downloadPdf']);
 
     });
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ApprovableDocument;
 use App\Models\Letter;
+use App\Models\MeetingMinute;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +23,7 @@ class ApprovalController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject');
+        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceMinute.meeting');
 
         // Officers may track only the documents they personally submitted.
         // Reviewing roles retain the shared workflow queue they need to act on.
@@ -55,7 +56,7 @@ class ApprovalController extends Controller
 
     public function show(Request $request, int $id): JsonResponse
     {
-        $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
+        $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceMinute.meeting')
             ->findOrFail($id);
 
         if ($request->user()->hasRole('officer')
@@ -72,7 +73,7 @@ class ApprovalController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'document_type' => 'required|in:letter,grant,training_request,hr_transfer',
+            'document_type' => 'required|in:letter,minute,grant,training_request,hr_transfer',
             'source_id' => 'nullable|integer',
             'subject' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -120,12 +121,16 @@ class ApprovalController extends Controller
                         Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
                     }
 
+                    if ($existingDocument->document_type === 'minute' && $existingDocument->source_id) {
+                        MeetingMinute::where('minute_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
+                    }
+
                     $this->notifyCurrentReviewer($existingDocument, $request->user()->user_id, true);
 
                     return response()->json([
                         'message' => 'Revised approved document submitted for approval',
                         'document' => $this->withSubjectCode(
-                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
+                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceMinute.meeting')
                         ),
                     ]);
                 }
@@ -147,12 +152,16 @@ class ApprovalController extends Controller
                         Letter::where('letter_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
                     }
 
+                    if ($existingDocument->document_type === 'minute' && $existingDocument->source_id) {
+                        MeetingMinute::where('minute_id', $existingDocument->source_id)->update(['status' => 'pending_approval']);
+                    }
+
                     $this->notifyCurrentReviewer($existingDocument, $request->user()->user_id, true);
 
                     return response()->json([
                         'message' => 'Rejected document resubmitted for approval',
                         'document' => $this->withSubjectCode(
-                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')
+                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceMinute.meeting')
                         ),
                     ]);
                 }
@@ -164,6 +173,15 @@ class ApprovalController extends Controller
                         'rejected' => 'rejected',
                     };
                     Letter::where('letter_id', $existingDocument->source_id)->update(['status' => $letterStatus]);
+                }
+
+                if ($existingDocument->document_type === 'minute' && $existingDocument->source_id) {
+                    $minuteStatus = match ($existingDocument->status) {
+                        'pending' => 'pending_approval',
+                        'approved' => 'approved',
+                        'rejected' => 'rejected',
+                    };
+                    MeetingMinute::where('minute_id', $existingDocument->source_id)->update(['status' => $minuteStatus]);
                 }
 
                 return response()->json([
@@ -189,9 +207,13 @@ class ApprovalController extends Controller
             Letter::where('letter_id', $document->source_id)->update(['status' => 'pending_approval']);
         }
 
+        if ($document->document_type === 'minute' && $document->source_id) {
+            MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'pending_approval']);
+        }
+
         return response()->json([
             'message' => 'Document submitted for approval',
-            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceMinute.meeting')),
         ], 201);
     }
 
@@ -245,6 +267,10 @@ class ApprovalController extends Controller
             if ($document->document_type === 'letter' && $document->source_id) {
                 Letter::where('letter_id', $document->source_id)->update(['status' => 'approved']);
             }
+
+            if ($document->document_type === 'minute' && $document->source_id) {
+                MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'approved']);
+            }
         }
 
         if ($request->filled('notes')) {
@@ -289,7 +315,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Approved',
-            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceMinute.meeting')),
         ]);
     }
 
@@ -308,6 +334,10 @@ class ApprovalController extends Controller
 
         if ($document->document_type === 'letter' && $document->source_id) {
             Letter::where('letter_id', $document->source_id)->update(['status' => 'rejected']);
+        }
+
+        if ($document->document_type === 'minute' && $document->source_id) {
+            MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'rejected']);
         }
 
         if ($request->filled('notes')) {
@@ -334,7 +364,7 @@ class ApprovalController extends Controller
 
         return response()->json([
             'message' => 'Rejected',
-            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject')),
+            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceMinute.meeting')),
         ]);
     }
 
@@ -342,7 +372,11 @@ class ApprovalController extends Controller
     {
         $document->setAttribute(
             'subject_code',
-            $document->document_type === 'letter' ? $document->sourceLetter?->subject?->code : null
+            match ($document->document_type) {
+                'letter' => $document->sourceLetter?->subject?->code,
+                'minute' => $document->sourceMinute?->meeting?->meeting_code ?? $document->subject,
+                default => null,
+            }
         );
 
         return $document;
@@ -383,7 +417,7 @@ class ApprovalController extends Controller
 
     private function notifyCurrentReviewer(ApprovableDocument $document, int $actorUserId, bool $resubmitted = false): void
     {
-        $document->loadMissing('steps', 'submitter', 'sourceLetter.subject');
+        $document->loadMissing('steps', 'submitter', 'sourceLetter.subject', 'sourceMinute.meeting');
         $currentStep = $document->steps->firstWhere('step_order', $document->current_step_order);
 
         if (!$currentStep) {
@@ -410,11 +444,13 @@ class ApprovalController extends Controller
     /** @return array{0: string, 1: string} */
     private function notificationIdentity(ApprovableDocument $document): array
     {
-        $document->loadMissing('sourceLetter.subject');
+        $document->loadMissing('sourceLetter.subject', 'sourceMinute.meeting');
         $entityName = ucfirst(str_replace('_', ' ', $document->document_type));
-        $entityCode = $document->document_type === 'letter'
-            ? ($document->sourceLetter?->subject?->code ?: $document->subject)
-            : $document->subject;
+        $entityCode = match ($document->document_type) {
+            'letter' => $document->sourceLetter?->subject?->code ?: $document->subject,
+            'minute' => $document->sourceMinute?->meeting?->meeting_code ?: $document->subject,
+            default => $document->subject,
+        };
 
         return [$entityName, $entityCode];
     }

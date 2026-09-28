@@ -1,7 +1,9 @@
 export interface MinuteDecision {
   decision_id: number;
   decision_order: number;
+  topic: string | null;
   decision_text: string;
+  responsibility: string | null;
 }
 
 export interface ActionItem {
@@ -28,7 +30,10 @@ export interface MeetingMinute {
   minute_id: number;
   meeting_id: number;
   discussion_summary: string | null;
-  status: 'draft' | 'pending_approval' | 'approved';
+  closing_remarks: string | null;
+  signatory_name: string | null;
+  signatory_designation: string | null;
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   decisions: MinuteDecision[];
   action_items: ActionItem[];
 }
