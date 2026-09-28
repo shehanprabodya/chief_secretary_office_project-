@@ -25,6 +25,7 @@ export default function CreateMinutesPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(false);
   const [meetingsError, setMeetingsError] = useState('');
+  const [meetingDescription, setMeetingDescription] = useState('');
   const [discussionSummary, setDiscussionSummary] = useState('');
   const [closingRemarks, setClosingRemarks] = useState('');
   const [signatoryName, setSignatoryName] = useState('');
@@ -36,11 +37,11 @@ export default function CreateMinutesPage() {
   const [draftChangeVersion, setDraftChangeVersion] = useState(0);
   const draftChangeVersionRef = useRef(0);
   const decisionRowsRef = useRef<DecisionRow[]>([]);
-  const draftPayloadRef = useRef({ discussionSummary, closingRemarks, signatoryName, signatoryDesignation });
+  const draftPayloadRef = useRef({ meetingDescription, discussionSummary, closingRemarks, signatoryName, signatoryDesignation });
 
   useEffect(() => {
-    draftPayloadRef.current = { discussionSummary, closingRemarks, signatoryName, signatoryDesignation };
-  }, [discussionSummary, closingRemarks, signatoryName, signatoryDesignation]);
+    draftPayloadRef.current = { meetingDescription, discussionSummary, closingRemarks, signatoryName, signatoryDesignation };
+  }, [meetingDescription, discussionSummary, closingRemarks, signatoryName, signatoryDesignation]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +89,7 @@ export default function CreateMinutesPage() {
         setMinute(minute);
         setMeeting(meeting);
         setDecisionRows(minute.decisions.map((decision) => ({ ...decision, rowKey: `decision-${decision.decision_id}` })));
+        setMeetingDescription(minute.meeting_description ?? '');
         setDiscussionSummary(minute.discussion_summary ?? '');
         setClosingRemarks(minute.closing_remarks ?? '');
         setSignatoryName(minute.signatory_name ?? '');
@@ -117,6 +119,7 @@ export default function CreateMinutesPage() {
     setDraftSaveState('saving');
     try {
       const updated = await minuteService.saveDraft(minute.minute_id, {
+        meeting_description: meetingDescription,
         discussion_summary: discussionSummary,
         closing_remarks: closingRemarks,
         signatory_name: signatoryName,
@@ -143,6 +146,7 @@ export default function CreateMinutesPage() {
       const approvalContent = [
         meeting.title,
         `Date: ${new Date(meeting.meeting_date).toLocaleDateString()} · Time: ${meeting.start_time?.slice(0, 5) ?? '—'} · Venue: ${meeting.location ?? 'Not specified'}`,
+        savedMinute.meeting_description || '',
         '',
         'Attendees',
         ...(meeting.attendees ?? []).map((attendee, index) => `${index + 1}. ${attendee.full_name} — ${attendee.designation ?? ''}${attendee.organization ? `, ${attendee.organization.organization_name}` : ''}`),
@@ -247,6 +251,7 @@ export default function CreateMinutesPage() {
       try {
         const payload = draftPayloadRef.current;
         await minuteService.saveDraft(minuteId, {
+          meeting_description: payload.meetingDescription,
           discussion_summary: payload.discussionSummary,
           closing_remarks: payload.closingRemarks,
           signatory_name: payload.signatoryName,
@@ -510,6 +515,18 @@ export default function CreateMinutesPage() {
               </div>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2"><div><label className="mb-2 block text-sm font-semibold text-slate-700">Venue</label><input value={meeting.location ?? 'Not assigned'} disabled className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900" /></div><div><label className="mb-2 block text-sm font-semibold text-slate-700">Meeting time</label><input value={`${meeting.start_time?.slice(0, 5) ?? '—'}${meeting.end_time ? ` – ${meeting.end_time.slice(0, 5)}` : ''}`} disabled className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900" /></div></div>
+
+              <div className="mt-4">
+                <label htmlFor="meeting-description" className="mb-2 block text-sm font-semibold text-slate-700">Meeting description</label>
+                <textarea
+                  id="meeting-description"
+                  value={meetingDescription}
+                  onChange={(event) => { setMeetingDescription(event.target.value); markDraftChanged(); }}
+                  rows={3}
+                  placeholder="Briefly describe the meeting and its purpose"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
 
               <div className="mt-5">
                 <label className="mb-2 block text-sm font-semibold text-slate-700">Attendees List</label>

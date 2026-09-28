@@ -80,14 +80,15 @@ class MinuteController extends Controller
         $minute = MeetingMinute::firstOrCreate(
             ['meeting_id' => $meetingId],
             [
+                'meeting_description' => $request->input('meeting_description'),
                 'discussion_summary' => $request->input('discussion_summary'),
                 'status' => 'draft',
                 'created_by' => $request->user()->user_id,
             ]
         );
 
-        if ($request->filled('discussion_summary') && !$minute->wasRecentlyCreated) {
-            $minute->update(['discussion_summary' => $request->input('discussion_summary')]);
+        if (!$minute->wasRecentlyCreated && ($request->exists('meeting_description') || $request->exists('discussion_summary'))) {
+            $minute->update($request->only(['meeting_description', 'discussion_summary']));
         }
 
         $minute->load('decisions', 'actionItems.responsibleOfficer');
@@ -100,6 +101,7 @@ class MinuteController extends Controller
         $minute = MeetingMinute::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
+            'meeting_description' => 'nullable|string',
             'discussion_summary' => 'nullable|string',
             'closing_remarks' => 'nullable|string',
             'signatory_name' => 'nullable|string|max:255',
