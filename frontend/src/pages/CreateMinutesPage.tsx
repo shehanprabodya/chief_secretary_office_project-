@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Save, Send, Bold, Italic, List as ListIcon, Link as LinkIcon, Plus, Trash2, FileDown, Eye, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
+import DecisionResponsibilityInput from '../components/Minutes/DecisionResponsibilityInput';
 import { minuteService } from '../services/minuteService';
 import { approvalService } from '../services/approvalService';
 import { meetingService } from '../services/meetingService';
@@ -16,6 +17,27 @@ const attendeeResponsibilityLabel = (attendee: NonNullable<Meeting['attendees']>
   attendee.organization?.address,
 ].filter(Boolean).join(', ');
 
+const selectedResponsibilityIds = (responsibility: string | null, attendees: NonNullable<Meeting['attendees']> = []): number[] => {
+  if (!responsibility) return [];
+  try {
+    const parsed: unknown = JSON.parse(responsibility);
+    if (Array.isArray(parsed)) return parsed.map(Number).filter((id) => Number.isInteger(id));
+  } catch {
+    // Older rows store the full attendee label instead of selected attendee IDs.
+  }
+  const legacyAttendee = attendees.find((attendee) => attendeeResponsibilityLabel(attendee) === responsibility);
+  return legacyAttendee ? [legacyAttendee.user_id] : [];
+};
+
+const responsibilityDetails = (responsibility: string | null, attendees: NonNullable<Meeting['attendees']> = []) => {
+  const selectedIds = selectedResponsibilityIds(responsibility, attendees);
+  return attendees
+    .filter((attendee) => selectedIds.includes(attendee.user_id))
+    .map((attendee) => [attendee.designation, attendee.organization?.address].filter(Boolean).join(', '))
+    .filter(Boolean)
+    .join('; ');
+};
+
 export default function CreateMinutesPage() {
   const { meetingId } = useParams();
   const navigate = useNavigate();
@@ -25,6 +47,7 @@ export default function CreateMinutesPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(false);
   const [meetingsError, setMeetingsError] = useState('');
+  const [meetingDescription, setMeetingDescription] = useState('');
   const [discussionSummary, setDiscussionSummary] = useState('');
   const [closingRemarks, setClosingRemarks] = useState('');
   const [signatoryName, setSignatoryName] = useState('');
@@ -36,11 +59,11 @@ export default function CreateMinutesPage() {
   const [draftChangeVersion, setDraftChangeVersion] = useState(0);
   const draftChangeVersionRef = useRef(0);
   const decisionRowsRef = useRef<DecisionRow[]>([]);
-  const draftPayloadRef = useRef({ discussionSummary, closingRemarks, signatoryName, signatoryDesignation });
+  const draftPayloadRef = useRef({ meetingDescription, discussionSummary, closingRemarks, signatoryName, signatoryDesignation });
 
   useEffect(() => {
-    draftPayloadRef.current = { discussionSummary, closingRemarks, signatoryName, signatoryDesignation };
-  }, [discussionSummary, closingRemarks, signatoryName, signatoryDesignation]);
+    draftPayloadRef.current = { meetingDescription, discussionSummary, closingRemarks, signatoryName, signatoryDesignation };
+  }, [meetingDescription, discussionSummary, closingRemarks, signatoryName, signatoryDesignation]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +111,7 @@ export default function CreateMinutesPage() {
         setMinute(minute);
         setMeeting(meeting);
         setDecisionRows(minute.decisions.map((decision) => ({ ...decision, rowKey: `decision-${decision.decision_id}` })));
+        setMeetingDescription(minute.meeting_description ?? '');
         setDiscussionSummary(minute.discussion_summary ?? '');
         setClosingRemarks(minute.closing_remarks ?? '');
         setSignatoryName(minute.signatory_name ?? '');
@@ -117,6 +141,7 @@ export default function CreateMinutesPage() {
     setDraftSaveState('saving');
     try {
       const updated = await minuteService.saveDraft(minute.minute_id, {
+        meeting_description: meetingDescription,
         discussion_summary: discussionSummary,
         closing_remarks: closingRemarks,
         signatory_name: signatoryName,
@@ -143,6 +168,7 @@ export default function CreateMinutesPage() {
       const approvalContent = [
         meeting.title,
         `Date: ${new Date(meeting.meeting_date).toLocaleDateString()} · Time: ${meeting.start_time?.slice(0, 5) ?? '—'} · Venue: ${meeting.location ?? 'Not specified'}`,
+        savedMinute.meeting_description || '',
         '',
         'Attendees',
         ...(meeting.attendees ?? []).map((attendee, index) => `${index + 1}. ${attendee.full_name} — ${attendee.designation ?? ''}${attendee.organization ? `, ${attendee.organization.organization_name}` : ''}`),
@@ -151,7 +177,7 @@ export default function CreateMinutesPage() {
         finalSummary || '—',
         '',
         'Discussion points and decisions',
-        ...savedDecisions.map((decision) => `${decision.decision_order}. ${decision.topic ?? '—'}: ${decision.decision_text} (Responsible: ${decision.responsibility ?? '—'})`),
+        ...savedDecisions.map((decision) => `${decision.decision_order}. ${decision.topic ?? '—'}: ${decision.decision_text} (Responsible: ${responsibilityDetails(decision.responsibility, meeting.attendees) || '—'})`),
         '',
         'Closing remarks',
         savedMinute.closing_remarks || '—',
@@ -247,6 +273,7 @@ export default function CreateMinutesPage() {
       try {
         const payload = draftPayloadRef.current;
         await minuteService.saveDraft(minuteId, {
+          meeting_description: payload.meetingDescription,
           discussion_summary: payload.discussionSummary,
           closing_remarks: payload.closingRemarks,
           signatory_name: payload.signatoryName,
@@ -511,6 +538,18 @@ export default function CreateMinutesPage() {
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2"><div><label className="mb-2 block text-sm font-semibold text-slate-700">Venue</label><input value={meeting.location ?? 'Not assigned'} disabled className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900" /></div><div><label className="mb-2 block text-sm font-semibold text-slate-700">Meeting time</label><input value={`${meeting.start_time?.slice(0, 5) ?? '—'}${meeting.end_time ? ` – ${meeting.end_time.slice(0, 5)}` : ''}`} disabled className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900" /></div></div>
 
+              <div className="mt-4">
+                <label htmlFor="meeting-description" className="mb-2 block text-sm font-semibold text-slate-700">Meeting description</label>
+                <textarea
+                  id="meeting-description"
+                  value={meetingDescription}
+                  onChange={(event) => { setMeetingDescription(event.target.value); markDraftChanged(); }}
+                  rows={3}
+                  placeholder="Briefly describe the meeting and its purpose"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
               <div className="mt-5">
                 <label className="mb-2 block text-sm font-semibold text-slate-700">Attendees List</label>
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -575,7 +614,7 @@ export default function CreateMinutesPage() {
                         <td className="border-b border-slate-100 px-3 py-3 text-center font-semibold text-slate-500">{String(index + 1).padStart(2, '0')}</td>
                         <td className="border-b border-slate-100 px-2 py-3"><textarea aria-label={`Topic for item ${index + 1}`} value={row.topic ?? ''} onChange={(event) => updateDecisionRow(row.rowKey, 'topic', event.target.value)} rows={3} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="Topic or agenda item" /></td>
                         <td className="border-b border-slate-100 px-2 py-3"><textarea aria-label={`Discussion and decision for item ${index + 1}`} value={row.decision_text} onChange={(event) => updateDecisionRow(row.rowKey, 'decision_text', event.target.value)} rows={4} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-6 text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="Type the discussion, decision, or resolution" /></td>
-                        <td className="border-b border-slate-100 px-2 py-3"><select aria-label={`Responsible officer for item ${index + 1}`} value={row.responsibility ?? ''} onChange={(event) => updateDecisionRow(row.rowKey, 'responsibility', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"><option value="">Select meeting attendee</option>{meeting.attendees?.map((attendee) => { const label = attendeeResponsibilityLabel(attendee); return <option key={attendee.user_id} value={label}>{label}</option>; })}{row.responsibility && !meeting.attendees?.some((attendee) => attendeeResponsibilityLabel(attendee) === row.responsibility) && <option value={row.responsibility}>{row.responsibility} (previously entered)</option>}</select></td>
+                        <td className="border-b border-slate-100 px-2 py-3"><DecisionResponsibilityInput attendees={meeting.attendees ?? []} selectedIds={selectedResponsibilityIds(row.responsibility, meeting.attendees)} onChange={(ids) => updateDecisionRow(row.rowKey, 'responsibility', ids.length ? JSON.stringify(ids) : '')} /></td>
                         <td className="border-b border-slate-100 px-1 py-3 text-center">
                           <button type="button" onClick={() => handleSaveDecisionRow(row)} disabled={savingDecisionKey === row.rowKey || !row.decision_text.trim()} aria-label={`Save item ${index + 1}`} title="Save row" className="mb-2 rounded p-1 text-blue-700 hover:bg-blue-50 disabled:opacity-40"><Save className="h-4 w-4" /></button>
                           <button type="button" onClick={() => void handleDeleteDecisionRow(row)} aria-label={`Delete item ${index + 1}`} title="Delete row" className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>

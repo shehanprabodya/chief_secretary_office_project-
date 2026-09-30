@@ -184,7 +184,7 @@ class DepartmentHeadRecordController extends Controller
                 'creator.organization:organization_id,organization_name',
                 'meeting',
             ])
-            ->withCount(['decisions', 'actionItems'])
+            ->withCount('decisions')
             ->when($filters['officer_id'], fn (Builder $query, int $officerId) => $query->where('created_by', $officerId))
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
             ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate('created_at', '>=', $date))
@@ -211,7 +211,6 @@ class DepartmentHeadRecordController extends Controller
                 'creator.organization',
                 'meeting.attendees.organization',
                 'decisions',
-                'actionItems.responsibleOfficer.organization',
             ]),
         ]);
     }

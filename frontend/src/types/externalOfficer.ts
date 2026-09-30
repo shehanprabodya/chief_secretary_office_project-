@@ -1,3 +1,5 @@
+import type { MinuteDecision } from './minute';
+
 export interface ExternalMeetingLetter {
   letter_id: number;
   sender_name: string;
@@ -44,4 +46,15 @@ export interface ExternalOfficerMeeting {
   organizer_designation: string | null;
   excuse_request: AttendanceExcuseRequest | null;
   letter: ExternalMeetingLetter | null;
+  attendees: Array<{ user_id: number; full_name: string; designation: string | null; organization: { organization_id: number; organization_name: string; address: string | null } | null }>;
+  minutes: Array<{
+    minute_id: number;
+    meeting_id: number;
+    signatory_name: string | null;
+    signatory_designation: string | null;
+    meeting_description: string | null;
+    discussion_summary: string | null;
+    closing_remarks: string | null;
+    decisions: MinuteDecision[];
+  }>;
 }

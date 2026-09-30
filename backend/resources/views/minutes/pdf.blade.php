@@ -10,7 +10,7 @@
         .office { text-align: center; font-size: 14pt; font-weight: bold; }
         .office-subtitle { text-align: center; font-size: 10px; margin-bottom: 20px; }
         h1 { font-size: 16pt; text-align: center; font-weight: bold; margin: 0 0 10px; }
-        .meeting-title { font-weight: bold; text-align: center; font-size: 14pt; margin: 0 0 12px; }
+        .meeting-title { font-weight: bold; text-align: center; font-size: 14pt; text-decoration: underline; margin: 0 0 12px; }
         .facts { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
         .facts td { padding: 2px 4px; vertical-align: top; text-align: left; }
         .fact-label { width: 16%; font-weight: bold; }
@@ -36,8 +36,7 @@
     </style>
 </head>
 <body>
-    <h1>රැස්වීම් වාර්තාව</h1>
-    <div class="meeting-title">{{ $meeting->title ?? $meeting->subject->title ?? 'රැස්වීම' }}</div>
+    <div class="meeting-title"><u>{{ $meeting->title ?? $meeting->subject->title ?? 'රැස්වීම' }}</u></div>
 
     <table class="facts">
         <tr>
@@ -55,6 +54,10 @@
         </tr>
         @endif
     </table>
+
+    @if($minute->meeting_description)
+        <div class="intro">{!! nl2br(e($minute->meeting_description)) !!}</div>
+    @endif
 
     <div class="section-title">සහභාගී වූ නිලධාරීන්</div>
     <table class="grid attendees" width="100%" border="1" cellspacing="0" cellpadding="2" style="width:100%; border-collapse:collapse; table-layout:fixed;">
@@ -82,21 +85,35 @@
         <colgroup><col width="6%"><col width="24%"><col width="46%"><col width="24%"></colgroup>
         <thead><tr><th class="item-no">අනු අංකය</th><th class="item-topic">කාරණය</th><th class="item-detail">තීරණය</th><th class="item-owner">වගකීම</th></tr></thead>
         <tbody>
-        @php($hasItems = $minute->decisions->isNotEmpty() || $minute->actionItems->isNotEmpty())
+        @php
+            $hasItems = $minute->decisions->isNotEmpty();
+        @endphp
         @foreach($minute->decisions as $index => $decision)
             <tr>
                 <td class="item-no">{{ sprintf('%02d', $index + 1) }}</td>
-                <td><strong>{{ $decision->topic ?: '—' }}</strong></td>
+                <td>{{ $decision->topic ?: '—' }}</td>
                 <td>{!! nl2br(e($decision->decision_text)) !!}</td>
-                <td>{{ $decision->responsibility ?: '—' }}</td>
-            </tr>
-        @endforeach
-        @foreach($minute->actionItems as $index => $item)
-            <tr>
-                <td class="item-no">{{ sprintf('%02d', $minute->decisions->count() + $index + 1) }}</td>
-                <td><strong>පසු විපරම් කටයුත්ත</strong></td>
-                <td>{!! nl2br(e($item->task_description)) !!}</td>
-                <td>{{ $item->responsibleOfficer?->full_name ?? $item->responsibleOfficer?->name ?? '—' }}{{ $item->deadline ? ' · නියමිත දිනය ' . $item->deadline->format('d/m/Y') : '' }}</td>
+                <td>
+                    @php
+                        $responsibilityIds = json_decode((string) ($decision->responsibility ?? ''), true);
+                        if (!is_array($responsibilityIds)) {
+                            $legacyAttendee = collect($meeting->attendees ?? [])->first(function ($attendee) use ($decision) {
+                                $name = trim(($attendee->full_name ?? '') . ($attendee->designation ? ' — ' . $attendee->designation : ''));
+                                $labelParts = array_filter([$name, $attendee->organization?->organization_name, $attendee->organization?->address]);
+                                return implode(', ', $labelParts) === $decision->responsibility;
+                            });
+                            $responsibilityIds = $legacyAttendee ? [$legacyAttendee->user_id] : [];
+                        }
+                        $responsibleAttendees = collect($meeting->attendees ?? [])->filter(
+                            fn ($attendee) => in_array((int) $attendee->user_id, array_map('intval', $responsibilityIds), true)
+                        );
+                    @endphp
+                    @forelse($responsibleAttendees as $attendee)
+                        {{ collect([$attendee->designation, $attendee->organization?->address])->filter()->implode(', ') }}@if(!$loop->last)<br>@endif
+                    @empty
+                        —
+                    @endforelse
+                </td>
             </tr>
         @endforeach
         @unless($hasItems)
@@ -106,14 +123,15 @@
     </table>
 
     @if($minute->closing_remarks)
-        <div class="closing"><strong>අවසන් අදහස්:</strong> {!! nl2br(e($minute->closing_remarks)) !!}</div>
+        <div class="closing">{!! nl2br(e($minute->closing_remarks)) !!}</div>
     @endif
 
     @if($minute->signatory_name || $minute->signatory_designation)
         <div class="signature">
             <div class="signature-line">........................................................</div>
             <strong>{{ $minute->signatory_name }}</strong><br>
-            {{ $minute->signatory_designation }}
+            {{ $minute->signatory_designation }}<br>
+            දිනය: {{ optional($meeting->meeting_date)->format('Y.m.d') ?? '-' }}
         </div>
     @endif
 

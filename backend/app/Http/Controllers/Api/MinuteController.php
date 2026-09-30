@@ -28,7 +28,7 @@ class MinuteController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $minute = MeetingMinute::with('meeting.attendees', 'decisions', 'actionItems.responsibleOfficer')
+        $minute = MeetingMinute::with('meeting.attendees', 'decisions')
             ->findOrFail($id);
 
         return response()->json(['minute' => $minute]);
@@ -51,7 +51,7 @@ class MinuteController extends Controller
             ['status' => 'draft', 'created_by' => $request->user()->user_id]
         );
 
-        $minute->load('decisions', 'actionItems.responsibleOfficer');
+        $minute->load('decisions');
 
         $latestLetter = $meeting->letters->sortByDesc('letter_id')->first();
         $letterRecipients = $latestLetter
@@ -80,17 +80,18 @@ class MinuteController extends Controller
         $minute = MeetingMinute::firstOrCreate(
             ['meeting_id' => $meetingId],
             [
+                'meeting_description' => $request->input('meeting_description'),
                 'discussion_summary' => $request->input('discussion_summary'),
                 'status' => 'draft',
                 'created_by' => $request->user()->user_id,
             ]
         );
 
-        if ($request->filled('discussion_summary') && !$minute->wasRecentlyCreated) {
-            $minute->update(['discussion_summary' => $request->input('discussion_summary')]);
+        if (!$minute->wasRecentlyCreated && ($request->exists('meeting_description') || $request->exists('discussion_summary'))) {
+            $minute->update($request->only(['meeting_description', 'discussion_summary']));
         }
 
-        $minute->load('decisions', 'actionItems.responsibleOfficer');
+        $minute->load('decisions');
 
         return response()->json(['minute' => $minute, 'meeting' => $meeting], $minute->wasRecentlyCreated ? 201 : 200);
     }
@@ -100,6 +101,7 @@ class MinuteController extends Controller
         $minute = MeetingMinute::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
+            'meeting_description' => 'nullable|string',
             'discussion_summary' => 'nullable|string',
             'closing_remarks' => 'nullable|string',
             'signatory_name' => 'nullable|string|max:255',
@@ -239,7 +241,6 @@ class MinuteController extends Controller
         $minute = MeetingMinute::with([
             'meeting.attendees.organization',
             'decisions',
-            'actionItems.responsibleOfficer',
         ])->findOrFail($id);
 
         // Basic authorization

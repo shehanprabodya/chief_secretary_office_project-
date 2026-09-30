@@ -217,6 +217,77 @@ class ApprovalController extends Controller
         ], 201);
     }
 
+    private function notifyApprovedMinuteTargets(ApprovableDocument $document): void
+    {
+        $minute = MeetingMinute::with([
+            'decisions',
+            'meeting.letters' => fn ($query) => $query->whereIn('status', ['approved', 'dispatched'])->with('recipients'),
+        ])
+            ->find($document->source_id);
+        if (!$minute) {
+            return;
+        }
+
+        $meetingCode = $minute->meeting?->meeting_code ?: $document->subject;
+        foreach ($minute->decisions as $decision) {
+            $responsibleIds = json_decode((string) $decision->responsibility, true);
+            if (!is_array($responsibleIds)) {
+                continue;
+            }
+            foreach ($responsibleIds as $responsibleId) {
+                if (filter_var($responsibleId, FILTER_VALIDATE_INT)) {
+                    $responsibleId = (int) $responsibleId;
+                    $isExternalOfficer = \App\Models\User::query()
+                        ->where('user_id', $responsibleId)
+                        ->whereHas('role', fn ($query) => $query->where('role_name', 'external_officer'))
+                        ->exists();
+                    if (!$isExternalOfficer) {
+                        continue;
+                    }
+                    $responsibilityLabel = $decision->topic ?: 'a meeting decision';
+                    $this->notifications->sendToUser(
+                        $responsibleId,
+                        'minute_responsibility_assigned',
+                        'You have a responsibility in approved meeting minutes',
+                        "You were selected as responsible for {$responsibilityLabel} in meeting {$meetingCode}. The approved minutes are now available in your external officer portal.",
+                        '/dashboard/external-officer#minutes',
+                        'meeting_minute',
+                        $minute->minute_id,
+                        'important',
+                    );
+                }
+            }
+        }
+
+        $latestLetter = $minute->meeting?->letters?->sortByDesc('letter_id')->first();
+        foreach ($latestLetter?->recipients ?? [] as $recipient) {
+            $recipientUserIds = collect();
+            if ($recipient->user_id && \App\Models\User::query()
+                ->where('user_id', $recipient->user_id)
+                ->whereHas('role', fn ($query) => $query->where('role_name', 'external_officer'))
+                ->exists()) {
+                $recipientUserIds->push((int) $recipient->user_id);
+            }
+            if ($recipient->organization_id) {
+                $recipientUserIds = $recipientUserIds->merge(
+                    \App\Models\User::query()
+                        ->where('organization_id', $recipient->organization_id)
+                        ->whereHas('role', fn ($query) => $query->where('role_name', 'external_officer'))
+                        ->pluck('user_id')
+                );
+            }
+            $recipientUserIds->unique()->each(fn (int $userId) => $this->notifications->sendToUser(
+                $userId,
+                'approved_minutes_available',
+                'Approved meeting minutes are available',
+                "The approved minutes for meeting {$meetingCode} are now available in your external officer portal.",
+                '/dashboard/external-officer',
+                'meeting_minute',
+                $minute->minute_id,
+            ));
+        }
+    }
+
     private function resetWorkflowForResubmission(ApprovableDocument $document, int $submittedBy): void
     {
         $document->steps()->where('step_order', 1)->update([
@@ -270,6 +341,7 @@ class ApprovalController extends Controller
 
             if ($document->document_type === 'minute' && $document->source_id) {
                 MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'approved']);
+                $this->notifyApprovedMinuteTargets($document);
             }
         }
 

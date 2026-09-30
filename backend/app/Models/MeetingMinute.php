@@ -12,7 +12,7 @@ class MeetingMinute extends Model
     protected $primaryKey = 'minute_id';
 
     protected $fillable = [
-        'meeting_id', 'discussion_summary', 'closing_remarks', 'signatory_name',
+        'meeting_id', 'meeting_description', 'discussion_summary', 'closing_remarks', 'signatory_name',
         'signatory_designation', 'status', 'created_by',
     ];
 

@@ -54,11 +54,28 @@ const plainText = (html: string | null | undefined) => {
   return document.body.textContent?.trim() ?? '';
 };
 
+const responsibilityNames = (
+  responsibility: string | null,
+  attendees: ExternalOfficerMeeting['attendees'],
+): string[] => {
+  try {
+    const parsed: unknown = JSON.parse(responsibility || '[]');
+    if (!Array.isArray(parsed)) return [];
+    const userIds = parsed.map(Number).filter(Number.isInteger);
+    return attendees
+      .filter((attendee) => userIds.includes(attendee.user_id))
+      .map((attendee) => attendee.full_name);
+  } catch {
+    return [];
+  }
+};
+
 export default function ExternalOfficerDashboard() {
   const { user } = useAuth();
   const location = useLocation();
   const [meetings, setMeetings] = useState<ExternalOfficerMeeting[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedMinuteId, setSelectedMinuteId] = useState<number | null>(null);
   const [letterMeeting, setLetterMeeting] = useState<ExternalOfficerMeeting | null>(null);
   const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -109,6 +126,15 @@ export default function ExternalOfficerDashboard() {
   const upcomingCount = meetings.filter((meeting) => meetingState(meeting) === 'Upcoming').length;
   const letterCount = meetings.filter((meeting) => meeting.letter).length;
   const isMeetingsView = location.hash === '#meetings';
+  const isMinutesView = location.hash === '#minutes';
+  const approvedMinutes = meetings.flatMap((meeting) => meeting.minutes.map((minute) => ({ ...minute, meeting })));
+  const selectedMinute = approvedMinutes.find((minute) => minute.minute_id === selectedMinuteId) ?? null;
+
+  useEffect(() => {
+    if (isMinutesView && approvedMinutes.length > 0 && !approvedMinutes.some((minute) => minute.minute_id === selectedMinuteId)) {
+      setSelectedMinuteId(approvedMinutes[0].minute_id);
+    }
+  }, [approvedMinutes, isMinutesView, selectedMinuteId]);
 
   const openLetterPreview = async (meeting: ExternalOfficerMeeting) => {
     if (!meeting.letter) return;
@@ -313,6 +339,113 @@ export default function ExternalOfficerDashboard() {
           ].map((detail) => <div key={detail.label} className="flex gap-3 rounded-lg bg-slate-50 p-3"><detail.icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" /><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{detail.label}</p><p className="mt-0.5 text-sm font-medium text-slate-700">{detail.value}</p></div></div>)}</div><div><h3 className="text-sm font-bold text-slate-900">Meeting description</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{selected.description || 'No additional meeting description has been provided.'}</p></div>{excusePanel}{selected.letter ? <button id="letters" onClick={() => openLetterPreview(selected)} disabled={isLetterLoading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"><FileText className="h-4 w-4" />{isLetterLoading ? 'Loading letter...' : 'View approved meeting letter'}</button> : <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">The approved meeting letter is not available yet.</div>}</div></div> : <div className="self-start rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Select a meeting to view its details.</div>}
         </section>
         </>}
+
+        {isMinutesView && <section className="sinhala-ui space-y-6">
+          <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8">
+            <p className="text-base font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)] dark:text-blue-300">External Officer Portal</p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Approved Meeting Minutes</h1>
+            <p className="mt-2 max-w-2xl text-base leading-6 text-slate-600 dark:text-slate-300">ඔබ වෙත යොමු කළ සහ ඔබට වගකීම් පවරා ඇති රැස්වීම්වල අනුමත වාර්තා මෙහි බලන්න.</p>
+          </header>
+
+          {approvedMinutes.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-base text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+              No approved meeting minutes have been shared with you yet.
+            </div>
+          ) : (
+            <div className="grid items-start gap-6 xl:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.6fr)]">
+              <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+                  <h2 className="font-bold text-slate-900 dark:text-white">Available Minutes</h2>
+                  <p className="mt-1 text-base text-slate-500 dark:text-slate-400">Select a report to view its details.</p>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {approvedMinutes.map((minute) => (
+                    <button
+                      key={minute.minute_id}
+                      type="button"
+                      onClick={() => setSelectedMinuteId(minute.minute_id)}
+                      className={`block w-full p-5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/60 ${selectedMinuteId === minute.minute_id ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-white dark:bg-slate-800'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-semibold leading-6 text-slate-900 dark:text-white">{minute.meeting.title}</p>
+                        <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-base font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">Approved</span>
+                      </div>
+                      <p className="mt-2 text-base text-slate-500 dark:text-slate-400">{minute.meeting.meeting_code && <>{minute.meeting.meeting_code} · </>}{formatDate(minute.meeting.meeting_date)}</p>
+                    </button>
+                  ))}
+                </div>
+              </aside>
+
+              {selectedMinute && <article className="rounded-2xl border border-slate-200 bg-slate-100 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 sm:p-5">
+                <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:space-y-8 sm:p-8 lg:p-10">
+                  <header className="rounded-xl bg-slate-50 px-5 py-7 text-center dark:bg-slate-900/70 sm:px-8">
+                    <h2 className="mt-3 text-3xl font-bold leading-relaxed text-slate-900 dark:text-white">{selectedMinute.meeting.title}</h2>
+                    <p className="mt-2 text-base text-slate-600 dark:text-slate-300">{selectedMinute.meeting.meeting_code && <>{selectedMinute.meeting.meeting_code} · </>}{formatDate(selectedMinute.meeting.meeting_date)}</p>
+                    <div className="mt-5 flex flex-wrap justify-center gap-3">
+                      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <span className="font-semibold">වේලාව: </span>{formatTime(selectedMinute.meeting.start_time)}{selectedMinute.meeting.end_time ? ` – ${formatTime(selectedMinute.meeting.end_time)}` : ''}
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <span className="font-semibold">ස්ථානය: </span>{selectedMinute.meeting.location || 'සඳහන් කර නැත'}
+                      </div>
+                    </div>
+                  </header>
+
+                  <section className="rounded-xl border border-slate-200 p-5 dark:border-slate-700 sm:p-6">
+                    <h3 className="border-l-4 border-[var(--color-secondary)] pl-3 text-lg font-bold leading-relaxed text-slate-900 dark:text-white">සහභාගී වූ නිලධාරීන්</h3>
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      {selectedMinute.meeting.attendees.map((attendee, index) => (
+                        <div key={attendee.user_id} className="rounded-lg bg-slate-50 p-4 dark:bg-slate-700/50">
+                          <p className="text-base font-semibold leading-6 text-slate-900 dark:text-white">{String(index + 1).padStart(2, '0')}. {attendee.full_name}</p>
+                          <p className="mt-1 text-base leading-6 text-slate-600 dark:text-slate-300">{[attendee.designation, attendee.organization?.organization_name].filter(Boolean).join(' · ') || '—'}</p>
+                        </div>
+                      ))}
+                      {selectedMinute.meeting.attendees.length === 0 && <p className="text-base text-slate-500 dark:text-slate-400">සහභාගී වූවන් සඳහන් කර නැත.</p>}
+                    </div>
+                  </section>
+
+                  {selectedMinute.meeting_description && <section className="rounded-xl border border-slate-200 p-5 dark:border-slate-700 sm:p-6">
+                    <h3 className="border-l-4 border-[var(--color-secondary)] pl-3 text-lg font-bold leading-relaxed text-slate-900 dark:text-white">රැස්වීමේ විස්තරය</h3>
+                    <p className="mt-4 whitespace-pre-line text-base leading-7 text-slate-700 dark:text-slate-200">{selectedMinute.meeting_description}</p>
+                  </section>}
+
+                  <section className="rounded-xl border border-slate-200 p-5 dark:border-slate-700 sm:p-6">
+                    <h3 className="border-l-4 border-[var(--color-secondary)] pl-3 text-lg font-bold leading-relaxed text-slate-900 dark:text-white">පිළිගැනීම සහ රැස්වීමේ අරමුණ</h3>
+                    <p className="mt-4 whitespace-pre-line text-base leading-7 text-slate-700 dark:text-slate-200">{selectedMinute.discussion_summary || 'සාරාංශයක් සඳහන් කර නැත.'}</p>
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 p-5 dark:border-slate-700 sm:p-6">
+                    <h3 className="border-l-4 border-[var(--color-secondary)] pl-3 text-lg font-bold leading-relaxed text-slate-900 dark:text-white">සාකච්ඡා කරුණු සහ තීරණ</h3>
+                    <div className="mt-5 space-y-4">
+                      {selectedMinute.decisions.map((decision, index) => {
+                        const assignedNames = responsibilityNames(decision.responsibility, selectedMinute.meeting.attendees);
+                        return <div key={decision.decision_id} className="rounded-lg bg-slate-50 p-4 dark:bg-slate-700/50 sm:p-5">
+                          <p className="text-base font-semibold uppercase tracking-wide text-[var(--color-primary)] dark:text-blue-300">{String(index + 1).padStart(2, '0')} · {decision.topic || 'තීරණය'}</p>
+                          <p className="mt-3 whitespace-pre-line text-base leading-7 text-slate-800 dark:text-slate-100">{decision.decision_text}</p>
+                          {assignedNames.length > 0 && <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-600">
+                            <p className="text-base font-bold text-slate-600 dark:text-slate-300">වගකීම</p>
+                            <p className="mt-1 text-base leading-6 text-slate-700 dark:text-slate-200">{assignedNames.join(' · ')}</p>
+                          </div>}
+                        </div>;
+                      })}
+                      {selectedMinute.decisions.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-base text-slate-500 dark:bg-slate-700/50 dark:text-slate-400">සාකච්ඡා කරුණු හෝ තීරණ සඳහන් කර නැත.</p>}
+                    </div>
+                  </section>
+
+                  {selectedMinute.closing_remarks && <section className="rounded-xl border border-slate-200 p-5 dark:border-slate-700 sm:p-6">
+                    <h3 className="border-l-4 border-[var(--color-secondary)] pl-3 text-lg font-bold leading-relaxed text-slate-900 dark:text-white">අවසන් සටහන්</h3>
+                    <p className="mt-4 whitespace-pre-line text-base leading-7 text-slate-700 dark:text-slate-200">{selectedMinute.closing_remarks}</p>
+                  </section>}
+
+                  {(selectedMinute.signatory_name || selectedMinute.signatory_designation) && <footer className="border-t border-slate-200 pt-6 dark:border-slate-700">
+                    <p className="text-base font-semibold text-slate-900 dark:text-white">{selectedMinute.signatory_name}</p>
+                    <p className="mt-1 text-base text-slate-600 dark:text-slate-300">{selectedMinute.signatory_designation}</p>
+                  </footer>}
+                </div>
+              </article>}
+            </div>
+          )}
+        </section>}
       </div>
 
       {excuseMeeting && (

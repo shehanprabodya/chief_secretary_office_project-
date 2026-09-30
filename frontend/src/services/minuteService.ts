@@ -8,7 +8,7 @@ export const minuteService = {
     return data;
   },
 
-  async saveDraft(minuteId: number, payload: Pick<MeetingMinute, 'discussion_summary' | 'closing_remarks' | 'signatory_name' | 'signatory_designation'>): Promise<MeetingMinute> {
+  async saveDraft(minuteId: number, payload: Pick<MeetingMinute, 'meeting_description' | 'discussion_summary' | 'closing_remarks' | 'signatory_name' | 'signatory_designation'>): Promise<MeetingMinute> {
     const { data } = await api.put<{ minute: MeetingMinute }>(`/officer/minutes/${minuteId}`, payload);
     return data.minute;
   },

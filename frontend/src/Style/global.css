@@ -11,6 +11,15 @@
 }
 
 @font-face {
+  font-family: "Iskoola Pota Minutes";
+  src: url("/fonts/Iskoola%20Pota%20Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0D80-0DFF;
+}
+
+@font-face {
   font-family: "Iskoola Pota UI";
   src: url("/fonts/Iskoola Pota Regular.ttf") format("truetype");
   font-style: normal;
@@ -218,4 +227,18 @@ h6 {
     flex-direction: column;
     gap: clamp(1rem, 1.5vw, 1.5rem);
   }
+}
+
+
+/* Use the bundled Sinhala font directly in the external minutes view. The UI
+   font has size adjustment tuned for mixed dashboard copy, which can distort
+   Sinhala mark placement in document headings and body text. */
+.sinhala-ui,
+.sinhala-ui * {
+  font-family: "Iskoola Pota Minutes", "Iskoola Pota", "Noto Sans Sinhala", "Nirmala UI", sans-serif !important;
+  letter-spacing: normal;
+  word-spacing: -0.04em;
+  font-kerning: normal;
+  font-synthesis: weight;
+  text-rendering: optimizeLegibility;
 }
