@@ -36,5 +36,4 @@ export interface MeetingMinute {
   signatory_designation: string | null;
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   decisions: MinuteDecision[];
-  action_items: ActionItem[];
 }

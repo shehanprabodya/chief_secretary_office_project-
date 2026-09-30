@@ -28,7 +28,7 @@ class MinuteController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $minute = MeetingMinute::with('meeting.attendees', 'decisions', 'actionItems.responsibleOfficer')
+        $minute = MeetingMinute::with('meeting.attendees', 'decisions')
             ->findOrFail($id);
 
         return response()->json(['minute' => $minute]);
@@ -51,7 +51,7 @@ class MinuteController extends Controller
             ['status' => 'draft', 'created_by' => $request->user()->user_id]
         );
 
-        $minute->load('decisions', 'actionItems.responsibleOfficer');
+        $minute->load('decisions');
 
         $latestLetter = $meeting->letters->sortByDesc('letter_id')->first();
         $letterRecipients = $latestLetter
@@ -91,7 +91,7 @@ class MinuteController extends Controller
             $minute->update($request->only(['meeting_description', 'discussion_summary']));
         }
 
-        $minute->load('decisions', 'actionItems.responsibleOfficer');
+        $minute->load('decisions');
 
         return response()->json(['minute' => $minute, 'meeting' => $meeting], $minute->wasRecentlyCreated ? 201 : 200);
     }
@@ -241,7 +241,6 @@ class MinuteController extends Controller
         $minute = MeetingMinute::with([
             'meeting.attendees.organization',
             'decisions',
-            'actionItems.responsibleOfficer',
         ])->findOrFail($id);
 
         // Basic authorization

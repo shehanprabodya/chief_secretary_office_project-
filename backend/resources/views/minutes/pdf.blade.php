@@ -86,7 +86,7 @@
         <thead><tr><th class="item-no">අනු අංකය</th><th class="item-topic">කාරණය</th><th class="item-detail">තීරණය</th><th class="item-owner">වගකීම</th></tr></thead>
         <tbody>
         @php
-            $hasItems = $minute->decisions->isNotEmpty() || $minute->actionItems->isNotEmpty();
+            $hasItems = $minute->decisions->isNotEmpty();
         @endphp
         @foreach($minute->decisions as $index => $decision)
             <tr>
@@ -114,14 +114,6 @@
                         —
                     @endforelse
                 </td>
-            </tr>
-        @endforeach
-        @foreach($minute->actionItems as $index => $item)
-            <tr>
-                <td class="item-no">{{ sprintf('%02d', $minute->decisions->count() + $index + 1) }}</td>
-                <td>පසු විපරම් කටයුත්ත</td>
-                <td>{!! nl2br(e($item->task_description)) !!}</td>
-                <td>{{ $item->responsibleOfficer?->full_name ?? $item->responsibleOfficer?->name ?? '—' }}{{ $item->deadline ? ' · නියමිත දිනය ' . $item->deadline->format('d/m/Y') : '' }}</td>
             </tr>
         @endforeach
         @unless($hasItems)

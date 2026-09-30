@@ -31,8 +31,12 @@ class ExternalOfficerController extends Controller
             ->with([
                 'subject:id,code,title',
                 'creator:user_id,full_name,designation',
+                'attendees.organization',
                 'attendanceExcuseRequests' => fn ($query) => $query
                     ->where('user_id', $userId),
+                'minutes' => fn ($query) => $query
+                    ->where('status', 'approved')
+                    ->with('decisions'),
                 'letters' => fn ($query) => $query
                     ->whereIn('status', ['approved', 'dispatched'])
                     ->latest('letter_id')
@@ -51,7 +55,17 @@ class ExternalOfficerController extends Controller
                     ]),
             ])
             ->withCount('attendees')
-            ->whereHas('attendees', fn ($query) => $query->where('users.user_id', $userId))
+            ->where(function ($query) use ($userId, $request) {
+                $query->whereHas('letters', fn ($letterQuery) => $letterQuery
+                    ->whereIn('status', ['approved', 'dispatched'])
+                    ->whereHas('recipients', fn ($recipients) => $recipients->where(function ($recipientQuery) use ($userId, $request) {
+                        $recipientQuery->where('user_id', $userId);
+                        if ($request->user()->organization_id) {
+                            $recipientQuery->orWhere('organization_id', $request->user()->organization_id);
+                        }
+                    })))
+                    ->orWhereHas('attendees', fn ($attendees) => $attendees->where('users.user_id', $userId));
+            })
             ->where('status', '!=', 'cancelled')
             ->orderByRaw("CASE WHEN meeting_date >= ? THEN 0 ELSE 1 END", [now()->toDateString()])
             ->orderBy('meeting_date')
@@ -77,9 +91,29 @@ class ExternalOfficerController extends Controller
                     'subject' => $meeting->subject,
                     'organizer' => $meeting->creator?->full_name,
                     'organizer_designation' => $meeting->creator?->designation,
+                    'attendees' => $meeting->attendees->map(fn ($attendee) => [
+                        'user_id' => $attendee->user_id,
+                        'full_name' => $attendee->full_name,
+                        'designation' => $attendee->designation,
+                        'organization' => $attendee->organization ? [
+                            'organization_id' => $attendee->organization->organization_id,
+                            'organization_name' => $attendee->organization->organization_name,
+                            'address' => $attendee->organization->address,
+                        ] : null,
+                    ])->values(),
                     'excuse_request' => $excuseRequest
                         ? $this->excuseRequestData($excuseRequest)
                         : null,
+                    'minutes' => $meeting->minutes->map(fn ($minute) => [
+                        'minute_id' => $minute->minute_id,
+                        'meeting_id' => $minute->meeting_id,
+                        'signatory_name' => $minute->signatory_name,
+                        'signatory_designation' => $minute->signatory_designation,
+                        'meeting_description' => $minute->meeting_description,
+                        'discussion_summary' => $minute->discussion_summary,
+                        'closing_remarks' => $minute->closing_remarks,
+                        'decisions' => $minute->decisions,
+                    ])->values(),
                     'letter' => $letter ? [
                         'letter_id' => $letter->letter_id,
                         'sender_name' => $letter->sender_name,

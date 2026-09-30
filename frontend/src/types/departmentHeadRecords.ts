@@ -75,7 +75,6 @@ export interface DepartmentHeadMinute {
   status: 'draft' | 'pending_approval' | 'approved';
   created_at: string;
   decisions_count: number;
-  action_items_count: number;
   creator: DepartmentOfficer;
   meeting?: {
     meeting_id: number;
