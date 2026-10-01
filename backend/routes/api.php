@@ -11,9 +11,9 @@ use App\Http\Controllers\Api\MinuteController;
 use App\Http\Controllers\Api\ExternalOfficerController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DepartmentHeadRecordController;
-use App\Http\Controllers\Api\admin\AdminDashboardController;
-use App\Http\Controllers\Api\admin\UserManagementController;
-use App\Http\Controllers\Api\admin\SubjectManagementController;
+use App\Http\Controllers\Api\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\Admin\UserManagementController;
+use App\Http\Controllers\Api\Admin\SubjectManagementController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
