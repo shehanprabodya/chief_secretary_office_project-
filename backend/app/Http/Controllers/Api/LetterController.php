@@ -9,14 +9,14 @@ use App\Models\Organization;
 use App\Models\Subject;
 use App\Models\User;
 use App\Services\LetterPdfService;
-use App\Mail\MeetingLetterMail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\Process\Process;
 use Throwable;
 use ZipArchive;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\MeetingLetterMail;
 
 class LetterController extends Controller
 {
@@ -33,6 +33,7 @@ class LetterController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Repair legacy status mismatches caused by draft saves after submission.
         $approvalStatuses = ApprovableDocument::where('document_type', 'letter')
             ->whereIn('source_id', $letters->pluck('letter_id'))
             ->orderByDesc('document_id')
@@ -41,9 +42,8 @@ class LetterController extends Controller
             ->keyBy('source_id');
 
         foreach ($letters as $letter) {
-            $workflowStatus = $this->letterStatusFromApproval(
-                $approvalStatuses->get($letter->letter_id)?->status
-            );
+            $approvalStatus = $approvalStatuses->get($letter->letter_id)?->status;
+            $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
 
             if ($workflowStatus && $letter->status !== $workflowStatus) {
                 $letter->updateQuietly(['status' => $workflowStatus]);
@@ -54,7 +54,7 @@ class LetterController extends Controller
     }
 
     /**
-     * Get a single letter with all relations.
+     * Get a single letter with all relations
      */
     public function show(int $id): JsonResponse
     {
