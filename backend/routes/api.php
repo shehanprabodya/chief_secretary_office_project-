@@ -35,6 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Meeting creation is shared by the officer and admin meeting workflow.
     Route::post('/meetings', [MeetingController::class, 'store'])
         ->middleware('role:officer,admin');
+    Route::get('/meeting-subjects', [MeetingController::class, 'subjectOptions'])
+        ->middleware('role:officer,admin');
 
     // Lookups - accessible to all authenticated users (needed for forms)
     Route::prefix('admin')->group(function () {
@@ -82,6 +84,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('/{id}/logs', [UserManagementController::class, 'accessLogs']);
         });
+
+        Route::get('/organizations', [UserManagementController::class, 'organizationIndex']);
+        Route::post('/organizations', [UserManagementController::class, 'organizationStore']);
+        Route::put('/organizations/{organization}', [UserManagementController::class, 'organizationUpdate']);
+        Route::delete('/organizations/{organization}', [UserManagementController::class, 'organizationDestroy']);
 
         Route::apiResource('subjects', SubjectManagementController::class)
             ->only(['index', 'store', 'update', 'destroy']);
