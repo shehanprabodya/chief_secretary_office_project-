@@ -154,6 +154,7 @@ export default function Hero({
                           whitespace-nowrap
                           w-96
                       "
+                      style={name === officeNames[0] ? { fontFamily: '"Iskoola Pota", sans-serif' } : undefined}
                       >
                       {name}
                       </span>

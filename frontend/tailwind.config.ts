@@ -37,7 +37,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['Iskoola Pota', 'Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
         serif: ['Georgia', 'serif'],
         mono: ['Menlo', 'Monaco', 'monospace'],
       },

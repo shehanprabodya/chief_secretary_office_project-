@@ -8,17 +8,22 @@ use App\Models\Meeting;
 use App\Models\Organization;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\LetterPdfService;
+use App\Mail\MeetingLetterMail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\Process\Process;
 use Throwable;
 use ZipArchive;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\MeetingLetterMail;
 
 class LetterController extends Controller
 {
+    public function __construct(private readonly LetterPdfService $letterPdfService)
+    {
+    }
+
     /**
      * List letters visible to officer-role users.
      */
@@ -28,7 +33,6 @@ class LetterController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Repair legacy status mismatches caused by draft saves after submission.
         $approvalStatuses = ApprovableDocument::where('document_type', 'letter')
             ->whereIn('source_id', $letters->pluck('letter_id'))
             ->orderByDesc('document_id')
@@ -37,8 +41,9 @@ class LetterController extends Controller
             ->keyBy('source_id');
 
         foreach ($letters as $letter) {
-            $approvalStatus = $approvalStatuses->get($letter->letter_id)?->status;
-            $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+            $workflowStatus = $this->letterStatusFromApproval(
+                $approvalStatuses->get($letter->letter_id)?->status
+            );
 
             if ($workflowStatus && $letter->status !== $workflowStatus) {
                 $letter->updateQuietly(['status' => $workflowStatus]);
@@ -49,7 +54,7 @@ class LetterController extends Controller
     }
 
     /**
-     * Get a single letter with all relations
+     * Get a single letter with all relations.
      */
     public function show(int $id): JsonResponse
     {
@@ -273,8 +278,9 @@ class LetterController extends Controller
             'creator'
         )->findOrFail($id);
 
-        if (!$this->canModifyLetter($request, $letter)) {
-            return response()->json(['message' => 'You can only preview letters created by another officer.'], 403);
+        // Allow users who can export (creators, department heads) to generate/preview
+        if (!$this->canExportLetter($request, $letter)) {
+            return response()->json(['message' => 'You do not have permission to generate this letter.'], 403);
         }
 
         if (empty($letter->content)) {
@@ -328,10 +334,7 @@ class LetterController extends Controller
         ]);
     }
 
-    /**
-     * Download as PDF — returns base64 encoded PDF
-     * (Uses a simple HTML-to-PDF approach; swap with wkhtmltopdf/Dompdf if needed)
-     */
+    /** Download a letter PDF rendered through the shared Chromium service. */
     public function downloadPdf(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $letter = Letter::with(
@@ -345,47 +348,20 @@ class LetterController extends Controller
             return response()->json(['message' => 'You do not have permission to export this letter.'], 403);
         }
 
-        $html = $this->buildLetterHtml($letter, true); // true = include full page CSS
         $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
 
         try {
-            $path = $this->convertHtmlWithLibreOffice($html, 'pdf');
+            $html = $this->buildLetterHtml($letter, true);
+            $pdf = $this->letterPdfService->generate($html);
+        } catch (Throwable $exception) {
+            report($exception);
 
-            return response()->download($path, $filename, [
-                'Content-Type' => 'application/pdf',
-            ])->deleteFileAfterSend(true);
-        } catch (Throwable) {
-            // Fallback for environments without a working LibreOffice service.
+            return response()->json([
+                'message' => 'The letter PDF could not be rendered. Check the server Playwright and Chromium installation.',
+            ], 503);
         }
 
-        // Fallback: Dompdf (composer require dompdf/dompdf)
-        $options = new \Dompdf\Options();
-        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        $options->set('defaultFont', 'Iskoola Pota');
-        $options->setChroot(['/usr/share/fonts', base_path(), dirname($fontPath)]);
-
-        $dompdfFontDir = storage_path('app/dompdf-fonts');
-        if (!is_dir($dompdfFontDir)) {
-            mkdir($dompdfFontDir, 0775, true);
-        }
-        $options->set('fontDir', $dompdfFontDir);
-        $options->set('fontCache', $dompdfFontDir);
-
-        $dompdf = new \Dompdf\Dompdf($options);
-        if (is_file($fontPath)) {
-            $dompdf->getFontMetrics()->registerFont([
-                'family' => 'Iskoola Pota',
-                'weight' => 'normal',
-                'style' => 'normal',
-            ], 'file://' . $fontPath);
-        }
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper([0, 0, 576, 841.89], 'portrait');
-        $dompdf->render();
-
-        return response($dompdf->output(), 200, [
+        return response($pdf, 200, [
             'Content-Type'        => 'application/pdf',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
@@ -438,34 +414,7 @@ class LetterController extends Controller
             return response()->json(['message' => 'Letter content is empty. Please write the letter body first.'], 422);
         }
 
-        $html = $this->buildLetterHtml($letter, true);
         $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
-
-        try {
-            $pdfPath = $this->convertHtmlWithLibreOffice($html, 'pdf');
-        } catch (Throwable) {
-            $options = new \Dompdf\Options();
-            $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-            $options->set('defaultFont', 'Iskoola Pota');
-
-            $dompdf = new \Dompdf\Dompdf($options);
-            if (is_file($fontPath)) {
-                $dompdf->getFontMetrics()->registerFont([
-                    'family' => 'Iskoola Pota',
-                    'weight' => 'normal',
-                    'style' => 'normal',
-                ], 'file://' . $fontPath);
-            }
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper([0, 0, 576, 841.89], 'portrait');
-            $dompdf->render();
-
-            $pdfPath = tempnam(sys_get_temp_dir(), 'letter-') . '.pdf';
-            file_put_contents($pdfPath, $dompdf->output());
-        }
-
         $emails = $letter->recipients->map(fn($r) => $r->user?->email)
             ->filter()
             ->unique()
@@ -477,18 +426,36 @@ class LetterController extends Controller
         }
 
         try {
+            $html = $this->buildLetterHtml($letter, true);
+            $pdf = $this->letterPdfService->generate($html);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'The letter PDF could not be rendered. Check the server Playwright and Chromium installation.',
+            ], 503);
+        }
+
+        try {
+            $pdfPath = tempnam(sys_get_temp_dir(), 'letter-pdf-');
+            if ($pdfPath === false || file_put_contents($pdfPath, $pdf) === false) {
+                throw new \RuntimeException('Could not create the temporary email attachment.');
+            }
             Mail::to($emails)->send(new MeetingLetterMail($letter, $pdfPath, $filename));
-        } catch (Throwable $e) {
-            return response()->json(['message' => 'Failed to send email: ' . $e->getMessage()], 500);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'The letter email could not be sent because mail delivery failed.',
+            ], 500);
+        } finally {
+            if (isset($pdfPath) && is_file($pdfPath)) {
+                @unlink($pdfPath);
+            }
         }
 
         // Mark as dispatched
         $letter->update(['status' => 'dispatched']);
-
-        // Cleanup temporary file if created
-        if (isset($pdfPath) && is_file($pdfPath)) {
-            @unlink($pdfPath);
-        }
 
         return response()->json(['message' => 'Letter sent to recipients', 'emails' => $emails]);
     }
@@ -513,11 +480,7 @@ class LetterController extends Controller
 
         $fontConfigPath = $this->createExportFontConfig($workDir);
 
-        $conversionFilter = match ($format) {
-            'docx' => 'docx:Office Open XML Text',
-            'pdf' => 'pdf:writer_pdf_Export',
-            default => $format,
-        };
+        $conversionFilter = $format === 'docx' ? 'docx:Office Open XML Text' : $format;
 
         $process = new Process([
             $binary,
@@ -897,12 +860,7 @@ class LetterController extends Controller
         $designation = $letter->designation ?? 'ප්‍රධාන ලේකම්';
         $office = 'දකුණු පළාත';
 
-        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
-        $fontFace = is_file($fontPath)
-            ? '@font-face { font-family: "Iskoola Pota"; src: url("data:font/ttf;base64,'
-                . base64_encode((string) file_get_contents($fontPath))
-                . '") format("truetype"); font-style: normal; font-weight: 400; }'
-            : '';
+        $fontFace = $this->letterPdfService->fontFaceCss();
 
         return view('letters.document', compact(
             'standalone',

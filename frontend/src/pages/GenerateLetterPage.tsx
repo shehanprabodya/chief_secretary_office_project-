@@ -388,36 +388,12 @@ export default function GenerateLetterPage() {
   };
 
   const handlePrint = () => {
-    if (!previewHtml) {
+    // Use server-side PDF download instead of client print to preserve font embedding
+    if (!canEditLetter) {
       setActionMessage({ type: 'info', text: 'Please generate or preview the letter before printing.' });
       return;
     }
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`
-      <html>
-        <head>
-          <title>Print Letter</title>
-          <style>
-            @font-face {
-              font-family: 'Iskoola Pota';
-              src: url('/fonts/Iskoola Pota Regular.ttf') format('truetype');
-              font-style: normal;
-              font-weight: 400;
-            }
-            @page { size: 8in 297mm; margin: 10mm; }
-            html, body { margin: 0; padding: 0; }
-            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
-            .letter-page { width: 100%; box-sizing: border-box; }
-            .letter-page, .letter-page * { word-spacing: -1.5pt; }
-            .letter-page .body, .letter-page .body * { word-spacing: -1.5pt !important; }
-          </style>
-        </head>
-        <body>${previewHtml}</body>
-      </html>
-    `);
-    win.document.close();
-    win.print();
+    void handleDownloadPdf();
   };
 
   const handleDownloadPdf = async () => {

@@ -47,7 +47,7 @@ function hasHtml(value?: string | null) {
   return Boolean(value && /<\/?[a-z][\s\S]*>/i.test(value));
 }
 
-function htmlToPlainText(value?: string | null) {
+function htmlToPlainText(value?: string | null): string {
   if (!value) return '';
   if (!hasHtml(value)) return value;
 

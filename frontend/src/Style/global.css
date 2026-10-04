@@ -2,31 +2,23 @@
 
 @font-face {
   font-family: "Iskoola Pota";
-  src: url("/fonts/Iskoola Pota Regular.ttf") format("truetype");
+  src: url("/fonts/iskpota.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
   /* Sinhala and Sinhala Archaic Unicode blocks. */
-  unicode-range: U+0D80-0DFF, U+111E0-111FF;
+  /* Keep joiners in the same font run as Sinhala; Chrome needs them for
+     shaping repaya and other conjunct sequences correctly. */
+  unicode-range: U+0D80-0DFF, U+200C-200D, U+111E0-111FF;
 }
 
 @font-face {
-  font-family: "Iskoola Pota Minutes";
-  src: url("/fonts/Iskoola%20Pota%20Regular.ttf") format("truetype");
+  font-family: "Iskoola Pota";
+  src: url("/fonts/iskpotab.ttf") format("truetype");
   font-style: normal;
-  font-weight: 400;
+  font-weight: 700;
   font-display: swap;
-  unicode-range: U+0D80-0DFF;
-}
-
-@font-face {
-  font-family: "Iskoola Pota UI";
-  src: url("/fonts/Iskoola Pota Regular.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  size-adjust: 115%;
-  unicode-range: U+0D80-0DFF, U+111E0-111FF;
+  unicode-range: U+0D80-0DFF, U+200C-200D, U+111E0-111FF;
 }
 
 
@@ -65,6 +57,11 @@
   --transition-normal: 250ms ease-in-out;
 }
 
+/* Preferred application-wide Sinhala font */
+:root {
+  --font-sinhala: "Iskoola Pota", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 
 
 *,
@@ -92,18 +89,13 @@ body {
 
   color: var(--color-text-primary);
 
-  font-family:
-    "Iskoola Pota UI",
-    Inter,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sinhala);
 
   line-height: 1.5;
 
   text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  font-variant-ligatures: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -235,7 +227,7 @@ h6 {
    Sinhala mark placement in document headings and body text. */
 .sinhala-ui,
 .sinhala-ui * {
-  font-family: "Iskoola Pota Minutes", "Iskoola Pota", "Noto Sans Sinhala", "Nirmala UI", sans-serif !important;
+  font-family: "Iskoola Pota", "Nirmala UI", sans-serif !important;
   letter-spacing: normal;
   word-spacing: -0.04em;
   font-kerning: normal;

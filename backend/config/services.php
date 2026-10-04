@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'letter_pdf' => [
+        'node_binary' => env('LETTER_PDF_NODE_BINARY', 'node'),
+        'chromium_path' => env('LETTER_PDF_CHROMIUM_PATH'),
+        'browsers_path' => env('PLAYWRIGHT_BROWSERS_PATH'),
+        'timeout' => (int) env('LETTER_PDF_TIMEOUT', 75),
+    ],
+
 ];

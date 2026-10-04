@@ -12,13 +12,26 @@ import type { MeetingMinute } from '../types/minute';
 import type { Meeting } from '../types/meeting';
 
 const downloadBlob = (blob: Blob, contentDisposition: string | undefined, fallback: string) => {
-  const filename = contentDisposition?.match(/filename="?([^";]+)"?/i)?.[1] ?? fallback;
+  const encoded = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  let filename = fallback;
+  if (encoded) {
+    try {
+      filename = decodeURIComponent(encoded);
+    } catch {
+      filename = contentDisposition?.match(/filename="?([^";]+)"?/i)?.[1]?.trim() ?? fallback;
+    }
+  } else {
+    filename = contentDisposition?.match(/filename="?([^";]+)"?/i)?.[1]?.trim() ?? fallback;
+  }
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
-  window.URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 };
 
 export const departmentHeadRecordService = {
