@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/approvals/{id}', [ApprovalController::class, 'show']);
     Route::post('/approvals', [ApprovalController::class, 'store']);
     Route::post('/approvals/{id}/approve', [ApprovalController::class, 'approve']);
+    Route::put('/approvals/{id}/edit-and-forward', [ApprovalController::class, 'editAndForward']);
     Route::post('/approvals/{id}/reject', [ApprovalController::class, 'reject']);
     Route::post('/approvals/{id}/comments', [ApprovalController::class, 'addComment']);
 
@@ -147,6 +148,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('role:dept_head,deputy')->prefix('dept-head')->group(function () {
         Route::get('/officers', [DepartmentHeadRecordController::class, 'officers']);
+        Route::get('/letter-recipient-organizations', [DepartmentHeadRecordController::class, 'letterRecipientOrganizations']);
 
         Route::get('/letters', [DepartmentHeadRecordController::class, 'letters']);
         Route::get('/letters/{letter}', [DepartmentHeadRecordController::class, 'showLetter']);

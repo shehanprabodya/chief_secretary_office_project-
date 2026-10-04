@@ -114,11 +114,15 @@ class LetterController extends Controller
             }
         }
 
+        $subject = $request->filled('subject_id')
+            ? Subject::findOrFail($request->subject_id)
+            : ($meeting?->meeting_code ? Subject::where('code', $meeting->meeting_code)->first() : null);
+
         $data = [
             'sender_name'    => 'දකුණු පළාත් ප්‍රධාන ලේකම් කාර්යාලය',
-            'meeting_code'   => $meeting?->meeting_code,
+            'meeting_code'   => $subject?->code ?? $meeting?->meeting_code,
             'meeting_id'     => $meeting?->meeting_id,
-            'subject_id'     => $request->subject_id,
+            'subject_id'     => $subject?->id ?? $request->subject_id,
             'title'          => $request->title ?? '',
             'content'        => $request->content ?? '',
             'designation'    => $request->designation ?? 'ප්‍රධාන ලේකම්',
@@ -176,7 +180,7 @@ class LetterController extends Controller
      * meeting assignments. Internal attendees assigned through the meeting
      * form are preserved.
      */
-    private function syncExternalMeetingAttendees(int $meetingId): void
+    public function syncExternalMeetingAttendees(int $meetingId): void
     {
         $meeting = Meeting::with('letters.recipients')->find($meetingId);
 
