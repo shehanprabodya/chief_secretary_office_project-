@@ -13,8 +13,11 @@ const downloadBlob = (blob: Blob, filename: string) => {
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
-  window.URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 };
 
 export const attendanceService = {

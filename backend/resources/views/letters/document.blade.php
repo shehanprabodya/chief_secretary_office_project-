@@ -8,7 +8,7 @@
         {!! $fontFace !!}
 
         @@page {
-            size: 8in 297mm;
+            size: A4 portrait;
             margin: 10mm;
         }
 
@@ -16,25 +16,30 @@
         body {
             margin: 0;
             padding: 0;
+            font-family: "Iskoola Pota", sans-serif;
         }
 
         .letter-page {
             width: 100%;
             box-sizing: border-box;
             color: #000;
-            font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
+            font-family: "Iskoola Pota", sans-serif;
             font-size: 12pt;
             line-height: 1.3;
             letter-spacing: normal;
             word-spacing: -1.5pt;
+            font-kerning: normal;
+            font-variant-ligatures: normal;
         }
 
         .letter-page * {
             box-sizing: border-box;
-            font-family: "Iskoola Pota", "Noto Sans Sinhala", "DejaVu Sans", sans-serif;
+            font-family: "Iskoola Pota", sans-serif !important;
             font-size: 12pt;
             letter-spacing: normal;
             word-spacing: -1.5pt;
+            font-kerning: normal;
+            font-variant-ligatures: normal;
         }
 
         .letterhead-meta {

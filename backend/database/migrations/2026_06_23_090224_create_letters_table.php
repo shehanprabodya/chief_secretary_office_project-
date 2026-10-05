@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('letters', function (Blueprint $table) {
             $table->increments('letter_id');
             $table->unsignedInteger('meeting_id')->nullable();
-            $table->string('meeting_code', 50)->nullable(); // optional link to a meeting
+            $table->string('meeting_code', 50)->nullable(); // subject code shown as the letter's meeting code
             $table->string('sender_name', 255);
             $table->string('title', 255);
             $table->longText('content')->nullable();
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
             
             $table->foreignId('subject_id')->nullable()->constrained('subjects')->nullOnDelete();
-            $table->foreign('meeting_code')->references('meeting_code')->on('meetings')->onDelete('set null');
+            $table->foreign('meeting_code')->references('code')->on('subjects')->onDelete('set null');
             $table->foreign('meeting_id')->references('meeting_id')->on('meetings')->onDelete('set null');
             $table->foreign('created_by')->references('user_id')->on('users');
            

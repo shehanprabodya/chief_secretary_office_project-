@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\Letter;
 use App\Models\MeetingMinute;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,29 @@ use Illuminate\Validation\ValidationException;
 
 class DepartmentHeadRecordController extends Controller
 {
+    public function letterRecipientOrganizations(): JsonResponse
+    {
+        $organizations = Organization::where('status', 'ACTIVE')
+            ->with(['users' => fn (Builder $query) => $query
+                ->where('status', 'ACTIVE')
+                ->whereHas('role', fn (Builder $role) => $role->where('role_name', 'external_officer'))])
+            ->orderBy('organization_name')
+            ->get()
+            ->map(fn (Organization $organization) => [
+                'organization_id' => $organization->organization_id,
+                'organization_name' => $organization->organization_name,
+                'abbreviation' => $organization->abbreviation,
+                'officers' => $organization->users->map(fn (User $officer) => [
+                    'user_id' => $officer->user_id,
+                    'full_name' => $officer->full_name,
+                    'designation' => (string) ($officer->designation ?? ''),
+                    'label' => trim(($officer->designation ?? '') . ', ' . $organization->organization_name, ', '),
+                ])->values(),
+            ]);
+
+        return response()->json(['organizations' => $organizations]);
+    }
+
     public function officers(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Letter::class);

@@ -33,5 +33,38 @@ export interface ApprovableDocument {
   submitter: { user_id: number; full_name: string; role?: { role_name: string } };
   steps: ApprovalStep[];
   comments: ApprovalComment[];
+  source_letter?: {
+    letter_id: number;
+    title: string;
+    content: string;
+    designation: string | null;
+    signatory_name: string | null;
+    signature_date: string | null;
+    recipients: Array<{
+      letter_recipient_id: number;
+      organization_id: number | null;
+      user_id: number | null;
+      recipient_label: string | null;
+      organization?: { organization_name: string } | null;
+      user?: {
+        designation: string | null;
+        organization?: { organization_name: string } | null;
+      } | null;
+    }>;
+  } | null;
+  source_minute?: {
+    minute_id: number;
+    meeting_description: string | null;
+    discussion_summary: string | null;
+    closing_remarks: string | null;
+    signatory_name: string | null;
+    signatory_designation: string | null;
+    decisions: Array<{
+      decision_id: number;
+      topic: string | null;
+      decision_text: string;
+      responsibility: string | null;
+    }>;
+  } | null;
   created_at: string;
 }

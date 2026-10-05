@@ -13,39 +13,7 @@ interface PreviewModalProps {
 
 export default function PreviewModal({ html, letterId, onClose, allowExports = true, onDownloadPdf, onDownloadDocx }: PreviewModalProps) {
   const safeHtml = sanitizeDocumentHtml(html);
-  const previewHtml = `
-    <style>
-      .letter-page .recipients,
-      .letter-page .recipients *,
-      .letter-page .body,
-      .letter-page .body *,
-      .letter-page .signature,
-      .letter-page .signature * {
-        font-size: 12pt !important;
-      }
-
-      .letter-page .subject,
-      .letter-page .subject * {
-        font-size: 13pt !important;
-      }
-    </style>
-    ${safeHtml}
-    <style>
-      /* Counter the 125% screen zoom for fixed header coordinates. These
-         values keep the visible subject and date at 1.5in and 6.5in. */
-      .letter-page .letterhead-spacer {
-        width: 20.5mm !important;
-      }
-
-      .letter-page .letterhead-subject-column {
-        width: 101.6mm !important;
-      }
-
-      .letter-page .letterhead-date-column {
-        width: 61.1mm !important;
-      }
-    </style>
-  `;
+  const previewHtml = safeHtml;
 
   const handleDownloadPdf = async () => {
     await (onDownloadPdf ? onDownloadPdf() : letterService.downloadPdf(letterId));
@@ -56,34 +24,8 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
   };
 
   const handlePrint = () => {
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`
-      <html>
-        <head>
-          <title>Letter</title>
-          <style>
-            @font-face {
-              font-family: 'Iskoola Pota';
-              src: url('/fonts/Iskoola Pota Regular.ttf') format('truetype');
-              font-style: normal;
-              font-weight: 400;
-            }
-            @page { size: 8in 297mm; margin: 10mm; }
-            html, body { margin: 0; padding: 0; }
-            body { font-family: 'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif; font-size: 12pt; }
-            .letter-page { width: 100%; box-sizing: border-box; }
-            .letter-page, .letter-page * { letter-spacing: normal; word-spacing: -1.5pt; }
-            .letter-page .body, .letter-page .body * { word-spacing: -1.5pt !important; }
-          </style>
-        </head>
-        <body>${previewHtml}</body>
-      </html>
-    `);
-    win.document.close();
-    win.focus();
-    win.print();
-    win.close();
+    // Use the server-side PDF download to preserve font embedding and OpenType shaping
+    void handleDownloadPdf();
   };
 
   return (
@@ -133,10 +75,10 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
           <div
             className="mx-auto shrink-0 box-border bg-white p-[10mm] shadow-xl"
             style={{
-              width: '8in',
+              width: '210mm',
               minHeight: '297mm',
               zoom: 1.25,
-              fontFamily: "'Iskoola Pota', 'Noto Sans Sinhala', 'DejaVu Sans', sans-serif",
+              fontFamily: "'Iskoola Pota', sans-serif",
               fontSize: '12pt',
             }}
             dangerouslySetInnerHTML={{ __html: previewHtml }}

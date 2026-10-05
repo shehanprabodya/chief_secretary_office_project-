@@ -6,13 +6,14 @@ import {
 } from 'lucide-react';
 
 import AddUserModal from '../components/Admin/AddUserModal';
+import OrganizationModal from '../components/Admin/OrganizationModal';
 import ResetPasswordModal from '../components/Admin/ResetPasswordModal';
 import { adminService } from '../services/adminService';
-import type { AccessLog, AdminUser, UserStats } from '../types/admin';
+import type { AccessLog, AdminUser, Organization, UserStats } from '../types/admin';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 
-type Tab = 'users' | 'roles' | 'logs';
+type Tab = 'users' | 'roles' | 'organizations' | 'logs';
 
 const ROLE_BADGE: Record<string, string> = {
   admin: 'bg-blue-100 text-blue-800',
@@ -44,6 +45,17 @@ export default function UserManagementPage() {
   const [lastPage, setLastPage] = useState(1);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationPage, setOrganizationPage] = useState(1);
+  const [organizationLastPage, setOrganizationLastPage] = useState(1);
+  const [organizationTotal, setOrganizationTotal] = useState(0);
+  const [organizationSearch, setOrganizationSearch] = useState('');
+  const [organizationLoading, setOrganizationLoading] = useState(false);
+  const [organizationError, setOrganizationError] = useState<string | null>(null);
+  const [showOrganizationModal, setShowOrganizationModal] = useState(false);
+  const [editOrganization, setEditOrganization] = useState<Organization | null>(null);
+  const [deleteOrganization, setDeleteOrganization] = useState<Organization | null>(null);
+  const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
   const [logSearch, setLogSearch] = useState('');
   const [logPage, setLogPage] = useState(1);
@@ -77,6 +89,32 @@ export default function UserManagementPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
   }, [search, page, fetchUsers]);
+
+  const fetchOrganizations = useCallback(async () => {
+    if (activeTab !== 'organizations') return;
+    setOrganizationLoading(true);
+    setOrganizationError(null);
+    try {
+      const result = await adminService.getAdminOrganizations({
+        search: organizationSearch || undefined,
+        page: organizationPage,
+        per_page: 10,
+      });
+      setOrganizations(result.data);
+      setOrganizationTotal(result.total);
+      setOrganizationLastPage(result.last_page);
+    } catch (error) {
+      console.error(error);
+      setOrganizationError('Unable to load organizations.');
+    } finally {
+      setOrganizationLoading(false);
+    }
+  }, [activeTab, organizationPage, organizationSearch]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrganizations();
+  }, [fetchOrganizations]);
 
   const fetchAccessLogs = useCallback(async () => {
     if (activeTab !== 'logs') return;
@@ -121,7 +159,22 @@ export default function UserManagementPage() {
   const handleSaved = () => {
     fetchUsers();
     fetchStats();
+    fetchOrganizations();
     setEditUser(null);
+    setEditOrganization(null);
+  };
+
+  const handleDeleteOrganization = async () => {
+    if (!deleteOrganization) return;
+    setIsDeletingOrganization(true);
+    try {
+      await adminService.deleteOrganization(deleteOrganization.organization_id);
+      setDeleteOrganization(null);
+      await fetchOrganizations();
+      await fetchStats();
+    } finally {
+      setIsDeletingOrganization(false);
+    }
   };
 
   return (
@@ -143,7 +196,7 @@ export default function UserManagementPage() {
 
         {/* Tabs */}
         <div className="flex gap-6 border-b border-slate-200">
-          {(['users', 'roles', 'logs'] as Tab[]).map((tab) => (
+          {(['users', 'roles', 'organizations', 'logs'] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -153,7 +206,7 @@ export default function UserManagementPage() {
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
-              {tab === 'users' ? 'Users List' : tab === 'roles' ? 'Role Management' : 'Access Logs'}
+              {tab === 'users' ? 'Users List' : tab === 'roles' ? 'Role Management' : tab === 'organizations' ? 'Organizations' : 'Access Logs'}
             </button>
           ))}
         </div>
@@ -319,6 +372,104 @@ export default function UserManagementPage() {
           </div>
         )}
 
+        {activeTab === 'organizations' && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="relative max-w-md flex-1">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={organizationSearch}
+                  onChange={(e) => { setOrganizationSearch(e.target.value); setOrganizationPage(1); }}
+                  placeholder="Search organizations"
+                  className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+              <button
+                onClick={() => setShowOrganizationModal(true)}
+                className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+              >
+                <Building2 className="h-4 w-4" /> Add Organization
+              </button>
+            </div>
+
+            {organizationError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{organizationError}</div>
+            )}
+
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-6 py-3">Organization</th>
+                    <th className="px-6 py-3">Abbreviation</th>
+                    <th className="px-6 py-3">Contact</th>
+                    <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {organizationLoading ? (
+                    <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-400">Loading organizations...</td></tr>
+                  ) : organizations.length === 0 ? (
+                    <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-400">No organizations found</td></tr>
+                  ) : (
+                    organizations.map((org) => (
+                      <tr key={org.organization_id} className="hover:bg-slate-50/50">
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-semibold text-slate-900">{org.organization_name}</p>
+                            <p className="text-xs text-slate-400">{org.address || ''}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{org.abbreviation || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          <div>{org.email || '—'}</div>
+                          <div className="text-xs text-slate-400">{org.telephone || 'No phone'}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${org.status === 'ACTIVE' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {org.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setEditOrganization(org)}
+                              className="rounded-lg p-1.5 text-blue-500 hover:bg-blue-50"
+                              title="Edit organization"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteOrganization(org)}
+                              className="rounded-lg p-1.5 text-red-500 hover:bg-red-50"
+                              title="Delete organization"
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3">
+                <p className="text-sm text-slate-500">Showing {organizations.length} of {organizationTotal} organizations</p>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setOrganizationPage((p) => Math.max(1, p - 1))} disabled={organizationPage === 1} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-40">‹</button>
+                  {Array.from({ length: organizationLastPage }, (_, i) => i + 1).map((p) => (
+                    <button key={p} onClick={() => setOrganizationPage(p)} className={`h-8 w-8 rounded text-sm font-medium ${p === organizationPage ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{p}</button>
+                  ))}
+                  <button onClick={() => setOrganizationPage((p) => Math.min(organizationLastPage, p + 1))} disabled={organizationPage === organizationLastPage} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-40">›</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'logs' && (
           <div className="flex flex-col gap-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -365,6 +516,13 @@ export default function UserManagementPage() {
           onSaved={handleSaved}
         />
       )}
+      {(showOrganizationModal || editOrganization) && (
+        <OrganizationModal
+          organization={editOrganization}
+          onClose={() => { setShowOrganizationModal(false); setEditOrganization(null); }}
+          onSaved={handleSaved}
+        />
+      )}
       {resetUser && (
         <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />
       )}
@@ -378,6 +536,15 @@ export default function UserManagementPage() {
         isProcessing={isChangingStatus}
         onConfirm={handleToggleStatus}
         onCancel={() => setStatusUser(null)}
+      />
+      <ConfirmDialog
+        open={deleteOrganization !== null}
+        title="Delete organization?"
+        message={deleteOrganization ? `This will remove ${deleteOrganization.organization_name}. Users assigned to this organization must be reassigned first.` : 'This organization will be deleted.'}
+        confirmLabel="Delete"
+        isProcessing={isDeletingOrganization}
+        onConfirm={handleDeleteOrganization}
+        onCancel={() => setDeleteOrganization(null)}
       />
     </DashboardLayout>
   );

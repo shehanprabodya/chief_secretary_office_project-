@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class UserManagementController extends Controller
@@ -88,7 +89,100 @@ class UserManagementController extends Controller
             'roles' => $roles
              ]);
         }
-    
+
+    public function organizationIndex(Request $request): JsonResponse
+    {
+        $search = trim((string) $request->input('search', ''));
+
+        $query = Organization::query();
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('organization_name', 'like', "%{$search}%")
+                    ->orWhere('abbreviation', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('telephone', 'like', "%{$search}%")
+                    ->orWhere('address', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        $organizations = $query
+            ->orderBy('organization_name')
+            ->paginate($request->integer('per_page', 10));
+
+        return response()->json($organizations);
+    }
+
+    public function organizationStore(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'organization_name' => ['required', 'string', 'max:255', Rule::unique('organizations', 'organization_name')],
+            'abbreviation' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'telephone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'status' => ['nullable', 'in:ACTIVE,INACTIVE'],
+        ]);
+
+        $organization = Organization::create([
+            'organization_name' => trim($data['organization_name']),
+            'abbreviation' => isset($data['abbreviation']) ? trim($data['abbreviation']) : null,
+            'address' => isset($data['address']) ? trim($data['address']) : null,
+            'telephone' => isset($data['telephone']) ? trim($data['telephone']) : null,
+            'email' => isset($data['email']) ? trim($data['email']) : null,
+            'status' => $data['status'] ?? 'ACTIVE',
+        ]);
+
+        return response()->json([
+            'message' => 'Organization created successfully.',
+            'organization' => $organization,
+        ], 201);
+    }
+
+    public function organizationUpdate(Request $request, Organization $organization): JsonResponse
+    {
+        $data = $request->validate([
+            'organization_name' => ['required', 'string', 'max:255', Rule::unique('organizations', 'organization_name')->ignore($organization->organization_id, 'organization_id')],
+            'abbreviation' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'telephone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'status' => ['nullable', 'in:ACTIVE,INACTIVE'],
+        ]);
+
+        $organization->update([
+            'organization_name' => trim($data['organization_name']),
+            'abbreviation' => isset($data['abbreviation']) ? trim($data['abbreviation']) : null,
+            'address' => isset($data['address']) ? trim($data['address']) : null,
+            'telephone' => isset($data['telephone']) ? trim($data['telephone']) : null,
+            'email' => isset($data['email']) ? trim($data['email']) : null,
+            'status' => $data['status'] ?? $organization->status,
+        ]);
+
+        return response()->json([
+            'message' => 'Organization updated successfully.',
+            'organization' => $organization->fresh(),
+        ]);
+    }
+
+    public function organizationDestroy(Organization $organization): JsonResponse
+    {
+        if ($organization->users()->exists()) {
+            return response()->json([
+                'message' => 'This organization cannot be deleted because users are assigned to it.',
+            ], 409);
+        }
+
+        $organization->delete();
+
+        return response()->json([
+            'message' => 'Organization deleted successfully.',
+        ]);
+    }
 
     public function store(Request $request): JsonResponse
     {

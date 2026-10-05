@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, RefreshCw, Filter } from 'lucide-react';
+import { Search, RefreshCw, Filter, Pencil, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import WorkflowTracker from '../components/Approvals/WorkflowTracker';
 import { approvalService } from '../services/approvalService';
@@ -8,6 +8,24 @@ import { useAuth } from '../context/AuthContext';
 import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import type { ApprovableDocument } from '../types/approval';
+import type { DepartmentHeadEditPayload } from '../services/approvalService';
+import RecipientTagInput from '../components/Letters/RecipientTagInput';
+import type { Organization, RecipientTag } from '../types/letter';
+
+type LetterEdit = Extract<DepartmentHeadEditPayload, { title: string }> & { recipients: RecipientTag[] };
+type MinuteEdit = {
+  meeting_description?: string | null;
+  discussion_summary?: string | null;
+  closing_remarks?: string | null;
+  signatory_name?: string | null;
+  signatory_designation?: string | null;
+  decisions: Array<{
+    decision_id: number;
+    topic: string | null;
+    decision_text: string;
+    responsibility: string | null;
+  }>;
+};
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-orange-50 text-orange-700',
@@ -29,6 +47,17 @@ function hasHtml(value?: string | null) {
   return Boolean(value && /<\/?[a-z][\s\S]*>/i.test(value));
 }
 
+function htmlToPlainText(value?: string | null): string {
+  if (!value) return '';
+  if (!hasHtml(value)) return value;
+
+  const parsed = new DOMParser().parseFromString(value, 'text/html');
+  parsed.querySelectorAll('br').forEach((node) => node.replaceWith('\n'));
+  parsed.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6').forEach((node) => node.append('\n'));
+  const text = parsed.body.textContent ?? '';
+  return hasHtml(text) ? htmlToPlainText(text) : text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export default function ApprovalsPage() {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<ApprovableDocument[]>([]);
@@ -42,6 +71,10 @@ export default function ApprovalsPage() {
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [minutePdfUrl, setMinutePdfUrl] = useState<string | null>(null);
   const [isMinutePdfLoading, setIsMinutePdfLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [letterEdit, setLetterEdit] = useState<LetterEdit | null>(null);
+  const [minuteEdit, setMinuteEdit] = useState<MinuteEdit | null>(null);
+  const [recipientOrganizations, setRecipientOrganizations] = useState<Organization[]>([]);
 
   const fetchList = useCallback(async () => {
     setIsLoading(true);
@@ -68,12 +101,99 @@ export default function ApprovalsPage() {
 
   const handleSelectDoc = async (id: number) => {
     const doc = await approvalService.getById(id);
+    setIsEditing(false);
+    setLetterEdit(null);
+    setMinuteEdit(null);
     setSelectedDoc(doc);
     setActiveTab('preview');
   };
 
   const currentStep = selectedDoc?.steps?.find((s) => s.step_order === selectedDoc.current_step_order);
   const canAct = currentStep && user && currentStep.required_role === user.role && currentStep.status === 'pending';
+  const canEditSubmitted = Boolean(canAct && user?.role === 'dept_head' && ['letter', 'minute'].includes(selectedDoc?.document_type ?? ''));
+
+  const startEditing = async () => {
+    if (!selectedDoc) return;
+    try {
+      if (selectedDoc.document_type === 'letter' && selectedDoc.source_letter) {
+        const letter = selectedDoc.source_letter;
+        let organizations: Organization[];
+        try {
+          organizations = await approvalService.getRecipientOrganizations();
+        } catch (lookupError) {
+          console.warn('Recipient organization lookup unavailable; opening the letter with its saved recipients.', lookupError);
+          organizations = (letter.recipients ?? []).flatMap((recipient) => {
+            if (!recipient.organization_id || !recipient.organization?.organization_name) return [];
+            return [{
+              organization_id: recipient.organization_id,
+              organization_name: recipient.organization.organization_name,
+              abbreviation: null,
+            }];
+          }).filter((organization, index, all) => all.findIndex((item) => item.organization_id === organization.organization_id) === index);
+        }
+        setRecipientOrganizations(organizations);
+        setLetterEdit({
+          title: htmlToPlainText(letter.title),
+          content: htmlToPlainText(letter.content),
+          designation: htmlToPlainText(letter.designation),
+          signatory_name: htmlToPlainText(letter.signatory_name),
+          signature_date: letter.signature_date,
+          recipients: (letter.recipients ?? []).map((recipient) => ({
+            id: String(recipient.letter_recipient_id),
+            organization_id: recipient.organization_id ?? undefined,
+            user_id: recipient.user_id ?? undefined,
+            recipient_label: htmlToPlainText(recipient.recipient_label),
+            organization_name: recipient.organization?.organization_name ?? recipient.user?.organization?.organization_name,
+            designation: recipient.user?.designation ?? undefined,
+          })),
+        });
+      } else if (selectedDoc.document_type === 'minute' && selectedDoc.source_minute) {
+        const minute = selectedDoc.source_minute;
+        setMinuteEdit({
+          meeting_description: minute.meeting_description,
+          discussion_summary: minute.discussion_summary,
+          closing_remarks: minute.closing_remarks,
+          signatory_name: minute.signatory_name,
+          signatory_designation: minute.signatory_designation,
+          decisions: (minute.decisions ?? []).map((decision) => ({ ...decision })),
+        });
+      } else {
+        setError('The original document could not be loaded for editing. Refresh and try again.');
+        return;
+      }
+      setError(null);
+      setIsEditing(true);
+    } catch (err) {
+      console.error(err);
+      setError('Could not load letter recipients for editing. Refresh and try again.');
+    }
+  };
+
+  const handleEditAndForward = async () => {
+    if (!selectedDoc || (!letterEdit && !minuteEdit)) return;
+    setIsActing(true);
+    setError(null);
+    try {
+      const updated = await approvalService.editAndForward(
+        selectedDoc.document_id,
+      letterEdit
+        ? { ...letterEdit, recipients: letterEdit.recipients.map(({ organization_id, user_id, recipient_label }) => ({ organization_id, user_id, recipient_label })) }
+        : minuteEdit as DepartmentHeadEditPayload,
+        commentText || undefined,
+      );
+      setSelectedDoc(updated);
+      setIsEditing(false);
+      setLetterEdit(null);
+      setMinuteEdit(null);
+      setCommentText('');
+      await fetchList();
+    } catch (err) {
+      console.error(err);
+      setError('Could not save and forward this document. Refresh the approval and try again.');
+    } finally {
+      setIsActing(false);
+    }
+  };
 
   const handleApprove = async () => {
     if (!selectedDoc) return;
@@ -257,9 +377,35 @@ export default function ApprovalsPage() {
                 <h2 className="text-xl font-bold text-slate-900">Approval Detail View</h2>
                 {canAct ? (
                   <div className="flex items-center gap-2">
+                    {canEditSubmitted && !isEditing && (
+                      <button
+                        onClick={startEditing}
+                        className="flex items-center gap-2 rounded-lg border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                      >
+                        <Pencil className="h-4 w-4" /> Edit document
+                      </button>
+                    )}
+                    {isEditing && (
+                      <>
+                        <button
+                          onClick={() => { setIsEditing(false); setLetterEdit(null); setMinuteEdit(null); }}
+                          disabled={isActing}
+                          className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          <X className="h-4 w-4" /> Cancel
+                        </button>
+                        <button
+                          onClick={handleEditAndForward}
+                          disabled={isActing}
+                          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {isActing ? 'Saving…' : 'Save & Forward'}
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={handleReject}
-                      disabled={isActing}
+                      disabled={isActing || isEditing}
                       className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                     >
                       Reject
@@ -267,13 +413,11 @@ export default function ApprovalsPage() {
                     <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                       Notes/Observations
                     </button>
-                    <button
+                    {!isEditing && <button
                       onClick={handleApprove}
                       disabled={isActing}
                       className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                    >
-                      Approve
-                    </button>
+                    >Approve</button>}
                   </div>
                 ) : (
                   <span className="text-xs text-slate-400">
@@ -302,7 +446,59 @@ export default function ApprovalsPage() {
               {/* Document Preview */}
               {activeTab === 'preview' && (
                 <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-slate-200 p-6">
-                  {selectedDoc.document_type === 'minute' ? (
+                  {isEditing && letterEdit ? (
+                    <div className="mx-auto max-w-4xl space-y-5 rounded-lg bg-white p-6">
+                      <h3 className="text-lg font-semibold text-slate-900">Edit letter before forwarding</h3>
+                      <label className="block text-sm font-medium text-slate-700">Subject
+                        <input value={letterEdit.title} onChange={(e) => setLetterEdit({ ...letterEdit, title: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+                      </label>
+                      <div>
+                        <p className="mb-1 text-sm font-medium text-slate-700">Letter content</p>
+                        <textarea rows={14} value={letterEdit.content} onChange={(e) => setLetterEdit({ ...letterEdit, content: e.target.value })} className="w-full rounded-md border border-slate-300 px-3 py-2 leading-7" />
+                      </div>
+                      <div>
+                        <p className="mb-2 text-sm font-medium text-slate-700">Recipients</p>
+                        <RecipientTagInput
+                          organizations={recipientOrganizations}
+                          recipients={letterEdit.recipients}
+                          onChange={(recipients) => setLetterEdit({ ...letterEdit, recipients })}
+                        />
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <label className="text-sm font-medium text-slate-700">Designation<input value={letterEdit.designation ?? ''} onChange={(e) => setLetterEdit({ ...letterEdit, designation: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" /></label>
+                        <label className="text-sm font-medium text-slate-700">Signatory name<input value={letterEdit.signatory_name ?? ''} onChange={(e) => setLetterEdit({ ...letterEdit, signatory_name: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" /></label>
+                        <label className="text-sm font-medium text-slate-700">Signature date<input type="date" value={letterEdit.signature_date?.slice(0, 10) ?? ''} onChange={(e) => setLetterEdit({ ...letterEdit, signature_date: e.target.value || null })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" /></label>
+                      </div>
+                    </div>
+                  ) : isEditing && minuteEdit ? (
+                    <div className="mx-auto max-w-4xl space-y-5 rounded-lg bg-white p-6">
+                      <h3 className="text-lg font-semibold text-slate-900">Edit minutes before forwarding</h3>
+                      {([
+                        ['meeting_description', 'Meeting description'],
+                        ['discussion_summary', 'Discussion summary'],
+                        ['closing_remarks', 'Closing remarks'],
+                      ] as const).map(([key, label]) => (
+                        <label key={key} className="block text-sm font-medium text-slate-700">{label}
+                          <textarea rows={3} value={minuteEdit[key] ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, [key]: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+                        </label>
+                      ))}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="text-sm font-medium text-slate-700">Signatory name<input value={minuteEdit.signatory_name ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, signatory_name: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" /></label>
+                        <label className="text-sm font-medium text-slate-700">Signatory designation<input value={minuteEdit.signatory_designation ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, signatory_designation: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" /></label>
+                      </div>
+                      <div className="space-y-4">
+                        <h4 className="font-semibold text-slate-800">Decisions and responsibilities</h4>
+                        {minuteEdit.decisions.map((decision, index) => (
+                          <div key={decision.decision_id} className="space-y-3 rounded-lg border border-slate-200 p-4">
+                            <p className="text-sm font-semibold text-slate-600">Decision {index + 1}</p>
+                            <input aria-label="Decision topic" placeholder="Topic" value={decision.topic ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.decision_id === decision.decision_id ? { ...item, topic: e.target.value || null } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                            <textarea aria-label="Decision text" rows={3} value={decision.decision_text} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.decision_id === decision.decision_id ? { ...item, decision_text: e.target.value } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                            <input aria-label="Responsibility" placeholder="Responsibility" value={decision.responsibility ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.decision_id === decision.decision_id ? { ...item, responsibility: e.target.value || null } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : selectedDoc.document_type === 'minute' ? (
                     <div className="mx-auto h-[75vh] w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                       {isMinutePdfLoading ? (
                         <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading PDF preview...</div>
@@ -315,6 +511,27 @@ export default function ApprovalsPage() {
                       ) : (
                         <div className="flex h-full items-center justify-center text-sm text-slate-500">The minute PDF preview is not available.</div>
                       )}
+                    </div>
+                  ) : selectedDoc.document_type === 'letter' && selectedDoc.source_letter ? (
+                    <div className="mx-auto min-h-[70vh] w-full max-w-4xl bg-white p-10 shadow-xl">
+                      <div className="mb-10 flex justify-between gap-6 text-sm">
+                        <span>{selectedDoc.subject_code ?? '—'}</span>
+                        <span>{selectedDoc.source_letter.signature_date ? new Date(selectedDoc.source_letter.signature_date).toLocaleDateString() : ''}</span>
+                      </div>
+                      <div className="mb-8 space-y-1 text-sm">
+                        {(selectedDoc.source_letter.recipients ?? []).map((recipient) => (
+                          <p key={recipient.letter_recipient_id}>
+                            {recipient.recipient_label ?? recipient.user?.designation ?? recipient.organization?.organization_name ?? ''}
+                            {!recipient.recipient_label && recipient.user?.organization?.organization_name ? `, ${recipient.user.organization.organization_name}` : ''}
+                          </p>
+                        ))}
+                      </div>
+                      <h3 className="mb-8 text-center text-lg font-bold underline">{htmlToPlainText(selectedDoc.source_letter.title)}</h3>
+                      <p className="whitespace-pre-wrap text-justify text-sm leading-7">{htmlToPlainText(selectedDoc.source_letter.content)}</p>
+                      <div className="mt-12 space-y-1 text-sm">
+                        <p>{htmlToPlainText(selectedDoc.source_letter.signatory_name)}</p>
+                        <p>{htmlToPlainText(selectedDoc.source_letter.designation)}</p>
+                      </div>
                     </div>
                   ) : hasHtml(selectedDoc.full_content) ? (
                     <div

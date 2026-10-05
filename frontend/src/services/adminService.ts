@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs} from '../types/admin';
+import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs, PaginatedOrganizations, OrganizationPayload} from '../types/admin';
 
 export interface UserFilters {
   search?: string;
@@ -70,6 +70,25 @@ export const adminService = {
   const { data } = await api.get<{organizations: Organization[];}>('/admin/lookups/organizations');
 
   return data.organizations;
+  },
+
+  async getAdminOrganizations(filters: { search?: string; status?: string; page?: number; per_page?: number } = {}): Promise<PaginatedOrganizations> {
+    const { data } = await api.get<PaginatedOrganizations>('/admin/organizations', { params: filters });
+    return data;
+  },
+
+  async createOrganization(payload: OrganizationPayload): Promise<Organization> {
+    const { data } = await api.post<{ organization: Organization }>('/admin/organizations', payload);
+    return data.organization;
+  },
+
+  async updateOrganization(id: number, payload: Partial<OrganizationPayload>): Promise<Organization> {
+    const { data } = await api.put<{ organization: Organization }>(`/admin/organizations/${id}`, payload);
+    return data.organization;
+  },
+
+  async deleteOrganization(id: number): Promise<void> {
+    await api.delete(`/admin/organizations/${id}`);
   },
 
   async getSubjects(search = '', page = 1): Promise<PaginatedSubjects> {

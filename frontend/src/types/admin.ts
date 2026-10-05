@@ -9,6 +9,9 @@ export interface Organization {
   organization_id: number;
   organization_name: string;
   abbreviation: string | null;
+  address: string | null;
+  telephone: string | null;
+  email: string | null;
   status: 'ACTIVE' | 'INACTIVE';
 }
 export interface UserStats {
@@ -58,6 +61,22 @@ export interface CreateUserPayload {
 
 export interface PaginatedUsers {
   data: AdminUser[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
+
+export interface OrganizationPayload {
+  organization_name: string;
+  abbreviation?: string | null;
+  address?: string | null;
+  telephone?: string | null;
+  email?: string | null;
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface PaginatedOrganizations {
+  data: Organization[];
   current_page: number;
   last_page: number;
   total: number;

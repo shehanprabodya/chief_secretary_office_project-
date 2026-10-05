@@ -18,8 +18,16 @@ export interface DraftPayload {
 }
 
 const getDownloadFilename = (contentDisposition: string | undefined, fallback: string) => {
-  const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
-  return match?.[1] ?? fallback;
+  const encoded = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      // Fall through to the plain filename when the encoded value is malformed.
+    }
+  }
+  const match = contentDisposition?.match(/filename="?([^";]+)"?/i);
+  return match?.[1]?.trim() ?? fallback;
 };
 
 const downloadBlob = (blob: Blob, filename: string) => {
@@ -27,8 +35,11 @@ const downloadBlob = (blob: Blob, filename: string) => {
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
-  window.URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 };
 
 export const letterService = {
