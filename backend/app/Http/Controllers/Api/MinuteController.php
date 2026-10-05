@@ -274,42 +274,9 @@ class MinuteController extends Controller
             now()->format('Ymd') .
             '.pdf';
 
-        try {
-            $pdfPath = $this->convertHtmlWithLibreOffice($html);
+        $pdf = (new \App\Services\LetterPdfService())->generate($html);
 
-            return response()->download($pdfPath, $filename, [
-                'Content-Type' => 'application/pdf',
-            ])->deleteFileAfterSend(true);
-        } catch (Throwable) {
-            // Use Dompdf when LibreOffice is unavailable.
-        }
-
-        $options = new \Dompdf\Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        $options->set('defaultFont', 'Iskoola Pota');
-        $options->setChroot(['/usr/share/fonts', base_path(), dirname($fontPath)]);
-
-        $dompdfFontDir = storage_path('app/dompdf-fonts');
-        if (!is_dir($dompdfFontDir)) {
-            mkdir($dompdfFontDir, 0775, true);
-        }
-        $options->set('fontDir', $dompdfFontDir);
-        $options->set('fontCache', $dompdfFontDir);
-
-        $dompdf = new \Dompdf\Dompdf($options);
-        if (is_file($fontPath)) {
-            $dompdf->getFontMetrics()->registerFont([
-                'family' => 'Iskoola Pota',
-                'weight' => 'normal',
-                'style' => 'normal',
-            ], 'file://' . $fontPath);
-        }
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'landscape');
-        $dompdf->render();
-
-        return response($dompdf->output(), 200, [
+        return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
