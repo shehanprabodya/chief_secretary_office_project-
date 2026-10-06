@@ -255,12 +255,9 @@ class MinuteController extends Controller
             ], 403);
         }
 
-        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
-        $fontFace = is_file($fontPath)
-            ? '@font-face { font-family: "Iskoola Pota"; src: url("data:font/ttf;base64,'
-                . base64_encode((string) file_get_contents($fontPath))
-                . '") format("truetype"); font-style: normal; font-weight: 400; }'
-            : '';
+        // Use the shared LetterPdfService font embedding so minutes and letters
+        // use the same base64-embedded Iskoola Pota font that Playwright verifies.
+        $fontFace = (new \App\Services\LetterPdfService())->fontFaceCss();
 
         $html = view('minutes.pdf', [
             'minute' => $minute,

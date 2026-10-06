@@ -40,8 +40,26 @@
 
     <table class="facts">
         <tr>
-            <td class="fact-label">දිනය හා වේලාව:</td>
-            <td>{{ optional($meeting->meeting_date)->format('Y.m.d') ?? '-' }}{{ $meeting->start_time ? ' ' . (\Illuminate\Support\Carbon::parse($meeting->start_time)->format('A') === 'AM' ? 'පෙ.ව.' : 'ප.ව.') . \Illuminate\Support\Carbon::parse($meeting->start_time)->format('g.i') : '' }}{{ $meeting->end_time ? ' – ' . (\Illuminate\Support\Carbon::parse($meeting->end_time)->format('A') === 'AM' ? 'පෙ.ව.' : 'ප.ව.') . \Illuminate\Support\Carbon::parse($meeting->end_time)->format('g.i') : '' }}</td>
+            <td class="fact-label" style="width: 12%;">දිනය:</td>
+            <td style="width: 38%;">
+                {{ optional($meeting->meeting_date)->format('Y.m.d') ?? '-' }}
+            </td>
+
+            <td class="fact-label" style="width: 12%;">වේලාව:</td>
+            <td style="width: 38%;">
+                @if($meeting->start_time)
+                    {{ \Illuminate\Support\Carbon::parse($meeting->start_time)->format('A') === 'AM' ? 'පෙ.ව.' : 'ප.ව.' }}
+                    {{ \Illuminate\Support\Carbon::parse($meeting->start_time)->format('g.i') }}
+
+                    @if($meeting->end_time)
+                        –
+                        {{ \Illuminate\Support\Carbon::parse($meeting->end_time)->format('A') === 'AM' ? 'පෙ.ව.' : 'ප.ව.' }}
+                        {{ \Illuminate\Support\Carbon::parse($meeting->end_time)->format('g.i') }}
+                    @endif
+                @else
+                    -
+                @endif
+            </td>
         </tr>
         <tr>
             <td class="fact-label">ස්ථානය:</td>
