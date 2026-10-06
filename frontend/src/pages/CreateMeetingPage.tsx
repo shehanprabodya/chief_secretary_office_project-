@@ -20,7 +20,7 @@ const EMPTY_FORM: MeetingFormData = {
   meetingDate: '',
   startTime: '',
   endTime: '',
-  location: 'Chief Secretary Office',
+  location: 'දකුණු පළාත් ප්‍රධාන ලේකම් කාර්යාලය',
 };
 
 export default function CreateMeetingPage() {
