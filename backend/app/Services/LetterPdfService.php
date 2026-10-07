@@ -86,4 +86,36 @@ class LetterPdfService
 
         return $pdf;
     }
+
+        /**
+     * Generate PDF once and reuse it until the HTML content changes.
+     */
+    public function generateCached(
+        int $letterId,
+        string $html,
+        string $version = '1'
+    ): string {
+        $hash = hash('sha256', $version . '|' . $html);
+
+        $directory = storage_path('app/private/letters/pdf');
+
+        if (!is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+
+        $path = $directory . "/letter-{$letterId}-{$hash}.pdf";
+
+        // PDF already exists.
+        if (is_file($path) && filesize($path) > 0) {
+            return $path;
+        }
+
+        $pdf = $this->generate($html);
+
+        if (file_put_contents($path, $pdf, LOCK_EX) === false) {
+            throw new RuntimeException('Unable to save generated letter PDF.');
+        }
+
+        return $path;
+    }
 }
