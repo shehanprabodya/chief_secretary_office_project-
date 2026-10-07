@@ -23,39 +23,65 @@ class ApprovalController extends Controller
      * List documents this user's role needs to see/act on,
      * plus a search by reference ID or subject.
      */
-    public function index(Request $request): JsonResponse
-    {
-        $query = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions');
+public function index(Request $request): JsonResponse
+{
+    $perPage = min(
+        max((int) $request->input('per_page', 10), 1),
+        50
+    );
 
-        // Officers may track only the documents they personally submitted.
-        // Reviewing roles retain the shared workflow queue they need to act on.
-        if ($request->user()->hasRole('officer')) {
-            $query->where('submitted_by', $request->user()->user_id);
-        }
+    $query = ApprovableDocument::query()
+        ->where('status', 'pending')
+        ->with([
+            'submitter',
+            'steps',
+            'sourceLetter.subject',
+            'sourceMinute.meeting',
+        ]);
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('reference_id', 'like', "%{$search}%")
-                  ->orWhere('subject', 'like', "%{$search}%")
-                  ->orWhereHas('sourceLetter.subject', function ($subjectQuery) use ($search) {
-                      $subjectQuery->where('code', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-
-        $documents = $query->orderBy('created_at', 'desc')->get()
-            ->unique(fn (ApprovableDocument $document) => $document->document_type . ':' . ($document->source_id ?? 'document-' . $document->document_id))
-            ->values()
-            ->map(fn (ApprovableDocument $document) => $this->withSubjectCode($document));
-
-        return response()->json(['documents' => $documents]);
+    // Officers only see their own pending documents
+    if ($request->user()->hasRole('officer')) {
+        $query->where(
+            'submitted_by',
+            $request->user()->user_id
+        );
     }
 
+    // Search
+    if ($request->filled('search')) {
+        $search = trim($request->input('search'));
+
+        $query->where(function ($q) use ($search) {
+            $q->where('reference_id', 'like', "%{$search}%")
+                ->orWhere('subject', 'like', "%{$search}%")
+                ->orWhereHas('sourceLetter.subject', function ($subjectQuery) use ($search) {
+                    $subjectQuery->where('code', 'like', "%{$search}%");
+                });
+        });
+    }
+
+    $documents = $query
+        ->orderByDesc('created_at')
+        ->paginate($perPage);
+
+    $documents->getCollection()->transform(
+        fn (ApprovableDocument $document) =>
+            $this->withSubjectCode($document)
+    );
+
+    return response()->json([
+        'documents' => $documents->items(),
+
+        'pagination' => [
+            'current_page' => $documents->currentPage(),
+            'last_page' => $documents->lastPage(),
+            'per_page' => $documents->perPage(),
+            'total' => $documents->total(),
+            'from' => $documents->firstItem(),
+            'to' => $documents->lastItem(),
+        ],
+    ]);
+}
     public function show(Request $request, int $id): JsonResponse
     {
         $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')
@@ -388,8 +414,10 @@ class ApprovalController extends Controller
         }
 
         return response()->json([
-            'message' => 'Approved',
-            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')),
+                'message' => 'Approved',
+                'document_id' => $document->document_id,
+                'status' => $document->status,
+                'current_step_order' => $document->current_step_order,
         ]);
     }
 

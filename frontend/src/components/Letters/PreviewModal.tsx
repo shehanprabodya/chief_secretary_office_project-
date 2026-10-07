@@ -26,6 +26,7 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
   const handlePrint = () => {
     // Use the server-side PDF download to preserve font embedding and OpenType shaping
     void handleDownloadPdf();
+     //window.print();
   };
 
   return (

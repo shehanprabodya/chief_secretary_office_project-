@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   List, Grid3x3, Plus,
@@ -38,12 +38,17 @@ const STATUS_BADGE: Record<string, { label: string; className: string; dotClassN
   },
 };
 
-const LETTERS_PER_PAGE = 10;
+//const LETTERS_PER_PAGE = 10;
 
 export default function MeetingsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [letters, setLetters] = useState<Letter[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [totalLetters, setTotalLetters] = useState(0);
+  const [fromLetter, setFromLetter] = useState<number | null>(null);
+  const [toLetter, setToLetter] = useState<number | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [subjectCode, setSubjectCode] = useState('');
@@ -52,24 +57,50 @@ export default function MeetingsPage() {
   const [endDate, setEndDate] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  
 
-  const loadLetters = useCallback(async () => {
-    setIsLoading(true);
+ useEffect(() => {
+  let cancelled = false;
+
+  const fetchLetters = async () => {
     try {
-      const letters = await letterService.getMyLetters();
-      setLetters(letters);
-    } catch (err) {
-      console.error('Failed to fetch letters:', err);
-    } finally {
+      const response = await letterService.getMyLetters({
+        page: currentPage,
+        subject_code: subjectCode,
+        subject_title: subjectTitle,
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      if (cancelled) return;
+
+      setLetters(response.data);
+      setCurrentPage(response.current_page);
+      setLastPage(response.last_page);
+      setTotalLetters(response.total);
+      setFromLetter(response.from);
+      setToLetter(response.to);
+      setIsLoading(false);
+    } catch (error) {
+      if (cancelled) return;
+
+      console.error('Failed to load letters:', error);
       setIsLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadLetters();
-  }, [loadLetters]);
+  fetchLetters();
+
+  return () => {
+    cancelled = true;
+  };
+}, [
+  currentPage,
+  subjectCode,
+  subjectTitle,
+  startDate,
+  endDate,
+]);
 
   useEffect(() => {
     letterService.getSubjects()
@@ -77,27 +108,9 @@ export default function MeetingsPage() {
       .catch((err) => console.error('Failed to fetch subjects:', err));
   }, []);
 
-  const filteredLetters = useMemo(() => {
-    const code = subjectCode.trim().toLowerCase();
-    const titleFilter = subjectTitle.trim().toLowerCase();
+  
 
-    return letters.filter((letter) => {
-      const letterDate = (letter.signature_date || letter.created_at || '').slice(0, 10);
-      const letterCode = (letter.subject?.code || letter.meeting_code || '').toLowerCase();
-      const letterSubjectTitle = (letter.subject?.title || '').toLowerCase();
-      const matchesCode = !code || letterCode === code;
-      const matchesTitle = !titleFilter || letterSubjectTitle === titleFilter;
-      const matchesStart = !startDate || !letterDate || letterDate >= startDate;
-      const matchesEnd = !endDate || !letterDate || letterDate <= endDate;
-
-      return matchesCode && matchesTitle && matchesStart && matchesEnd;
-    });
-  }, [letters, subjectCode, subjectTitle, startDate, endDate]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredLetters.length / LETTERS_PER_PAGE));
-  const activePage = Math.min(currentPage, pageCount);
-  const pageStart = (activePage - 1) * LETTERS_PER_PAGE;
-  const paginatedLetters = filteredLetters.slice(pageStart, pageStart + LETTERS_PER_PAGE);
+  
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
@@ -237,14 +250,14 @@ export default function MeetingsPage() {
                     Loading letters...
                   </td>
                 </tr>
-              ) : filteredLetters.length === 0 ? (
+              ) : letters.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
                     No letters found for the selected filters.
                   </td>
                 </tr>
               ) : (
-                paginatedLetters.map((letter) => (
+                letters.map((letter) => (
                   <tr
                     key={letter.letter_id}
                     className="hover:bg-blue-50/60"
@@ -324,25 +337,29 @@ export default function MeetingsPage() {
 
           <div className="flex items-center justify-between bg-slate-100 border-t border-slate-200 px-6 py-3">
             <p className="text-sm text-slate-500">
-              Showing {filteredLetters.length === 0 ? 0 : pageStart + 1}
-              -{Math.min(pageStart + paginatedLetters.length, filteredLetters.length)} of {filteredLetters.length} letters
+                 Showing {fromLetter ?? 0}
+                  -
+                  {toLetter ?? 0}
+                  of {totalLetters} letters
             </p>
             <div className="flex items-center gap-2">
               <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                disabled={activePage === 1}
-                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
-              >
-                Previous
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
+                >
+                  Previous
               </button>
-              {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (
+              {Array.from({ length: lastPage },(_, index) => index + 1).map((page) => (
                 <button
                   key={page}
                   type="button"
                   onClick={() => setCurrentPage(page)}
                   className={`h-8 min-w-8 rounded border px-2 text-xs font-semibold ${
-                    page === activePage
+                    page === currentPage
                       ? 'border-blue-600 bg-blue-600 text-white'
                       : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
@@ -351,12 +368,16 @@ export default function MeetingsPage() {
                 </button>
               ))}
               <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
-                disabled={activePage === pageCount}
-                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
-              >
-                Next
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) =>
+                      Math.min(lastPage, page + 1)
+                    )
+                  }
+                  disabled={currentPage === lastPage}
+                  className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-white"
+                >
+                  Next
               </button>
             </div>
           </div>

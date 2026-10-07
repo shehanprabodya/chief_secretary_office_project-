@@ -17,6 +17,26 @@ export interface DraftPayload {
   }>;
 }
 
+export interface LetterListParams {
+  page?: number;
+  per_page?: number;
+  subject_code?: string;
+  subject_title?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface LetterPagination {
+  current_page: number;
+  data: Letter[];
+  from: number | null;
+  to: number | null;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+
 const getDownloadFilename = (contentDisposition: string | undefined, fallback: string) => {
   const encoded = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
   if (encoded) {
@@ -43,10 +63,19 @@ const downloadBlob = (blob: Blob, filename: string) => {
 };
 
 export const letterService = {
-  async getMyLetters(): Promise<Letter[]> {
-    const { data } = await api.get<{ letters: Letter[] }>('/officer/letters');
-    return data.letters;
+   async getMyLetters(
+    params: LetterListParams = {}
+  ): Promise<LetterPagination> {
+    const { data } = await api.get<LetterPagination>(
+      '/officer/letters',
+      {
+        params,
+      }
+    );
+
+    return data;
   },
+
 
   async getById(id: number): Promise<Letter> {
     const { data } = await api.get<{ letter: Letter }>(`/officer/letters/${id}`);

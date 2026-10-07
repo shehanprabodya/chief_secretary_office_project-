@@ -29,30 +29,68 @@ class LetterController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $letters = Letter::with('recipients.organization', 'recipients.user', 'subject')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $perPage = min(
+            max((int) $request->input('per_page', 10), 1),
+            50
+        );
 
-        // Repair legacy status mismatches caused by draft saves after submission.
-        $approvalStatuses = ApprovableDocument::where('document_type', 'letter')
-            ->whereIn('source_id', $letters->pluck('letter_id'))
-            ->orderByDesc('document_id')
-            ->get(['source_id', 'status'])
-            ->unique('source_id')
-            ->keyBy('source_id');
+        $query = Letter::query()
+            ->select([
+                'letter_id',
+                'meeting_id',
+                'meeting_code',
+                'subject_id',
+                'title',
+                'status',
+                'signature_date',
+                'created_by',
+                'created_at',
+                'updated_at',
+            ])
+            ->with([
+                'subject:id,code,title',
+            ]);
 
-        foreach ($letters as $letter) {
-            $approvalStatus = $approvalStatuses->get($letter->letter_id)?->status;
-            $workflowStatus = $this->letterStatusFromApproval($approvalStatus);
+        if ($request->filled('subject_code')) {
+            $code = $request->input('subject_code');
 
-            if ($workflowStatus && $letter->status !== $workflowStatus) {
-                $letter->updateQuietly(['status' => $workflowStatus]);
-            }
+            $query->whereHas('subject', function ($q) use ($code) {
+                $q->where('code', $code);
+            });
         }
 
-        return response()->json(['letters' => $letters]);
-    }
+        if ($request->filled('subject_title')) {
+            $title = $request->input('subject_title');
 
+            $query->whereHas('subject', function ($q) use ($title) {
+                $q->where('title', $title);
+            });
+        }
+
+        if ($request->filled('start_date')) {
+            $query->where(
+                'signature_date',
+                '>=',
+                $request->input('start_date')
+            );
+        }
+
+        if ($request->filled('end_date')) {
+            $query->where(
+                'signature_date',
+                '<=',
+                $request->input('end_date')
+            );
+        }
+
+        $letters = $query
+            ->latest('created_at')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return response()->json($letters);
+    }
+    
     /**
      * Get a single letter with all relations
      */
@@ -352,7 +390,11 @@ class LetterController extends Controller
 
         try {
             $html = $this->buildLetterHtml($letter, true);
-            $pdf = $this->letterPdfService->generate($html);
+
+            $pdfPath = $this->letterPdfService->generateCached(
+                $letter->letter_id,
+                $html
+            );
         } catch (Throwable $exception) {
             report($exception);
 
@@ -361,10 +403,13 @@ class LetterController extends Controller
             ], 503);
         }
 
-        return response($pdf, 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+        return response()->download(
+            $pdfPath,
+            $filename,
+            [
+                'Content-Type' => 'application/pdf',
+            ]
+        );
     }
 
     /**
