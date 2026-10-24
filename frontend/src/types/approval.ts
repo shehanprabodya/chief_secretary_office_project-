@@ -6,9 +6,19 @@ export interface ApprovalStep {
   step_label: string;
   step_order: number;
   required_role: string;
+  assigned_to?: number | null;
+  assignee?: { user_id: number; full_name: string; organization?: { organization_name: string } | null } | null;
   status: StepStatus;
   actioned_by?: { user_id: number; full_name: string } | null;
   actioned_at: string | null;
+}
+
+export interface EligibleDeputy {
+  user_id: number;
+  full_name: string;
+  designation: string | null;
+  organization_id: number | null;
+  organization?: { organization_id: number; organization_name: string } | null;
 }
 
 export interface ApprovalComment {
@@ -26,13 +36,13 @@ export interface ApprovableDocument {
   source_id?: number | null;
   subject: string;
   description: string | null;
-  full_content: string | null;
-  amount: number | null;
+  full_content?: string | null;
+  amount?: number | null;
   status: DocumentStatus;
   current_step_order: number;
   submitter: { user_id: number; full_name: string; role?: { role_name: string } };
-  steps: ApprovalStep[];
-  comments: ApprovalComment[];
+  steps?: ApprovalStep[];
+  comments?: ApprovalComment[];
   source_letter?: {
     letter_id: number;
     title: string;

@@ -47,6 +47,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Approvals - accessible to all authenticated workflow participants.
+    Route::get('/approvals/eligible-deputies', [ApprovalController::class, 'eligibleDeputies'])
+        ->middleware('role:dept_head');
+    Route::post('/approvals/submit-letter/{letterId}', [ApprovalController::class, 'submitLetter']);
     Route::get('/approvals', [ApprovalController::class, 'index']);
     Route::get('/approvals/{id}', [ApprovalController::class, 'show']);
     Route::post('/approvals', [ApprovalController::class, 'store']);

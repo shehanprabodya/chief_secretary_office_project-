@@ -223,7 +223,7 @@ export default function ChiefSecretaryDashboard() {
                       <tr
                         key={doc.document_id}
                         className="cursor-pointer hover:bg-slate-50"
-                        onClick={() => navigate('/approvals')}
+                        onClick={() => navigate('/approvals', { state: { selectedDocumentId: doc.document_id } })}
                       >
                         <td className="px-4 py-4 text-sm font-semibold text-slate-800">{doc.subject_code ?? '—'}</td>
                         <td className="px-4 py-4 text-sm text-slate-600">{doc.subject}</td>

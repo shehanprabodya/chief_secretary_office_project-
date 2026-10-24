@@ -57,6 +57,11 @@ export default function WorkflowTracker({ steps }: WorkflowTrackerProps) {
                   <p className="text-xs text-slate-400">
                     {statusLabel}
                   </p>
+                  {step.assignee && (
+                    <p className="mt-1 max-w-32 truncate text-[11px] text-slate-500" title={`Assigned to ${step.assignee.full_name}`}>
+                      {step.assignee.full_name}
+                    </p>
+                  )}
                 </div>
               </div>
               {!isLast && (

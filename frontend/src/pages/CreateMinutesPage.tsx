@@ -193,7 +193,6 @@ export default function CreateMinutesPage() {
         full_content: approvalContent,
       });
 
-      await minuteService.submitForApproval(savedMinute.minute_id);
       setMinute((prev) => prev ? { ...prev, status: 'pending_approval' } : prev);
       navigate('/approvals', { state: { selectedDocumentId: approvalDoc.document_id } });
     } catch (error) {

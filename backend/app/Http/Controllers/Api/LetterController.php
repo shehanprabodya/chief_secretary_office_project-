@@ -333,6 +333,12 @@ class LetterController extends Controller
         ]);
     }
 
+    /** Build the saved letter snapshot used by the approval workflow. */
+    public function renderApprovalHtml(Letter $letter): string
+    {
+        return $this->buildLetterHtml($letter);
+    }
+
     /**
      * Preview — same as generate but returns lightweight preview data
      */

@@ -30,21 +30,43 @@ public function index(Request $request): JsonResponse
         50
     );
 
+    $user = $request->user();
+    $roleName = $user->role?->role_name;
     $query = ApprovableDocument::query()
+        ->select([
+            'document_id', 'reference_id', 'document_type', 'source_id',
+            'subject', 'description', 'status', 'submitted_by',
+            'current_step_order', 'created_at',
+        ])
         ->where('status', 'pending')
         ->with([
-            'submitter',
-            'steps',
-            'sourceLetter.subject',
-            'sourceMinute.meeting',
+            'submitter:user_id,full_name,role_id',
+            'submitter.role:role_id,role_name',
+            'steps:step_id,document_id,step_label,step_order,required_role,assigned_to,status,actioned_by,actioned_at',
+            'steps.assignee:user_id,full_name',
+            'sourceLetter:letter_id,subject_id',
+            'sourceLetter.subject:id,code',
+            'sourceMinute:minute_id,meeting_id',
+            'sourceMinute.meeting:meeting_id,meeting_code',
         ]);
 
-    // Officers only see their own pending documents
-    if ($request->user()->hasRole('officer')) {
-        $query->where(
-            'submitted_by',
-            $request->user()->user_id
-        );
+    if ($roleName !== 'admin') {
+        $query->where(function ($visible) use ($user, $roleName) {
+            $visible->where('submitted_by', $user->user_id);
+
+            if ($roleName) {
+                $visible->orWhereHas('steps', function ($step) use ($user, $roleName) {
+                    $step->whereColumn('approval_workflow_steps.document_id', 'approvable_documents.document_id')
+                        ->whereColumn('approval_workflow_steps.step_order', 'approvable_documents.current_step_order')
+                        ->where('approval_workflow_steps.required_role', $roleName)
+                        ->where('approval_workflow_steps.status', 'pending')
+                        ->where(function ($assignment) use ($user) {
+                            $assignment->whereNull('approval_workflow_steps.assigned_to')
+                                ->orWhere('approval_workflow_steps.assigned_to', $user->user_id);
+                        });
+                });
+            }
+        });
     }
 
     // Search
@@ -82,17 +104,78 @@ public function index(Request $request): JsonResponse
         ],
     ]);
 }
+
+    public function eligibleDeputies(Request $request): JsonResponse
+    {
+        $users = \App\Models\User::query()
+            ->select(['user_id', 'full_name', 'designation', 'organization_id'])
+            ->with('organization:organization_id,organization_name')
+            ->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($query) => $query->where('role_name', 'deputy'))
+            ->orderBy('full_name')
+            ->get();
+
+        return response()->json(['deputies' => $users]);
+    }
+
+    public function submitLetter(Request $request, int $letterId): JsonResponse
+    {
+        $letter = Letter::with('recipients.organization', 'recipients.user.organization', 'subject', 'meeting')
+            ->findOrFail($letterId);
+        abort_unless((int) $letter->created_by === (int) $request->user()->user_id, 403, 'Only the letter creator can submit this letter for approval.');
+        abort_if(trim((string) $letter->content) === '', 422, 'Letter content is empty. Please write the letter body first.');
+
+        $html = app(LetterController::class)->renderApprovalHtml($letter);
+        $submitRequest = Request::create('/api/approvals', 'POST', [
+            'document_type' => 'letter',
+            'source_id' => $letter->letter_id,
+            'subject' => $this->plainText((string) $letter->title),
+            'description' => mb_substr($this->plainText((string) $letter->content), 0, 300),
+            'full_content' => $html,
+        ]);
+        $submitRequest->setUserResolver(fn () => $request->user());
+
+        return $this->store($submitRequest);
+    }
+
     public function show(Request $request, int $id): JsonResponse
     {
-        $document = ApprovableDocument::with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')
+        $document = ApprovableDocument::with('submitter.role', 'steps.actionedBy', 'steps.assignee.organization', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting.attendees', 'sourceMinute.decisions')
             ->findOrFail($id);
 
-        if ($request->user()->hasRole('officer')
-            && (int) $document->submitted_by !== (int) $request->user()->user_id) {
-            return response()->json(['message' => 'You can only view documents you submitted.'], 403);
+        if (!$this->canViewDocument($document, $request->user())) {
+            return response()->json(['message' => 'You are not authorized to view this approval document.'], 403);
+        }
+
+        // The source letter is authoritative. Older Department Head edits stored
+        // plain text in full_content, which made later approvers see a different
+        // layout from the Officer's generated letter preview. Rebuild the same
+        // generated HTML for the detail response so every approval role sees the
+        // current saved letter in the official template.
+        if ($document->document_type === 'letter' && $document->sourceLetter) {
+            $document->full_content = app(LetterController::class)->renderApprovalHtml($document->sourceLetter);
         }
 
         return response()->json(['document' => $this->withSubjectCode($document)]);
+    }
+
+    private function canViewDocument(ApprovableDocument $document, \App\Models\User $user): bool
+    {
+        if ($user->hasRole('admin') || (int) $document->submitted_by === (int) $user->user_id) {
+            return true;
+        }
+
+        return $document->steps()->where(function ($steps) use ($user) {
+            $steps->where('actioned_by', $user->user_id)
+                ->orWhere('assigned_to', $user->user_id);
+        })->exists() || $document->steps()
+            ->where('step_order', $document->current_step_order)
+            ->where('status', 'pending')
+            ->where('required_role', $user->role?->role_name)
+            ->where(function ($assignment) use ($user) {
+                $assignment->whereNull('assigned_to')->orWhere('assigned_to', $user->user_id);
+            })
+            ->exists();
     }
 
     /**
@@ -116,9 +199,21 @@ public function index(Request $request): JsonResponse
         $validated = $validator->validated();
 
         if (!empty($validated['source_id'])) {
-            $existingDocument = ApprovableDocument::where('document_type', $validated['document_type'])
+            if ($validated['document_type'] === 'letter') {
+                $source = Letter::findOrFail($validated['source_id']);
+                abort_unless((int) $source->created_by === (int) $request->user()->user_id, 403, 'Only the letter creator can submit this letter for approval.');
+            } elseif ($validated['document_type'] === 'minute') {
+                $source = MeetingMinute::findOrFail($validated['source_id']);
+                abort_unless((int) $source->created_by === (int) $request->user()->user_id, 403, 'Only the minute creator can submit these minutes for approval.');
+            }
+
+            $existingDocument = ApprovableDocument::select([
+                    'document_id', 'reference_id', 'document_type', 'source_id', 'subject',
+                    'description', 'amount', 'status', 'submitted_by', 'current_step_order', 'created_at',
+                ])
+                ->where('document_type', $validated['document_type'])
                 ->where('source_id', $validated['source_id'])
-                ->with('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')
+                ->with('sourceLetter:letter_id,created_by,subject_id', 'sourceLetter.subject:id,code', 'sourceMinute:minute_id,meeting_id', 'sourceMinute.meeting:meeting_id,meeting_code')
                 ->first();
 
             if ($existingDocument) {
@@ -128,9 +223,12 @@ public function index(Request $request): JsonResponse
                     return response()->json(['message' => 'Only the letter creator can resubmit a revised letter.'], 403);
                 }
 
+                $savedContent = $existingDocument->status === 'approved' && array_key_exists('full_content', $validated)
+                    ? ApprovableDocument::whereKey($existingDocument->document_id)->value('full_content')
+                    : null;
                 $approvedContentChanged = $existingDocument->status === 'approved'
                     && array_key_exists('full_content', $validated)
-                    && trim((string) $existingDocument->full_content) !== trim((string) $validated['full_content']);
+                    && trim((string) $savedContent) !== trim((string) $validated['full_content']);
 
                 if ($approvedContentChanged) {
                     $existingDocument->update([
@@ -157,9 +255,7 @@ public function index(Request $request): JsonResponse
 
                     return response()->json([
                         'message' => 'Revised approved document submitted for approval',
-                        'document' => $this->withSubjectCode(
-                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')
-                        ),
+                        'document' => $this->submissionResponse($existingDocument),
                     ]);
                 }
 
@@ -188,9 +284,7 @@ public function index(Request $request): JsonResponse
 
                     return response()->json([
                         'message' => 'Rejected document resubmitted for approval',
-                        'document' => $this->withSubjectCode(
-                            $existingDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')
-                        ),
+                        'document' => $this->submissionResponse($existingDocument),
                     ]);
                 }
 
@@ -214,34 +308,54 @@ public function index(Request $request): JsonResponse
 
                 return response()->json([
                     'message' => 'Document is already in the approval workflow',
-                    'document' => $this->withSubjectCode($existingDocument),
+                    'document' => $this->submissionResponse($existingDocument),
                 ]);
             }
         }
 
-        $document = ApprovableDocument::create([
-            ...$validated,
-            'reference_id' => ApprovableDocument::generateReferenceId($request->document_type),
-            'submitted_by' => $request->user()->user_id,
-            'status' => 'pending',
-            'current_step_order' => 2,
-        ]);
+        $document = DB::transaction(function () use ($validated, $request) {
+            if (!empty($validated['source_id']) && $validated['document_type'] === 'letter') {
+                Letter::where('letter_id', $validated['source_id'])->lockForUpdate()->first();
+            } elseif (!empty($validated['source_id']) && $validated['document_type'] === 'minute') {
+                MeetingMinute::where('minute_id', $validated['source_id'])->lockForUpdate()->first();
+            }
 
-        $document->initializeWorkflow();
+            $existing = !empty($validated['source_id'])
+                ? ApprovableDocument::where('document_type', $validated['document_type'])
+                    ->where('source_id', $validated['source_id'])
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+            if ($existing) {
+                return $existing;
+            }
 
-        $this->notifyCurrentReviewer($document, $request->user()->user_id);
+            $document = ApprovableDocument::create([
+                ...$validated,
+                'reference_id' => ApprovableDocument::generateReferenceId($request->document_type),
+                'submitted_by' => $request->user()->user_id,
+                'status' => 'pending',
+                'current_step_order' => 2,
+            ]);
+            $document->initializeWorkflow();
 
-        if ($document->document_type === 'letter' && $document->source_id) {
-            Letter::where('letter_id', $document->source_id)->update(['status' => 'pending_approval']);
-        }
+            if ($document->document_type === 'letter' && $document->source_id) {
+                Letter::where('letter_id', $document->source_id)->update(['status' => 'pending_approval']);
+            }
+            if ($document->document_type === 'minute' && $document->source_id) {
+                MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'pending_approval']);
+            }
 
-        if ($document->document_type === 'minute' && $document->source_id) {
-            MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'pending_approval']);
+            return $document;
+        });
+
+        if ($document->wasRecentlyCreated) {
+            $this->notifyCurrentReviewer($document, $request->user()->user_id);
         }
 
         return response()->json([
             'message' => 'Document submitted for approval',
-            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')),
+            'document' => $this->submissionResponse($document),
         ], 201);
     }
 
@@ -326,12 +440,14 @@ public function index(Request $request): JsonResponse
 
         $document->steps()->where('step_order', 2)->update([
             'status' => 'pending',
+            'assigned_to' => null,
             'actioned_by' => null,
             'actioned_at' => null,
         ]);
 
         $document->steps()->whereIn('step_order', [3, 4])->update([
             'status' => 'waiting',
+            'assigned_to' => null,
             'actioned_by' => null,
             'actioned_at' => null,
         ]);
@@ -342,82 +458,107 @@ public function index(Request $request): JsonResponse
      */
     public function approve(Request $request, int $id): JsonResponse
     {
-        $document = ApprovableDocument::with('steps')->findOrFail($id);
-        $currentStep = $document->steps->firstWhere('step_order', $document->current_step_order);
+        $actor = $request->user();
+        $notes = $request->input('notes');
+        $updatedDocument = DB::transaction(function () use ($request, $id, $actor, $notes) {
+            $document = ApprovableDocument::lockForUpdate()->findOrFail($id);
+            $currentStep = $document->steps()->where('step_order', $document->current_step_order)->lockForUpdate()->first();
+            abort_unless(
+                $document->status === 'pending'
+                    && $currentStep
+                    && $currentStep->status === 'pending'
+                    && $currentStep->required_role === $actor->role?->role_name
+                    && (!$currentStep->assigned_to || (int) $currentStep->assigned_to === (int) $actor->user_id),
+                403,
+                'You are not authorized to approve this step.'
+            );
 
-        if (!$currentStep || $currentStep->required_role !== $request->user()->role->role_name) {
-            return response()->json(['message' => 'You are not authorized to approve this step'], 403);
-        }
-
-        $currentStep->update([
-            'status' => 'approved',
-            'actioned_by' => $request->user()->user_id,
-            'actioned_at' => now(),
-        ]);
-
-        $nextStep = $document->steps->firstWhere('step_order', $document->current_step_order + 1);
-
-        if ($nextStep) {
-            $nextStep->update(['status' => 'pending']);
-            $document->update(['current_step_order' => $nextStep->step_order]);
-        } else {
-            $document->update(['status' => 'approved']);
-
-            if ($document->document_type === 'letter' && $document->source_id) {
-                Letter::where('letter_id', $document->source_id)->update(['status' => 'approved']);
+            $nextStep = $document->steps()->where('step_order', $currentStep->step_order + 1)->lockForUpdate()->first();
+            $selectedDeputyId = null;
+            $isDepartmentHeadLetterOrMinute = $currentStep->required_role === 'dept_head'
+                && in_array($document->document_type, ['letter', 'minute'], true);
+            if ($isDepartmentHeadLetterOrMinute) {
+                abort_unless($nextStep?->step_order === 3, 409, 'The Deputy approval step is missing from this workflow.');
+                $request->validate(['selected_deputy_id' => 'required|integer|exists:users,user_id']);
+                $deputy = \App\Models\User::query()
+                    ->where('user_id', $request->integer('selected_deputy_id'))
+                    ->where('status', 'ACTIVE')
+                    ->whereHas('role', fn ($query) => $query->where('role_name', 'deputy'))
+                    ->first();
+                abort_unless($deputy, 422, 'Select an active Deputy Secretary.');
+                $selectedDeputyId = (int) $deputy->user_id;
             }
 
-            if ($document->document_type === 'minute' && $document->source_id) {
-                MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'approved']);
-                $this->notifyApprovedMinuteTargets($document);
-            }
-        }
-
-        if ($request->filled('notes')) {
-            $document->comments()->create([
-                'user_id' => $request->user()->user_id,
-                'comment' => $request->notes,
+            $currentStep->update([
+                'status' => 'approved',
+                'actioned_by' => $actor->user_id,
+                'actioned_at' => now(),
             ]);
-        }
 
-        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
-            [$entityName, $entityCode] = $this->notificationIdentity($document);
-            $actionDate = now()->format('d M Y, h:i A');
+            if ($nextStep) {
+                $nextStep->update([
+                    'status' => 'pending',
+                    'assigned_to' => $selectedDeputyId,
+                ]);
+                $document->update(['current_step_order' => $nextStep->step_order]);
+            } else {
+                $document->update(['status' => 'approved']);
+                if ($document->document_type === 'letter' && $document->source_id) {
+                    Letter::where('letter_id', $document->source_id)->update(['status' => 'approved']);
+                }
+                if ($document->document_type === 'minute' && $document->source_id) {
+                    MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'approved']);
+                }
+            }
+
+            if (is_string($notes) && trim($notes) !== '') {
+                $document->comments()->create(['user_id' => $actor->user_id, 'comment' => $notes]);
+            }
+
+            return $document->fresh();
+        });
+
+        $nextStep = $updatedDocument->steps()->where('step_order', $updatedDocument->current_step_order)->first();
+        [$entityName, $entityCode] = $this->notificationIdentity($updatedDocument);
+        $actionDate = now()->format('d M Y, h:i A');
+        if ((int) $updatedDocument->submitted_by !== (int) $actor->user_id) {
             $this->notifications->sendToUser(
-                $document->submitted_by,
+                $updatedDocument->submitted_by,
                 'approval_step_approved',
                 $nextStep ? "{$entityName} approved and forwarded" : "{$entityName} approved",
                 $nextStep
-                    ? "{$entityName} {$entityCode} was approved by {$request->user()->full_name} on {$actionDate} and forwarded to {$this->roleLabel($nextStep->required_role)}."
-                    : "{$entityName} {$entityCode} received final approval from {$request->user()->full_name} on {$actionDate}.",
-                '/approvals',
-                'approval_document',
-                $document->document_id,
-                'important',
+                    ? "{$entityName} {$entityCode} was approved by {$actor->full_name} on {$actionDate} and forwarded to {$this->roleLabel($nextStep->required_role)}."
+                    : "{$entityName} {$entityCode} received final approval from {$actor->full_name} on {$actionDate}.",
+                '/approvals', 'approval_document', $updatedDocument->document_id, 'important',
             );
         }
-
         if ($nextStep) {
-            [$entityName, $entityCode] = $this->notificationIdentity($document);
-            $actionDate = now()->format('d M Y, h:i A');
-            $this->notifications->sendToRole(
-                $nextStep->required_role,
-                'approval_action_required',
-                "{$entityName} awaiting your approval",
-                "{$entityName} {$entityCode} was forwarded by {$request->user()->full_name} on {$actionDate} and is ready for your review.",
-                '/approvals',
-                'approval_document',
-                $document->document_id,
-                'important',
-                $request->user()->user_id,
-            );
+            $message = "{$entityName} {$entityCode} was forwarded by {$actor->full_name} on {$actionDate} and is ready for your review.";
+            if ($nextStep->assigned_to) {
+                $this->notifications->sendToUser(
+                    (int) $nextStep->assigned_to,
+                    'approval_action_required',
+                    "{$entityName} awaiting your approval",
+                    $message,
+                    '/approvals', 'approval_document', $updatedDocument->document_id, 'important',
+                );
+            } else {
+                $this->notifications->sendToRole(
+                    $nextStep->required_role,
+                    'approval_action_required',
+                    "{$entityName} awaiting your approval",
+                    $message,
+                    '/approvals', 'approval_document', $updatedDocument->document_id, 'important', $actor->user_id,
+                );
+            }
+        } elseif ($updatedDocument->document_type === 'minute') {
+            $this->notifyApprovedMinuteTargets($updatedDocument);
         }
 
+        $updatedDocument->load('submitter.role', 'steps.actionedBy', 'steps.assignee.organization', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting.attendees', 'sourceMinute.decisions');
         return response()->json([
-                'message' => 'Approved',
-                'document_id' => $document->document_id,
-                'status' => $document->status,
-                'current_step_order' => $document->current_step_order,
+            'message' => 'Approved',
+            'document' => $this->withSubjectCode($updatedDocument),
         ]);
     }
 
@@ -439,6 +580,7 @@ public function index(Request $request): JsonResponse
 
         $rules = $document->document_type === 'letter'
             ? [
+                'selected_deputy_id' => 'required|integer|exists:users,user_id',
                 'title' => 'required|string|max:255',
                 'content' => 'required|string',
                 'designation' => 'nullable|string|max:150',
@@ -451,6 +593,7 @@ public function index(Request $request): JsonResponse
             ]
             : ($document->document_type === 'minute'
                 ? [
+                    'selected_deputy_id' => 'required|integer|exists:users,user_id',
                     'meeting_description' => 'nullable|string',
                     'discussion_summary' => 'nullable|string',
                     'closing_remarks' => 'nullable|string',
@@ -482,6 +625,13 @@ public function index(Request $request): JsonResponse
                 409,
                 'This document is no longer awaiting Department Head review.'
             );
+
+            $selectedDeputy = \App\Models\User::query()
+                ->where('user_id', $validated['selected_deputy_id'])
+                ->where('status', 'ACTIVE')
+                ->whereHas('role', fn ($query) => $query->where('role_name', 'deputy'))
+                ->first();
+            abort_unless($selectedDeputy, 422, 'Select an active Deputy Secretary.');
 
             if ($document->document_type === 'letter') {
                 $letter = Letter::where('letter_id', $document->source_id)->lockForUpdate()->firstOrFail();
@@ -522,11 +672,11 @@ public function index(Request $request): JsonResponse
                 if ($letter->meeting_id) {
                     app(LetterController::class)->syncExternalMeetingAttendees($letter->meeting_id);
                 }
-                $letter->refresh();
+                $letter->load('recipients.organization', 'recipients.user.organization', 'subject', 'meeting');
                 $document->update([
                     'subject' => $plainTitle,
                     'description' => trim(mb_substr($plainContent, 0, 255)),
-                    'full_content' => $plainContent,
+                    'full_content' => app(LetterController::class)->renderApprovalHtml($letter),
                 ]);
             } else {
                 $minute = MeetingMinute::where('minute_id', $document->source_id)->lockForUpdate()->firstOrFail();
@@ -557,8 +707,12 @@ public function index(Request $request): JsonResponse
                 'actioned_at' => now(),
             ]);
             $nextStep = $document->steps->firstWhere('step_order', $document->current_step_order + 1);
+            abort_unless($nextStep?->step_order === 3, 409, 'The Deputy approval step is missing from this workflow.');
             if ($nextStep) {
-                $nextStep->update(['status' => 'pending']);
+                $nextStep->update([
+                    'status' => 'pending',
+                    'assigned_to' => (int) $selectedDeputy->user_id,
+                ]);
                 $document->update(['current_step_order' => $nextStep->step_order]);
             } else {
                 $document->update(['status' => 'approved']);
@@ -592,16 +746,26 @@ public function index(Request $request): JsonResponse
                     '/approvals', 'approval_document', $updatedDocument->document_id, 'important',
                 );
             }
-            $this->notifications->sendToRole(
-                $nextStep->required_role,
-                'approval_action_required',
-                "{$entityName} awaiting your approval",
-                "{$entityName} {$entityCode} was edited and forwarded by {$request->user()->full_name} on {$actionDate} and is ready for your review.",
-                '/approvals', 'approval_document', $updatedDocument->document_id, 'important', $request->user()->user_id,
-            );
+            if ($nextStep->assigned_to) {
+                $this->notifications->sendToUser(
+                    (int) $nextStep->assigned_to,
+                    'approval_action_required',
+                    "{$entityName} awaiting your approval",
+                    "{$entityName} {$entityCode} was edited and forwarded by {$request->user()->full_name} on {$actionDate} and is ready for your review.",
+                    '/approvals', 'approval_document', $updatedDocument->document_id, 'important',
+                );
+            } else {
+                $this->notifications->sendToRole(
+                    $nextStep->required_role,
+                    'approval_action_required',
+                    "{$entityName} awaiting your approval",
+                    "{$entityName} {$entityCode} was edited and forwarded by {$request->user()->full_name} on {$actionDate} and is ready for your review.",
+                    '/approvals', 'approval_document', $updatedDocument->document_id, 'important', $request->user()->user_id,
+                );
+            }
         }
 
-        $updatedDocument->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions');
+        $updatedDocument->load('submitter.role', 'steps.actionedBy', 'steps.assignee.organization', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting.attendees', 'sourceMinute.decisions');
         return response()->json([
             'message' => 'Changes saved and document forwarded for approval.',
             'document' => $this->withSubjectCode($updatedDocument),
@@ -610,40 +774,46 @@ public function index(Request $request): JsonResponse
 
     public function reject(Request $request, int $id): JsonResponse
     {
-        $document = ApprovableDocument::with('steps')->findOrFail($id);
-        $currentStep = $document->steps->firstWhere('step_order', $document->current_step_order);
+        $actor = $request->user();
+        $document = DB::transaction(function () use ($request, $id, $actor) {
+            $document = ApprovableDocument::lockForUpdate()->findOrFail($id);
+            $currentStep = $document->steps()->where('step_order', $document->current_step_order)->lockForUpdate()->first();
+            abort_unless(
+                $document->status === 'pending'
+                    && $currentStep
+                    && $currentStep->status === 'pending'
+                    && $currentStep->required_role === $actor->role?->role_name
+                    && (!$currentStep->assigned_to || (int) $currentStep->assigned_to === (int) $actor->user_id),
+                403,
+                'You are not authorized to reject this step.'
+            );
 
-        $currentStep?->update([
-            'status' => 'rejected',
-            'actioned_by' => $request->user()->user_id,
-            'actioned_at' => now(),
-        ]);
-
-        $document->update(['status' => 'rejected']);
-
-        if ($document->document_type === 'letter' && $document->source_id) {
-            Letter::where('letter_id', $document->source_id)->update(['status' => 'rejected']);
-        }
-
-        if ($document->document_type === 'minute' && $document->source_id) {
-            MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'rejected']);
-        }
-
-        if ($request->filled('notes')) {
-            $document->comments()->create([
-                'user_id' => $request->user()->user_id,
-                'comment' => $request->notes,
+            $currentStep->update([
+                'status' => 'rejected',
+                'actioned_by' => $actor->user_id,
+                'actioned_at' => now(),
             ]);
-        }
+            $document->update(['status' => 'rejected']);
+            if ($document->document_type === 'letter' && $document->source_id) {
+                Letter::where('letter_id', $document->source_id)->update(['status' => 'rejected']);
+            }
+            if ($document->document_type === 'minute' && $document->source_id) {
+                MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'rejected']);
+            }
+            if ($request->filled('notes')) {
+                $document->comments()->create(['user_id' => $actor->user_id, 'comment' => $request->input('notes')]);
+            }
+            return $document->fresh();
+        });
 
-        if ((int) $document->submitted_by !== (int) $request->user()->user_id) {
+        if ((int) $document->submitted_by !== (int) $actor->user_id) {
             [$entityName, $entityCode] = $this->notificationIdentity($document);
             $actionDate = now()->format('d M Y, h:i A');
             $this->notifications->sendToUser(
                 $document->submitted_by,
                 'approval_rejected',
                 "{$entityName} rejected",
-                "{$entityName} {$entityCode} was rejected by {$request->user()->full_name} on {$actionDate}.",
+                "{$entityName} {$entityCode} was rejected by {$actor->full_name} on {$actionDate}.",
                 '/approvals',
                 'approval_document',
                 $document->document_id,
@@ -651,9 +821,10 @@ public function index(Request $request): JsonResponse
             );
         }
 
+        $document->load('submitter.role', 'steps.actionedBy', 'steps.assignee.organization', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting.attendees', 'sourceMinute.decisions');
         return response()->json([
             'message' => 'Rejected',
-            'document' => $this->withSubjectCode($document->load('submitter', 'steps.actionedBy', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions')),
+            'document' => $this->withSubjectCode($document),
         ]);
     }
 
@@ -669,6 +840,14 @@ public function index(Request $request): JsonResponse
         );
 
         return $document;
+    }
+
+    private function submissionResponse(ApprovableDocument $document): ApprovableDocument
+    {
+        $document->loadMissing('submitter', 'steps');
+        $document->makeHidden(['full_content']);
+
+        return $this->withSubjectCode($document);
     }
 
     private function plainText(string $value): string
@@ -691,6 +870,9 @@ public function index(Request $request): JsonResponse
         }
 
         $document = ApprovableDocument::findOrFail($id);
+        if (!$this->canViewDocument($document, $request->user())) {
+            return response()->json(['message' => 'You are not authorized to comment on this approval document.'], 403);
+        }
         $comment = $document->comments()->create([
             'user_id' => $request->user()->user_id,
             'comment' => $request->comment,
@@ -715,7 +897,7 @@ public function index(Request $request): JsonResponse
 
     private function notifyCurrentReviewer(ApprovableDocument $document, int $actorUserId, bool $resubmitted = false): void
     {
-        $document->loadMissing('steps', 'submitter', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions');
+        $document->loadMissing('steps', 'submitter', 'sourceLetter.subject', 'sourceMinute.meeting');
         $currentStep = $document->steps->firstWhere('step_order', $document->current_step_order);
 
         if (!$currentStep) {
@@ -742,7 +924,7 @@ public function index(Request $request): JsonResponse
     /** @return array{0: string, 1: string} */
     private function notificationIdentity(ApprovableDocument $document): array
     {
-        $document->loadMissing('sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting', 'sourceMinute.decisions');
+        $document->loadMissing('sourceLetter.subject', 'sourceMinute.meeting');
         $entityName = ucfirst(str_replace('_', ' ', $document->document_type));
         $entityCode = match ($document->document_type) {
             'letter' => $document->sourceLetter?->subject?->code ?: $document->subject,
@@ -757,7 +939,7 @@ public function index(Request $request): JsonResponse
     {
         return match ($role) {
             'dept_head' => 'the Department Head',
-            'deputy' => 'the Deputy Secretary',
+            'deputy' => 'the Deputy Chief Secretary',
             'chief_secretary' => 'the Chief Secretary',
             default => ucfirst(str_replace('_', ' ', $role)),
         };

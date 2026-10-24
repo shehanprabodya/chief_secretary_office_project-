@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import type { ApprovableDocument, ApprovalComment } from '../types/approval';
+import type { ApprovableDocument, ApprovalComment, EligibleDeputy } from '../types/approval';
 import type { Organization } from '../types/letter';
 
 export interface SubmitApprovalPayload {
@@ -39,6 +39,10 @@ export type DepartmentHeadEditPayload =
     };
 
 export const approvalService = {
+  async eligibleDeputies(): Promise<EligibleDeputy[]> {
+    const { data } = await api.get<{ deputies: EligibleDeputy[] }>('/approvals/eligible-deputies');
+    return data.deputies;
+  },
   async getRecipientOrganizations(): Promise<Organization[]> {
     try {
       const { data } = await api.get<{ organizations: Organization[] }>('/dept-head/letter-recipient-organizations');
@@ -71,15 +75,24 @@ export const approvalService = {
     return data.document;
   },
 
-  async approve(id: number, notes?: string): Promise<ApprovableDocument> {
-    const { data } = await api.post<{ document: ApprovableDocument }>(`/approvals/${id}/approve`, { notes });
+  async submitLetter(letterId: number): Promise<ApprovableDocument> {
+    const { data } = await api.post<{ document: ApprovableDocument }>(`/approvals/submit-letter/${letterId}`);
     return data.document;
   },
 
-  async editAndForward(id: number, payload: DepartmentHeadEditPayload, notes?: string): Promise<ApprovableDocument> {
+  async approve(id: number, notes?: string, selectedDeputyId?: number): Promise<ApprovableDocument> {
+    const { data } = await api.post<{ document: ApprovableDocument }>(`/approvals/${id}/approve`, {
+      notes,
+      ...(selectedDeputyId ? { selected_deputy_id: selectedDeputyId } : {}),
+    });
+    return data.document;
+  },
+
+  async editAndForward(id: number, payload: DepartmentHeadEditPayload, notes?: string, selectedDeputyId?: number): Promise<ApprovableDocument> {
     const { data } = await api.put<{ document: ApprovableDocument }>(`/approvals/${id}/edit-and-forward`, {
       ...payload,
       notes,
+      selected_deputy_id: selectedDeputyId,
     });
     return data.document;
   },
