@@ -6,8 +6,8 @@ import WorkflowTracker from '../components/Approvals/WorkflowTracker';
 import { approvalService } from '../services/approvalService';
 import { minuteService } from '../services/minuteService';
 import { useAuth } from '../context/AuthContext';
-import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
+import LetterPreviewDocument from '../components/Letters/LetterPreviewDocument';
 import type { ApprovableDocument } from '../types/approval';
 import type { EligibleDeputy } from '../types/approval';
 import type { DepartmentHeadEditPayload } from '../services/approvalService';
@@ -596,32 +596,28 @@ export default function ApprovalsPage() {
                       )}
                     </div>
                   ) : hasHtml(selectedDoc.full_content) ? (
-                    <div
-                      className="mx-auto shrink-0 box-border bg-white p-[10mm] shadow-xl"
-                      style={{ width: '210mm', minHeight: '297mm', zoom: 1.25, fontFamily: "'Iskoola Pota', sans-serif", fontSize: '12pt' }}
-                      dangerouslySetInnerHTML={{ __html: sanitizeDocumentHtml(selectedDoc.full_content ?? '') }}
+                    <LetterPreviewDocument
+                      html={selectedDoc.full_content ?? ''}
+                      letter={{
+                        subject: { id: 0, code: selectedDoc.subject_code ?? '', title: selectedDoc.subject },
+                        meeting_code: selectedDoc.subject_code ?? null,
+                        signature_date: selectedDoc.source_letter?.signature_date ?? selectedDoc.created_at ?? null,
+                        your_ref: '',
+                      }}
                     />
                   ) : selectedDoc.document_type === 'letter' && selectedDoc.source_letter ? (
-                    <div className="mx-auto min-h-[70vh] w-full max-w-4xl bg-white p-10 shadow-xl">
-                      <div className="mb-10 flex justify-between gap-6 text-sm">
-                        <span>{selectedDoc.subject_code ?? '—'}</span>
-                        <span>{selectedDoc.source_letter.signature_date ? new Date(selectedDoc.source_letter.signature_date).toLocaleDateString() : ''}</span>
-                      </div>
-                      <div className="mb-8 space-y-1 text-sm">
-                        {(selectedDoc.source_letter.recipients ?? []).map((recipient) => (
-                          <p key={recipient.letter_recipient_id}>
-                            {recipient.recipient_label ?? recipient.user?.designation ?? recipient.organization?.organization_name ?? ''}
-                            {!recipient.recipient_label && recipient.user?.organization?.organization_name ? `, ${recipient.user.organization.organization_name}` : ''}
-                          </p>
-                        ))}
-                      </div>
-                      <h3 className="mb-8 text-center text-lg font-bold underline">{htmlToPlainText(selectedDoc.source_letter.title)}</h3>
-                      <p className="whitespace-pre-wrap text-justify text-sm leading-7">{htmlToPlainText(selectedDoc.source_letter.content)}</p>
-                      <div className="mt-12 space-y-1 text-sm">
-                        <p>{htmlToPlainText(selectedDoc.source_letter.signatory_name)}</p>
-                        <p>{htmlToPlainText(selectedDoc.source_letter.designation)}</p>
-                      </div>
-                    </div>
+                    <LetterPreviewDocument
+                      html={selectedDoc.source_letter.content}
+                      letter={{
+                        subject: { id: 0, code: selectedDoc.subject_code ?? '', title: selectedDoc.subject },
+                        meeting_code: selectedDoc.subject_code ?? null,
+                        signature_date: selectedDoc.source_letter.signature_date ?? selectedDoc.created_at ?? null,
+                        title: selectedDoc.source_letter.title,
+                        designation: selectedDoc.source_letter.designation ?? undefined,
+                        signatory_name: selectedDoc.source_letter.signatory_name ?? undefined,
+                        your_ref: '',
+                      }}
+                    />
                   ) : (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-8">
                       <div className="border-b-2 border-slate-800 pb-4 text-center">

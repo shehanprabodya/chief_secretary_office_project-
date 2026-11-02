@@ -1,19 +1,19 @@
 import { X, Download, Printer, FileText } from 'lucide-react';
 import { letterService } from '../../services/letterService';
-import { sanitizeDocumentHtml } from '../../utils/sanitizeHtml';
+import LetterPreviewDocument from './LetterPreviewDocument';
+import type { Letter } from '../../types/letter';
 
 interface PreviewModalProps {
   html: string;
   letterId: number;
+  letter?: Partial<Letter> & { your_ref?: string | null } | null;
   onClose: () => void;
   allowExports?: boolean;
   onDownloadPdf?: () => Promise<void>;
   onDownloadDocx?: () => Promise<void>;
 }
 
-export default function PreviewModal({ html, letterId, onClose, allowExports = true, onDownloadPdf, onDownloadDocx }: PreviewModalProps) {
-  const safeHtml = sanitizeDocumentHtml(html);
-  const previewHtml = safeHtml;
+export default function PreviewModal({ html, letterId, letter, onClose, allowExports = true, onDownloadPdf, onDownloadDocx }: PreviewModalProps) {
 
   const handleDownloadPdf = async () => {
     await (onDownloadPdf ? onDownloadPdf() : letterService.downloadPdf(letterId));
@@ -73,17 +73,9 @@ export default function PreviewModal({ html, letterId, onClose, allowExports = t
 
         {/* Preview Content */}
         <div className="flex-1 overflow-auto bg-slate-200 p-1 sm:p-2">
-          <div
-            className="mx-auto shrink-0 box-border bg-white p-[10mm] shadow-xl"
-            style={{
-              width: '210mm',
-              minHeight: '297mm',
-              zoom: 1.25,
-              fontFamily: "'Iskoola Pota', sans-serif",
-              fontSize: '12pt',
-            }}
-            dangerouslySetInnerHTML={{ __html: previewHtml }}
-          />
+          <div className="mx-auto" style={{ width: '210mm' }}>
+            <LetterPreviewDocument html={html} letter={letter} />
+          </div>
         </div>
       </div>
     </div>

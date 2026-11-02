@@ -831,6 +831,16 @@ export default function GenerateLetterPage() {
         <PreviewModal
           html={previewHtml}
           letterId={letterId!}
+          letter={{
+            subject: subjects.find((subject) => subject.id === subjectId) ?? undefined,
+            meeting_code: subjects.find((subject) => subject.id === subjectId)?.code ?? null,
+            signature_date: signatureDate || null,
+            title,
+            content,
+            designation,
+            signatory_name: signatoryName || null,
+            your_ref: '',
+          }}
           allowExports={canEditLetter}
           onClose={() => setShowPreview(false)}
         />

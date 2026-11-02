@@ -18,9 +18,21 @@ class LetterPdfService
         $fontDirectory = base_path('../frontend/public/fonts');
         $faces = [];
 
-        foreach ([400 => 'iskpota.ttf', 700 => 'iskpotab.ttf'] as $weight => $filename) {
-            $fontPath = $fontDirectory . DIRECTORY_SEPARATOR . $filename;
-            if (!is_file($fontPath) || !is_readable($fontPath)) {
+        foreach ([
+            400 => ['Iskoola Pota Regular.ttf', 'iskpota.ttf'],
+            700 => ['Iskoola Pota Bold.ttf', 'iskpotab.ttf'],
+        ] as $weight => $candidates) {
+            $fontPath = null;
+
+            foreach ($candidates as $filename) {
+                $candidate = $fontDirectory . DIRECTORY_SEPARATOR . $filename;
+                if (is_file($candidate) && is_readable($candidate)) {
+                    $fontPath = $candidate;
+                    break;
+                }
+            }
+
+            if ($fontPath === null) {
                 if ($weight === 400) {
                     throw new RuntimeException('The bundled regular Iskoola Pota font is missing or unreadable.');
                 }
@@ -30,7 +42,7 @@ class LetterPdfService
 
             $fontData = file_get_contents($fontPath);
             if ($fontData === false) {
-                throw new RuntimeException('Failed to read bundled Iskoola Pota font: ' . $filename);
+                throw new RuntimeException('Failed to read bundled Iskoola Pota font: ' . basename($fontPath));
             }
 
             $faces[] = '@font-face { font-family: "Iskoola Pota"; src: url("data:font/ttf;base64,'
