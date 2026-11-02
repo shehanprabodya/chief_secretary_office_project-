@@ -73,7 +73,7 @@ export default function PreviewModal({ html, letterId, letter, onClose, allowExp
 
         {/* Preview Content */}
         <div className="flex-1 overflow-auto bg-slate-200 p-1 sm:p-2">
-          <div className="mx-auto" style={{ width: '210mm' }}>
+          <div className="letter-preview-shell">
             <LetterPreviewDocument html={html} letter={letter} />
           </div>
         </div>

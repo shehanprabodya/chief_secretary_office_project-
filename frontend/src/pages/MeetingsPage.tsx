@@ -56,6 +56,7 @@ export default function MeetingsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLetter, setPreviewLetter] = useState<Letter | null>(null);
   const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
   
 
@@ -127,6 +128,7 @@ export default function MeetingsPage() {
     try {
       const result = await letterService.preview(letterId);
       setPreviewHtml(result.preview_html);
+      setPreviewLetter(result.letter);
       setPreviewLetterId(letterId);
     } catch (err) {
       console.error('Failed to preview letter:', err);
@@ -387,8 +389,10 @@ export default function MeetingsPage() {
         <PreviewModal
           html={previewHtml}
           letterId={previewLetterId}
+          letter={previewLetter ?? undefined}
           onClose={() => {
             setPreviewLetterId(null);
+            setPreviewLetter(null);
             setPreviewHtml('');
           }}
         />

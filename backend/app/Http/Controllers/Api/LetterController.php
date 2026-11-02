@@ -325,7 +325,7 @@ class LetterController extends Controller
             return response()->json(['message' => 'Letter content is empty. Please write the letter body first.'], 422);
         }
 
-        $generatedHtml = $this->buildLetterHtml($letter);
+        $generatedHtml = $this->buildLetterHtml($letter, false, true);
 
         return response()->json([
             'letter'         => $letter,
@@ -336,7 +336,7 @@ class LetterController extends Controller
     /** Build the saved letter snapshot used by the approval workflow. */
     public function renderApprovalHtml(Letter $letter): string
     {
-        return $this->buildLetterHtml($letter);
+        return $this->buildLetterHtml($letter, false, true);
     }
 
     /**
@@ -351,7 +351,7 @@ class LetterController extends Controller
             'creator'
         )->findOrFail($id);
 
-        $generatedHtml = $this->buildLetterHtml($letter);
+        $generatedHtml = $this->buildLetterHtml($letter, false, true);
 
         return response()->json([
             'preview_html' => $generatedHtml,
@@ -373,7 +373,7 @@ class LetterController extends Controller
             ->findOrFail($id);
 
         return response()->json([
-            'preview_html' => $this->buildLetterHtml($letter),
+            'preview_html' => $this->buildLetterHtml($letter, false, true),
             'letter_id' => $letter->letter_id,
         ]);
     }
@@ -866,7 +866,7 @@ class LetterController extends Controller
      * Build formatted letter HTML — the core generation logic.
      * Matches the official Sri Lanka government letter format.
      */
-    private function buildLetterHtml(Letter $letter, bool $standalone = false): string
+    private function buildLetterHtml(Letter $letter, bool $standalone = false, bool $preview = false): string
     {
         $date = $letter->signature_date
             ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
@@ -915,6 +915,7 @@ class LetterController extends Controller
 
         return view('letters.document', compact(
             'standalone',
+            'preview',
             'fontFace',
             'subjectCode',
             'date',

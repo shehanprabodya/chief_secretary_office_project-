@@ -7,7 +7,7 @@ import RecordFilters from '../components/DepartmentHead/RecordFilters';
 import { emptyRecordFilters } from '../components/DepartmentHead/recordFilterValues';
 import RecordPagination from '../components/DepartmentHead/RecordPagination';
 import { departmentHeadRecordService } from '../services/departmentHeadRecordService';
-import type { LetterStatus } from '../types/letter';
+import type { Letter, LetterStatus } from '../types/letter';
 import type { DepartmentHeadLetter, DepartmentOfficer } from '../types/departmentHeadRecords';
 
 const STATUS_STYLES: Record<LetterStatus, string> = {
@@ -30,7 +30,7 @@ export default function DeptHeadLettersPage() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState<{ letterId: number; html: string } | null>(null);
+  const [preview, setPreview] = useState<{ letterId: number; html: string; letter?: Partial<Letter> & { your_ref?: string | null } | null } | null>(null);
   const [previewingId, setPreviewingId] = useState<number | null>(null);
 
   const loadLetters = useCallback(async () => {
@@ -87,7 +87,18 @@ export default function DeptHeadLettersPage() {
     setError('');
     try {
       const html = await departmentHeadRecordService.previewLetter(letterId);
-      setPreview({ letterId, html });
+      const selectedLetter = letters.find((item) => item.letter_id === letterId);
+      setPreview({
+        letterId,
+        html,
+        letter: selectedLetter ? {
+          subject: selectedLetter.subject ?? undefined,
+          meeting_code: selectedLetter.meeting_code ?? selectedLetter.subject?.code ?? null,
+          signature_date: selectedLetter.signature_date ?? null,
+          title: selectedLetter.title,
+          your_ref: '',
+        } : undefined,
+      });
     } catch {
       setError('Unable to open the meeting letter preview.');
     } finally {
@@ -133,7 +144,7 @@ export default function DeptHeadLettersPage() {
         </section>
       </div>
 
-      {preview && <PreviewModal html={preview.html} letterId={preview.letterId} onDownloadPdf={() => departmentHeadRecordService.downloadLetterPdf(preview.letterId)} onDownloadDocx={() => departmentHeadRecordService.downloadLetterDocx(preview.letterId)} onClose={() => setPreview(null)} />}
+      {preview && <PreviewModal html={preview.html} letterId={preview.letterId} letter={preview.letter ?? undefined} onDownloadPdf={() => departmentHeadRecordService.downloadLetterPdf(preview.letterId)} onDownloadDocx={() => departmentHeadRecordService.downloadLetterDocx(preview.letterId)} onClose={() => setPreview(null)} />}
     </DashboardLayout>
   );
 }
