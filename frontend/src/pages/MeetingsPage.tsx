@@ -2,12 +2,13 @@ import { useState, useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   List, Grid3x3, Plus,
-  Eye, ClipboardCheck
+  Eye, ClipboardCheck, FileText, X, Download, Pencil
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import PreviewModal from '../components/Letters/PreviewModal';
 import { useAuth } from '../context/AuthContext';
 import { letterService } from '../services/letterService';
+import { minuteService } from '../services/minuteService';
 import type { Letter, Subject } from '../types/letter';
 
 const STATUS_BADGE: Record<string, { label: string; className: string; dotClassName: string }> = {
@@ -58,6 +59,17 @@ export default function MeetingsPage() {
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewLetter, setPreviewLetter] = useState<Letter | null>(null);
   const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
+  const [minutePreviewUrl, setMinutePreviewUrl] = useState('');
+  const [minutePreviewMeetingId, setMinutePreviewMeetingId] = useState<number | null>(null);
+  const [minutePreviewCreatorId, setMinutePreviewCreatorId] = useState<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (minutePreviewUrl) {
+        URL.revokeObjectURL(minutePreviewUrl);
+      }
+    };
+  }, [minutePreviewUrl]);
   
 
  useEffect(() => {
@@ -134,6 +146,53 @@ export default function MeetingsPage() {
       console.error('Failed to preview letter:', err);
       alert('Failed to preview letter');
     }
+  };
+
+  const handlePreviewMinute = async (letter: Letter) => {
+    if (!letter.meeting_id) {
+      alert('No meeting is linked to this letter yet.');
+      return;
+    }
+
+    try {
+      const meetingId = letter.meeting_id;
+      const { minute } = await minuteService.getOrCreateForMeeting(meetingId);
+      const blob = await minuteService.downloadPdf(minute.minute_id);
+      const url = URL.createObjectURL(blob);
+      setMinutePreviewUrl((currentUrl) => {
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl);
+        }
+        return url;
+      });
+      setMinutePreviewMeetingId(meetingId);
+      setMinutePreviewCreatorId(minute.created_by ?? null);
+    } catch (err) {
+      console.error('Failed to preview minute:', err);
+      alert('Failed to preview the officer-created minute.');
+    }
+  };
+
+  const closeMinutePreview = () => {
+    if (minutePreviewUrl) {
+      URL.revokeObjectURL(minutePreviewUrl);
+    }
+    setMinutePreviewUrl('');
+    setMinutePreviewMeetingId(null);
+    setMinutePreviewCreatorId(null);
+  };
+
+  const canEditMinute = Number(user?.id) === minutePreviewCreatorId;
+
+  const handleDownloadMinute = () => {
+    if (!minutePreviewUrl) return;
+
+    const link = document.createElement('a');
+    link.href = minutePreviewUrl;
+    link.download = `meeting-minutes-${minutePreviewMeetingId ?? 'preview'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   return (
@@ -241,6 +300,7 @@ export default function MeetingsPage() {
                 <th className="px-6 py-3">Subject Title</th>
                 <th className="px-6 py-3">Letter Date</th>
                 <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3 text-center">Minutes</th>
                 <th className="px-6 py-3 text-center">Attendance</th>
                 <th className="px-6 py-3 text-right">View</th>
               </tr>
@@ -286,6 +346,20 @@ export default function MeetingsPage() {
                         <span className={`h-1.5 w-1.5 rounded-full ${STATUS_BADGE[letter.status]?.dotClassName ?? 'bg-slate-400'}`} />
                         {STATUS_BADGE[letter.status]?.label ?? letter.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handlePreviewMinute(letter);
+                        }}
+                        className="rounded p-1.5 text-violet-600 hover:bg-violet-50 hover:text-violet-800"
+                        title="Preview meeting minutes"
+                        aria-label="Preview minutes"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
                     </td>
                     <td className="px-6 py-4 text-center">
                       {Number(user?.id) === letter.created_by ? (
@@ -396,6 +470,61 @@ export default function MeetingsPage() {
             setPreviewHtml('');
           }}
         />
+      )}
+
+      {minutePreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Meeting Minutes Preview</h2>
+                <p className="text-sm text-slate-500">Officer-created meeting minutes</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeMinutePreview}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <X className="h-4 w-4" />
+                Close
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-hidden bg-slate-100 p-2">
+              <iframe
+                src={minutePreviewUrl}
+                title="Meeting Minutes Preview"
+                className="h-full w-full rounded-xl border-0 bg-white"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3">
+              <button
+                type="button"
+                onClick={handleDownloadMinute}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </button>
+              <button
+                type="button"
+                disabled={!canEditMinute}
+                onClick={() => {
+                  if (minutePreviewMeetingId) {
+                    closeMinutePreview();
+                    navigate(`/meetings/${minutePreviewMeetingId}/minutes`);
+                  }
+                }}
+                title={canEditMinute ? 'Edit this minute' : 'Only the officer who created this minute can edit it'}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${canEditMinute ? 'bg-blue-700 text-white hover:bg-blue-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </DashboardLayout>
   );

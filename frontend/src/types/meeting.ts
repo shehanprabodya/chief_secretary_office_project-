@@ -27,6 +27,7 @@ export interface Meeting {
   creator?: { user_id: number; full_name: string };
   status: MeetingStatus;
   description: string | null;
+  created_by?: number | null;
   attendees?: MeetingAttendee[];
 }
 
