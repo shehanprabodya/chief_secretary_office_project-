@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\MinuteController;
 use App\Http\Controllers\Api\ExternalOfficerController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DepartmentHeadRecordController;
+use App\Http\Controllers\Api\SignatureManagementController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
 use App\Http\Controllers\Api\Admin\UserManagementController;
 use App\Http\Controllers\Api\Admin\SubjectManagementController;
@@ -31,6 +32,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/meetings', [MeetingController::class, 'index']);
         Route::get('/meetings/by-date', [MeetingController::class, 'byDate']);
     });
+
+    Route::post('/signing-delegations', [SignatureManagementController::class, 'storeDelegation'])
+        ->middleware('role:chief_secretary');
+    Route::post('/signing/documents/{documentType}/{documentId}/sign', [SignatureManagementController::class, 'signDocument']);
 
     // Meeting creation is shared by the officer and admin meeting workflow.
     Route::post('/meetings', [MeetingController::class, 'store'])
@@ -92,6 +97,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/organizations', [UserManagementController::class, 'organizationStore']);
         Route::put('/organizations/{organization}', [UserManagementController::class, 'organizationUpdate']);
         Route::delete('/organizations/{organization}', [UserManagementController::class, 'organizationDestroy']);
+        Route::get('/signatures', [SignatureManagementController::class, 'index']);
+        Route::post('/signatures', [SignatureManagementController::class, 'storeSignature']);
+        Route::delete('/signatures/{signatureId}', [SignatureManagementController::class, 'destroy']);
 
         Route::apiResource('subjects', SubjectManagementController::class)
             ->only(['index', 'store', 'update', 'destroy']);

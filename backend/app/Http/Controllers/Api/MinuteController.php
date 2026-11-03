@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActionItem;
 use App\Models\ApprovableDocument;
+use App\Models\DocumentSignature;
 use App\Models\Meeting;
 use App\Models\MeetingMinute;
 use App\Models\MinuteDecision;
+use App\Services\SignatureManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -355,10 +357,22 @@ class MinuteController extends Controller
         // use the same base64-embedded Iskoola Pota font that Playwright verifies.
         $fontFace = (new \App\Services\LetterPdfService())->fontFaceCss();
 
+        $signatureDataUri = null;
+        $documentSignature = DocumentSignature::query()
+            ->where('document_type', 'minute')
+            ->where('document_id', $minute->minute_id)
+            ->latest('signed_at')
+            ->first();
+
+        if ($documentSignature && $documentSignature->signer) {
+            $signatureDataUri = app(SignatureManagementService::class)->dataUriForUser($documentSignature->signer);
+        }
+
         $html = view('minutes.pdf', [
             'minute' => $minute,
             'meeting' => $minute->meeting,
             'fontFace' => $fontFace,
+            'signatureDataUri' => $signatureDataUri,
         ])->render();
 
         $filename = 'minutes-' .

@@ -15,6 +15,9 @@
     <div class="body" style="text-align: justify; text-align-last: left;">{!! $bodyHtml !!}</div>
 
     <div class="signature" style="margin-top: 0.5cm;">
+        @if (!empty($signatureDataUri))
+            <img src="{{ $signatureDataUri }}" alt="Official signature" style="max-height: 52px; max-width: 180px; display: block; margin-bottom: 0.25cm; object-fit: contain;" />
+        @endif
         <span>{{ $signatoryName }}</span><br>
         <span>{{ $designation }}</span><br>
         <span>{{ $office }}</span>
@@ -201,6 +204,9 @@
                 <div class="body">{!! $bodyHtml !!}</div>
 
                 <div class="signature">
+                    @if (!empty($signatureDataUri))
+                        <img src="{{ $signatureDataUri }}" alt="Official signature" style="max-height: 52px; max-width: 180px; display: block; margin-bottom: 0.25cm; object-fit: contain;" />
+                    @endif
                     <span>{{ $signatoryName }}</span><br>
                     <span>{{ $designation }}</span><br>
                     <span>{{ $office }}</span>

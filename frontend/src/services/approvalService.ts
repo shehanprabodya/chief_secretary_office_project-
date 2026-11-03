@@ -102,6 +102,15 @@ export const approvalService = {
     return data.document;
   },
 
+  async signDocument(documentType: string, documentId: number, password: string, sourceDocumentId?: number): Promise<{ message: string; document_signature: { document_type: string; document_id: number; signer_id: number; primary_signer_id?: number | null; signing_type?: string | null } }> {
+    const resolvedDocumentId = sourceDocumentId ?? documentId;
+    const { data } = await api.post<{ message: string; document_signature: { document_type: string; document_id: number; signer_id: number; primary_signer_id?: number | null; signing_type?: string | null } }>(`/signing/documents/${documentType}/${resolvedDocumentId}/sign`, {
+      confirm: true,
+      password,
+    });
+    return data;
+  },
+
   async addComment(id: number, comment: string): Promise<ApprovalComment> {
     const { data } = await api.post<{ comment: ApprovalComment }>(`/approvals/${id}/comments`, { comment });
     return data.comment;

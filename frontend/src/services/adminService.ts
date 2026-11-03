@@ -118,4 +118,49 @@ export const adminService = {
     });
     return data;
   },
+
+  async uploadSignature(userId: number, file: File, isActive = true): Promise<{ message: string }> {
+    const formData = new FormData();
+    formData.append('user_id', String(userId));
+    formData.append('signature', file);
+    formData.append('is_active', isActive ? '1' : '0');
+
+    const { data } = await api.post<{ message: string }>('/admin/signatures', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    return data;
+  },
+
+  async getSignatures(): Promise<Array<{
+    id: number;
+    user_id: number;
+    user_name: string | null;
+    role_name: string | null;
+    mime_type: string;
+    file_size: number;
+    is_active: boolean;
+    uploaded_at: string | null;
+    uploaded_by_name: string | null;
+    preview_data_uri: string | null;
+  }>> {
+    const { data } = await api.get<{ data: Array<{
+      id: number;
+      user_id: number;
+      user_name: string | null;
+      role_name: string | null;
+      mime_type: string;
+      file_size: number;
+      is_active: boolean;
+      uploaded_at: string | null;
+      uploaded_by_name: string | null;
+      preview_data_uri: string | null;
+    }> }>('/admin/signatures');
+
+    return data.data;
+  },
+
+  async deleteSignature(signatureId: number): Promise<void> {
+    await api.delete(`/admin/signatures/${signatureId}`);
+  },
 };
