@@ -8,7 +8,9 @@ use App\Models\Meeting;
 use App\Models\Organization;
 use App\Models\Subject;
 use App\Models\User;
+use App\Models\DocumentSignature;
 use App\Services\LetterPdfService;
+use App\Services\SignatureManagementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -910,6 +912,17 @@ class LetterController extends Controller
         $signatoryName = $letter->signatory_name ?? 'නදීකා සී. මුහන්දිරම්ගේ';
         $designation = $letter->designation ?? 'ප්‍රධාන ලේකම්';
         $office = 'දකුණු පළාත';
+        $signatureDataUri = null;
+
+        $documentSignature = DocumentSignature::query()
+            ->where('document_type', 'letter')
+            ->where('document_id', $letter->letter_id)
+            ->latest('signed_at')
+            ->first();
+
+        if ($documentSignature && $documentSignature->signer) {
+            $signatureDataUri = app(SignatureManagementService::class)->dataUriForUser($documentSignature->signer);
+        }
 
         $fontFace = $this->letterPdfService->fontFaceCss();
 
@@ -925,6 +938,7 @@ class LetterController extends Controller
             'signatoryName',
             'designation',
             'office',
+            'signatureDataUri',
         ))->render();
     }
 

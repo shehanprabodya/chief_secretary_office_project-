@@ -85,6 +85,9 @@ export default function ApprovalsPage() {
   const [deputyLookupError, setDeputyLookupError] = useState<string | null>(null);
   const [selectedDeputyId, setSelectedDeputyId] = useState('');
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [showSignDialog, setShowSignDialog] = useState(false);
+  const [signPassword, setSignPassword] = useState('');
+  const [signConfirmed, setSignConfirmed] = useState(false);
   const selectedDocumentId = useRef<number | null>(requestedDocumentId);
   const minutePdfUrlRef = useRef<string | null>(null);
 
@@ -157,6 +160,10 @@ export default function ApprovalsPage() {
   const currentStep = selectedDoc?.steps?.find((s) => s.step_order === selectedDoc.current_step_order);
   const canAct = currentStep && user && currentStep.required_role === user.role && currentStep.status === 'pending'
     && (!currentStep.assigned_to || Number(currentStep.assigned_to) === Number(user.id));
+  const canSignDocument = Boolean(
+    user && ['chief_secretary', 'deputy'].includes(user.role) && currentStep && currentStep.required_role === user.role && currentStep.status === 'pending'
+      && (!currentStep.assigned_to || Number(currentStep.assigned_to) === Number(user.id)),
+  );
   const canEditSubmitted = Boolean(canAct && user?.role === 'dept_head' && ['letter', 'minute'].includes(selectedDoc?.document_type ?? ''));
   const requiresDeputySelection = Boolean(canAct && user?.role === 'dept_head' && ['letter', 'minute'].includes(selectedDoc?.document_type ?? ''));
 
@@ -284,6 +291,44 @@ export default function ApprovalsPage() {
     } catch (approveError) {
       console.error(approveError);
       setError('Could not approve this document. It may have already moved to another stage. Refresh and try again.');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleSignDocument = async () => {
+    if (!selectedDoc) return;
+    setShowSignDialog(true);
+    setSignConfirmed(false);
+    setSignPassword('');
+  };
+
+  const confirmDocumentSigning = async () => {
+    if (!selectedDoc || !signPassword.trim()) {
+      setError('Enter your password to sign this document.');
+      return;
+    }
+    if (!signConfirmed) {
+      setError('Please confirm that you are signing as the authorized signatory.');
+      return;
+    }
+
+    setIsActing(true);
+    setError(null);
+    try {
+      await approvalService.signDocument(
+        selectedDoc.document_type,
+        selectedDoc.document_id,
+        signPassword,
+        selectedDoc.source_id ?? undefined,
+      );
+      setShowSignDialog(false);
+      setSignPassword('');
+      setSignConfirmed(false);
+      await fetchList();
+    } catch (signError) {
+      console.error(signError);
+      setError('Could not sign this document. Check your password, delegation status, or uploaded signature image.');
     } finally {
       setIsActing(false);
     }
@@ -491,6 +536,15 @@ export default function ApprovalsPage() {
                     >
                       Reject
                     </button>
+                    {canSignDocument && !isEditing && (
+                      <button
+                        onClick={handleSignDocument}
+                        disabled={isActing}
+                        className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                      >
+                        Sign document
+                      </button>
+                    )}
                     <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                       Notes/Observations
                     </button>
@@ -607,7 +661,7 @@ export default function ApprovalsPage() {
                     />
                   ) : selectedDoc.document_type === 'letter' && selectedDoc.source_letter ? (
                     <LetterPreviewDocument
-                      html={selectedDoc.source_letter.content}
+                      html={selectedDoc.full_content ?? selectedDoc.source_letter.content}
                       letter={{
                         subject: { id: 0, code: selectedDoc.subject_code ?? '', title: selectedDoc.subject },
                         meeting_code: selectedDoc.subject_code ?? null,
@@ -752,6 +806,43 @@ export default function ApprovalsPage() {
               <button type="button" onClick={() => setForwardMode(null)} disabled={isActing} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
               <button type="button" onClick={confirmForward} disabled={!selectedDeputyId || isLoadingDeputies || isActing} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {isActing ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {showSignDialog && selectedDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="sign-document-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <h2 id="sign-document-title" className="text-lg font-bold text-slate-900">Sign official document</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {selectedDoc.document_type === 'letter' ? 'This letter' : 'This minute'} will be signed with your official signature image and saved to the document record.
+            </p>
+
+            <label htmlFor="sign-password" className="mt-5 block text-sm font-medium text-slate-700">Your password</label>
+            <input
+              id="sign-password"
+              type="password"
+              value={signPassword}
+              onChange={(event) => setSignPassword(event.target.value)}
+              placeholder="Enter your password"
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={signConfirmed}
+                onChange={(event) => setSignConfirmed(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+              />
+              <span>I confirm that I am the authorized signatory and this document should be signed using my official signature.</span>
+            </label>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setShowSignDialog(false)} disabled={isActing} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={confirmDocumentSigning} disabled={isActing || !signPassword.trim()} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
+                {isActing ? 'Signing…' : 'Sign now'}
               </button>
             </div>
           </section>

@@ -6,6 +6,7 @@ import {
   Users,
   Files,
   BookOpen,
+  ImageUp,
 } from "lucide-react";
 
 export const navigation = {
@@ -24,6 +25,11 @@ export const navigation = {
       icon: BookOpen,
       label: "Subjects",
       href: "/admin/subjects",
+    },
+    {
+      icon: ImageUp,
+      label: "Signature Upload",
+      href: "/admin/signatures",
     },
   ],
 

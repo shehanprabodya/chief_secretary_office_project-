@@ -18,6 +18,7 @@ import CreateMeetingPage from './pages/CreateMeetingPage';
 import MeetingDetailsPage from './pages/MeetingDetailsPage';
 import ExternalOfficerDashboard from './pages/ExternalOfficerDashboard';
 import SubjectManagementPage from './pages/SubjectManagementPage';
+import SignatureManagementPage from './pages/SignatureManagementPage';
 import DeptHeadLettersPage from './pages/DeptHeadLettersPage';
 import DeptHeadAttendancePage from './pages/DeptHeadAttendancePage';
 import DeptHeadMinutesPage from './pages/DeptHeadMinutesPage';
@@ -32,14 +33,11 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/dashboard/admin" element={<AdminDashboard />} />
-          </Route>
-
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route path="/dashboard/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UserManagementPage />} />
             <Route path="/admin/subjects" element={<SubjectManagementPage />} />
+            <Route path="/admin/signatures" element={<SignatureManagementPage />} />
           </Route>
-          
+
           <Route element={<ProtectedRoute allowedRoles={['officer']} />}>
             <Route path="/dashboard/officer" element={<OfficerDashboard />} />
           </Route>

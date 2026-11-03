@@ -146,7 +146,11 @@
 
     @if($minute->signatory_name || $minute->signatory_designation)
         <div class="signature">
-            <div class="signature-line">........................................................</div>
+            @if (!empty($signatureDataUri))
+                <img src="{{ $signatureDataUri }}" alt="Official signature" style="max-height: 52px; max-width: 170px; display: block; margin-bottom: 8px; object-fit: contain;" />
+            @else
+                <div class="signature-line">........................................................</div>
+            @endif
             <strong>{{ $minute->signatory_name }}</strong><br>
             {{ $minute->signatory_designation }}<br>
             දිනය: {{ optional($meeting->meeting_date)->format('Y.m.d') ?? '-' }}
