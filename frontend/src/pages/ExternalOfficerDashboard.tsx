@@ -80,6 +80,7 @@ export default function ExternalOfficerDashboard() {
   const [letterMeeting, setLetterMeeting] = useState<ExternalOfficerMeeting | null>(null);
   const [previewLetterId, setPreviewLetterId] = useState<number | null>(null);
   const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLetter, setPreviewLetter] = useState<Partial<import('../types/letter').Letter> & { your_ref?: string | null } | null>(null);
   const [isLetterLoading, setIsLetterLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
@@ -145,6 +146,16 @@ export default function ExternalOfficerDashboard() {
     try {
       const html = await externalOfficerService.previewLetter(meeting.letter.letter_id);
       setPreviewHtml(html);
+      setPreviewLetter({
+        subject: meeting.subject ?? undefined,
+        meeting_code: meeting.meeting_code ?? meeting.subject?.code ?? null,
+        signature_date: meeting.letter.signature_date ?? null,
+        title: meeting.letter.title,
+        content: meeting.letter.content ?? '',
+        designation: meeting.letter.designation ?? null,
+        signatory_name: meeting.letter.signatory_name ?? null,
+        your_ref: '',
+      });
       setPreviewLetterId(meeting.letter.letter_id);
     } catch (err) {
       console.error(err);
@@ -498,9 +509,11 @@ export default function ExternalOfficerDashboard() {
         <PreviewModal
           html={previewHtml}
           letterId={previewLetterId}
+          letter={previewLetter ?? undefined}
           allowExports={false}
           onClose={() => {
             setPreviewLetterId(null);
+            setPreviewLetter(null);
             setPreviewHtml('');
           }}
         />

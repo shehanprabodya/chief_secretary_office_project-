@@ -13,8 +13,13 @@ class ApprovalWorkflowStep extends Model
 
     protected $fillable = [
         'document_id', 'step_label', 'step_order', 'required_role',
-        'status', 'actioned_by', 'actioned_at',
+        'assigned_to', 'status', 'actioned_by', 'actioned_at',
     ];
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to', 'user_id');
+    }
 
     public function actionedBy(): BelongsTo
     {

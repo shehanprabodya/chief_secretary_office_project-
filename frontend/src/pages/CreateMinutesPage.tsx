@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Save, Send, Bold, Italic, List as ListIcon, Link as LinkIcon, Plus, Trash2, FileDown, Eye, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import DecisionResponsibilityInput from '../components/Minutes/DecisionResponsibilityInput';
+import { useAuth } from '../context/AuthContext';
 import { minuteService } from '../services/minuteService';
 import { approvalService } from '../services/approvalService';
 import { meetingService } from '../services/meetingService';
@@ -41,6 +42,7 @@ const responsibilityDetails = (responsibility: string | null, attendees: NonNull
 export default function CreateMinutesPage() {
   const { meetingId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [minute, setMinute] = useState<MeetingMinute | null>(null);
@@ -90,7 +92,8 @@ export default function CreateMinutesPage() {
 
         try {
           const res = await meetingService.list({ per_page: 20 });
-          setMeetings(res.data || []);
+          const myMeetings = (res.data || []).filter((item) => Number(user?.id) === item.creator?.user_id);
+          setMeetings(myMeetings);
         } catch {
           setMeetingsError('Unable to load meetings.');
         } finally {
@@ -108,6 +111,16 @@ export default function CreateMinutesPage() {
 
       try {
         const { minute, meeting } = await minuteService.getOrCreateForMeeting(Number(meetingId));
+
+        const meetingCreatorId = Number(meeting.created_by ?? meeting.creator?.user_id ?? 0);
+        if (user && Number(user.id) !== meetingCreatorId) {
+          setMinute(null);
+          setMeeting(null);
+          setDecisionRows([]);
+          setMeetingLoadError('Only the officer who created this meeting can create or edit its minutes.');
+          return;
+        }
+
         setMinute(minute);
         setMeeting(meeting);
         setDecisionRows(minute.decisions.map((decision) => ({ ...decision, rowKey: `decision-${decision.decision_id}` })));
@@ -130,7 +143,7 @@ export default function CreateMinutesPage() {
     };
 
     void loadMinute();
-  }, [meetingId]);
+  }, [meetingId, user?.id]);
 
   const handleSaveDraft = async (): Promise<MeetingMinute> => {
     if (!minute) {
@@ -193,7 +206,6 @@ export default function CreateMinutesPage() {
         full_content: approvalContent,
       });
 
-      await minuteService.submitForApproval(savedMinute.minute_id);
       setMinute((prev) => prev ? { ...prev, status: 'pending_approval' } : prev);
       navigate('/approvals', { state: { selectedDocumentId: approvalDoc.document_id } });
     } catch (error) {

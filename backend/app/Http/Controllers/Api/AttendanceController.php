@@ -536,8 +536,19 @@ class AttendanceController extends Controller
             ? round(($statistics['present'] / $statistics['total']) * 100)
             : 0;
 
-        $fontPath = base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf');
-        $fontUrl = is_file($fontPath) ? 'file://' . $fontPath : null;
+        $fontCandidates = [
+            base_path('../frontend/public/fonts/Iskoola Pota Regular.ttf'),
+            base_path('../frontend/public/fonts/iskpota.ttf'),
+        ];
+        $fontPath = null;
+        foreach ($fontCandidates as $candidate) {
+            if (is_file($candidate) && is_readable($candidate)) {
+                $fontPath = $candidate;
+                break;
+            }
+        }
+
+        $fontUrl = $fontPath ? 'file://' . $fontPath : null;
         $html = view('attendance.report', compact('meeting', 'letter', 'records', 'statistics', 'fontUrl'))->render();
         $options = new \Dompdf\Options();
         $options->set('isHtml5ParserEnabled', true);

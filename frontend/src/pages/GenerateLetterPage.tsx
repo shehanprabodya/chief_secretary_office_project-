@@ -34,8 +34,6 @@ const getErrorMessage = (err: unknown, fallback: string) => {
   return String(firstError || data?.message || fallback);
 };
 
-const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-
 type StatusStepState = 'complete' | 'current' | 'waiting' | 'rejected';
 
 type StatusItem = {
@@ -456,18 +454,7 @@ export default function GenerateLetterPage() {
       const saved = await letterService.saveDraft(buildPayload());
       setLetterId(saved.letter_id);
 
-      const result = await letterService.generate(saved.letter_id);
-      const selectedSubject = subjects.find((subject) => subject.id === subjectId);
-      const approvalSubject = stripHtml(title) || selectedSubject?.title || selectedSubject?.code || `Letter ${saved.letter_id}`;
-      const description = stripHtml(content).slice(0, 300);
-
-      const submittedDocument = await approvalService.submit({
-        document_type: 'letter',
-        source_id: saved.letter_id,
-        subject: approvalSubject,
-        description,
-        full_content: result.generated_html,
-      });
+      const submittedDocument = await approvalService.submitLetter(saved.letter_id);
 
       setApprovalDocument(submittedDocument);
       setLetterStatus('pending_approval');
@@ -844,6 +831,16 @@ export default function GenerateLetterPage() {
         <PreviewModal
           html={previewHtml}
           letterId={letterId!}
+          letter={{
+            subject: subjects.find((subject) => subject.id === subjectId) ?? undefined,
+            meeting_code: subjects.find((subject) => subject.id === subjectId)?.code ?? null,
+            signature_date: signatureDate || null,
+            title,
+            content,
+            designation,
+            signatory_name: signatoryName || null,
+            your_ref: '',
+          }}
           allowExports={canEditLetter}
           onClose={() => setShowPreview(false)}
         />

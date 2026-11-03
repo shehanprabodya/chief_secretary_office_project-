@@ -26,10 +26,16 @@ class MinuteController extends Controller
         return response()->json($minutes);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
         $minute = MeetingMinute::with('meeting.attendees', 'decisions')
             ->findOrFail($id);
+
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the meeting minute creator can access this minute.',
+            ], 403);
+        }
 
         return response()->json(['minute' => $minute]);
     }
@@ -40,11 +46,43 @@ class MinuteController extends Controller
     public function getOrCreateForMeeting(Request $request, int $meetingId): JsonResponse
     {
         $meeting = Meeting::with(
+                'creator',
                 'attendees.organization',
                 'letters.recipients.user',
                 'letters.recipients.organization',
             )
             ->findOrFail($meetingId);
+
+        $isMeetingCreator = (int) $meeting->created_by === (int) $request->user()->user_id;
+        if (!$isMeetingCreator) {
+            $existingMinute = MeetingMinute::where('meeting_id', $meetingId)->first();
+
+            if (!$existingMinute) {
+                return response()->json([
+                    'message' => 'Only the officer who created this meeting can create minutes for it.',
+                ], 403);
+            }
+
+            $existingMinute->load('decisions');
+            $latestLetter = $meeting->letters->sortByDesc('letter_id')->first();
+            $letterRecipients = $latestLetter
+                ? $latestLetter->recipients->map(fn ($recipient) => [
+                    'letter_recipient_id' => $recipient->letter_recipient_id,
+                    'user_id' => $recipient->user_id,
+                    'organization_id' => $recipient->organization_id,
+                    'recipient_label' => $recipient->recipient_label,
+                    'designation' => optional($recipient->user)->designation,
+                    'full_name' => optional($recipient->user)->full_name,
+                    'organization_name' => optional($recipient->organization)->organization_name,
+                ])->values()
+                : collect();
+
+            return response()->json([
+                'minute' => $existingMinute,
+                'meeting' => $meeting,
+                'letter_recipients' => $letterRecipients,
+            ]);
+        }
 
         $minute = MeetingMinute::firstOrCreate(
             ['meeting_id' => $meetingId],
@@ -77,6 +115,12 @@ class MinuteController extends Controller
     {
         $meeting = Meeting::with('attendees')->findOrFail($meetingId);
 
+        if ((int) $meeting->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the officer who created this meeting can create minutes for it.',
+            ], 403);
+        }
+
         $minute = MeetingMinute::firstOrCreate(
             ['meeting_id' => $meetingId],
             [
@@ -100,6 +144,12 @@ class MinuteController extends Controller
     {
         $minute = MeetingMinute::findOrFail($id);
 
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the minute creator can save changes to this minute.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'meeting_description' => 'nullable|string',
             'discussion_summary' => 'nullable|string',
@@ -120,6 +170,12 @@ class MinuteController extends Controller
     public function submitForApproval(Request $request, int $id): JsonResponse
     {
         $minute = MeetingMinute::with('meeting')->findOrFail($id);
+
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the minute creator can submit this minute for approval.',
+            ], 403);
+        }
 
         $minute->update(['status' => 'pending_approval']);
 
@@ -158,6 +214,14 @@ class MinuteController extends Controller
      */
     public function addDecision(Request $request, int $minuteId): JsonResponse
     {
+        $minute = MeetingMinute::findOrFail($minuteId);
+
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the minute creator can modify decisions for this minute.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'topic' => 'nullable|string|max:500',
             'decision_text' => 'required|string',
@@ -181,14 +245,30 @@ class MinuteController extends Controller
         return response()->json(['decision' => $decision], 201);
     }
 
-    public function deleteDecision(int $decisionId): JsonResponse
+    public function deleteDecision(Request $request, int $decisionId): JsonResponse
     {
-        MinuteDecision::findOrFail($decisionId)->delete();
+        $decision = MinuteDecision::with('minute')->findOrFail($decisionId);
+
+        if ((int) $decision->minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the minute creator can delete decisions from this minute.',
+            ], 403);
+        }
+
+        $decision->delete();
         return response()->json(['message' => 'Decision removed']);
     }
 
     public function updateDecision(Request $request, int $decisionId): JsonResponse
     {
+        $decision = MinuteDecision::with('minute')->findOrFail($decisionId);
+
+        if ((int) $decision->minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the minute creator can update decisions for this minute.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'topic' => 'nullable|string|max:500',
             'decision_text' => 'required|string',
@@ -210,6 +290,14 @@ class MinuteController extends Controller
      */
     public function addActionItem(Request $request, int $minuteId): JsonResponse
     {
+        $minute = MeetingMinute::findOrFail($minuteId);
+
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the minute creator can add action items to this minute.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'task_description' => 'required|string|max:500',
             'responsible_officer_id' => 'required|exists:users,user_id',
@@ -230,9 +318,17 @@ class MinuteController extends Controller
         ], 201);
     }
 
-    public function deleteActionItem(int $itemId): JsonResponse
+    public function deleteActionItem(Request $request, int $itemId): JsonResponse
     {
-        ActionItem::findOrFail($itemId)->delete();
+        $item = ActionItem::with('minute')->findOrFail($itemId);
+
+        if ((int) $item->minute->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the minute creator can remove action items from this minute.',
+            ], 403);
+        }
+
+        $item->delete();
         return response()->json(['message' => 'Action item removed']);
     }
 
@@ -243,9 +339,9 @@ class MinuteController extends Controller
             'decisions',
         ])->findOrFail($id);
 
-        // Basic authorization
+        // Officers may preview the minute, but editing remains limited to the creator.
         if (
-            (int) $minute->created_by !== (int) $request->user()->user_id
+            !$request->user()->hasRole('officer')
             && !$request->user()->hasRole('dept_head')
             && !$request->user()->hasRole('deputy')
             && !$request->user()->hasRole('chief_secretary')

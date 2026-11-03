@@ -22,6 +22,10 @@ class MeetingController extends Controller
     {
         $query = Meeting::with('subject', 'creator');
 
+        if ($request->user()?->hasRole('officer')) {
+            $query->where('created_by', $request->user()->user_id);
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -62,9 +66,16 @@ class MeetingController extends Controller
     /**
      * Single meeting with full details (for calendar popup / edit modal)
      */
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
         $meeting = Meeting::with('creator', 'attendees')->findOrFail($id);
+
+        if ($request->user()?->hasRole('officer') && (int) $meeting->created_by !== (int) $request->user()->user_id) {
+            return response()->json([
+                'message' => 'Only the meeting creator can access this meeting.',
+            ], 403);
+        }
+
         return response()->json(['meeting' => $meeting]);
     }
 

@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Search, RefreshCw, Filter, Pencil, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import WorkflowTracker from '../components/Approvals/WorkflowTracker';
 import { approvalService } from '../services/approvalService';
 import { minuteService } from '../services/minuteService';
 import { useAuth } from '../context/AuthContext';
-import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
+import LetterPreviewDocument from '../components/Letters/LetterPreviewDocument';
 import type { ApprovableDocument } from '../types/approval';
+import type { EligibleDeputy } from '../types/approval';
 import type { DepartmentHeadEditPayload } from '../services/approvalService';
 import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import type { Organization, RecipientTag } from '../types/letter';
@@ -60,6 +62,8 @@ function htmlToPlainText(value?: string | null): string {
 
 export default function ApprovalsPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const requestedDocumentId = Number((location.state as { selectedDocumentId?: number } | null)?.selectedDocumentId) || null;
   const [documents, setDocuments] = useState<ApprovableDocument[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<ApprovableDocument | null>(null);
   const [search, setSearch] = useState('');
@@ -75,6 +79,21 @@ export default function ApprovalsPage() {
   const [letterEdit, setLetterEdit] = useState<LetterEdit | null>(null);
   const [minuteEdit, setMinuteEdit] = useState<MinuteEdit | null>(null);
   const [recipientOrganizations, setRecipientOrganizations] = useState<Organization[]>([]);
+  const [forwardMode, setForwardMode] = useState<'approve' | 'edit' | null>(null);
+  const [eligibleDeputies, setEligibleDeputies] = useState<EligibleDeputy[]>([]);
+  const [isLoadingDeputies, setIsLoadingDeputies] = useState(false);
+  const [deputyLookupError, setDeputyLookupError] = useState<string | null>(null);
+  const [selectedDeputyId, setSelectedDeputyId] = useState('');
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const selectedDocumentId = useRef<number | null>(requestedDocumentId);
+  const minutePdfUrlRef = useRef<string | null>(null);
+
+  const clearMinutePdfPreview = useCallback(() => {
+    if (minutePdfUrlRef.current) URL.revokeObjectURL(minutePdfUrlRef.current);
+    minutePdfUrlRef.current = null;
+    setMinutePdfUrl(null);
+    setIsMinutePdfLoading(false);
+  }, []);
 
   const fetchList = useCallback(async () => {
     setIsLoading(true);
@@ -82,17 +101,34 @@ export default function ApprovalsPage() {
     try {
       const docs = await approvalService.list(search || undefined);
       setDocuments(docs);
-      setSelectedDoc((current) => {
-        if (docs.length === 0) return null;
-        return current && docs.some((doc) => doc.document_id === current.document_id) ? current : docs[0];
-      });
+      const selectedId = docs.some((doc) => doc.document_id === selectedDocumentId.current)
+        ? selectedDocumentId.current
+        : docs[0]?.document_id;
+      if (!selectedId) {
+        selectedDocumentId.current = null;
+        setSelectedDoc(null);
+        return;
+      }
+      if (selectedDocumentId.current !== selectedId) {
+        clearMinutePdfPreview();
+      }
+      setIsDetailLoading(true);
+      try {
+        selectedDocumentId.current = selectedId;
+        setSelectedDoc(await approvalService.getById(selectedId));
+      } catch (detailError) {
+        console.error(detailError);
+        setSelectedDoc(docs.find((doc) => doc.document_id === selectedId) ?? null);
+      } finally {
+        setIsDetailLoading(false);
+      }
     } catch (err) {
       console.error(err);
       setError('Failed to load approvals. Please refresh or login again.');
     } finally {
       setIsLoading(false);
     }
-  }, [search]);
+  }, [clearMinutePdfPreview, search]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -100,17 +136,45 @@ export default function ApprovalsPage() {
   }, [fetchList]);
 
   const handleSelectDoc = async (id: number) => {
-    const doc = await approvalService.getById(id);
-    setIsEditing(false);
-    setLetterEdit(null);
-    setMinuteEdit(null);
-    setSelectedDoc(doc);
-    setActiveTab('preview');
+    selectedDocumentId.current = id;
+    clearMinutePdfPreview();
+    setIsDetailLoading(true);
+    try {
+      const doc = await approvalService.getById(id);
+      setIsEditing(false);
+      setLetterEdit(null);
+      setMinuteEdit(null);
+      setSelectedDoc(doc);
+      setActiveTab('preview');
+    } catch (detailError) {
+      console.error(detailError);
+      setError('Could not load this approval document. Refresh and try again.');
+    } finally {
+      setIsDetailLoading(false);
+    }
   };
 
   const currentStep = selectedDoc?.steps?.find((s) => s.step_order === selectedDoc.current_step_order);
-  const canAct = currentStep && user && currentStep.required_role === user.role && currentStep.status === 'pending';
+  const canAct = currentStep && user && currentStep.required_role === user.role && currentStep.status === 'pending'
+    && (!currentStep.assigned_to || Number(currentStep.assigned_to) === Number(user.id));
   const canEditSubmitted = Boolean(canAct && user?.role === 'dept_head' && ['letter', 'minute'].includes(selectedDoc?.document_type ?? ''));
+  const requiresDeputySelection = Boolean(canAct && user?.role === 'dept_head' && ['letter', 'minute'].includes(selectedDoc?.document_type ?? ''));
+
+  const openForwardDialog = async (mode: 'approve' | 'edit') => {
+    setForwardMode(mode);
+    setSelectedDeputyId('');
+    setEligibleDeputies([]);
+    setDeputyLookupError(null);
+    setIsLoadingDeputies(true);
+    try {
+      setEligibleDeputies(await approvalService.eligibleDeputies());
+    } catch (lookupError) {
+      console.error(lookupError);
+      setDeputyLookupError('Could not load active Deputy Chief Secretaries. Close this dialog and try again.');
+    } finally {
+      setIsLoadingDeputies(false);
+    }
+  };
 
   const startEditing = async () => {
     if (!selectedDoc) return;
@@ -171,17 +235,26 @@ export default function ApprovalsPage() {
 
   const handleEditAndForward = async () => {
     if (!selectedDoc || (!letterEdit && !minuteEdit)) return;
+    await openForwardDialog('edit');
+  };
+
+  const confirmForward = async () => {
+    if (!selectedDoc || !selectedDeputyId) return;
     setIsActing(true);
     setError(null);
     try {
-      const updated = await approvalService.editAndForward(
-        selectedDoc.document_id,
-      letterEdit
-        ? { ...letterEdit, recipients: letterEdit.recipients.map(({ organization_id, user_id, recipient_label }) => ({ organization_id, user_id, recipient_label })) }
-        : minuteEdit as DepartmentHeadEditPayload,
-        commentText || undefined,
-      );
+      const updated = forwardMode === 'edit'
+        ? await approvalService.editAndForward(
+          selectedDoc.document_id,
+          letterEdit
+            ? { ...letterEdit, recipients: letterEdit.recipients.map(({ organization_id, user_id, recipient_label }) => ({ organization_id, user_id, recipient_label })) }
+            : minuteEdit as DepartmentHeadEditPayload,
+          commentText || undefined,
+          Number(selectedDeputyId),
+        )
+        : await approvalService.approve(selectedDoc.document_id, commentText || undefined, Number(selectedDeputyId));
       setSelectedDoc(updated);
+      setForwardMode(null);
       setIsEditing(false);
       setLetterEdit(null);
       setMinuteEdit(null);
@@ -190,6 +263,7 @@ export default function ApprovalsPage() {
     } catch (err) {
       console.error(err);
       setError('Could not save and forward this document. Refresh the approval and try again.');
+      setDeputyLookupError('Forwarding failed. Your changes are still available; check the connection and try again.');
     } finally {
       setIsActing(false);
     }
@@ -197,12 +271,19 @@ export default function ApprovalsPage() {
 
   const handleApprove = async () => {
     if (!selectedDoc) return;
+    if (requiresDeputySelection) {
+      await openForwardDialog('approve');
+      return;
+    }
     setIsActing(true);
     try {
       const updated = await approvalService.approve(selectedDoc.document_id, commentText || undefined);
       setSelectedDoc(updated);
       setCommentText('');
-      fetchList();
+      await fetchList();
+    } catch (approveError) {
+      console.error(approveError);
+      setError('Could not approve this document. It may have already moved to another stage. Refresh and try again.');
     } finally {
       setIsActing(false);
     }
@@ -234,14 +315,11 @@ export default function ApprovalsPage() {
     setCommentText('');
   };
 
+  const selectedDocumentType = selectedDoc?.document_type;
+  const selectedMinuteId = selectedDoc?.source_id;
+
   useEffect(() => {
-    const sourceId = selectedDoc?.source_id;
-    if (!selectedDoc || selectedDoc.document_type !== 'minute' || sourceId == null) {
-      if (minutePdfUrl) {
-        URL.revokeObjectURL(minutePdfUrl);
-      }
-      setMinutePdfUrl(null);
-      setIsMinutePdfLoading(false);
+    if (selectedDocumentType !== 'minute' || selectedMinuteId == null) {
       return;
     }
 
@@ -249,11 +327,12 @@ export default function ApprovalsPage() {
     const loadMinutePdf = async () => {
       setIsMinutePdfLoading(true);
       try {
-        const blob = await minuteService.downloadPdf(sourceId);
+        const blob = await minuteService.downloadPdf(selectedMinuteId);
         const url = URL.createObjectURL(blob);
         if (isMounted) {
           setMinutePdfUrl((current) => {
             if (current) URL.revokeObjectURL(current);
+            minutePdfUrlRef.current = url;
             return url;
           });
         } else {
@@ -262,7 +341,12 @@ export default function ApprovalsPage() {
       } catch (err) {
         console.error('Failed to load minute approval PDF preview:', err);
         if (isMounted) {
-          setMinutePdfUrl(null);
+          setMinutePdfUrl((current) => {
+            if (current) URL.revokeObjectURL(current);
+            minutePdfUrlRef.current = null;
+            return null;
+          });
+          setIsMinutePdfLoading(false);
         }
       } finally {
         if (isMounted) {
@@ -275,13 +359,10 @@ export default function ApprovalsPage() {
 
     return () => {
       isMounted = false;
-      setIsMinutePdfLoading(false);
-      if (minutePdfUrl) {
-        URL.revokeObjectURL(minutePdfUrl);
-      }
-      setMinutePdfUrl(null);
+      if (minutePdfUrlRef.current) URL.revokeObjectURL(minutePdfUrlRef.current);
+      minutePdfUrlRef.current = null;
     };
-  }, [selectedDoc]);
+  }, [selectedDocumentType, selectedMinuteId]);
 
   return (
     <DashboardLayout pageTitle="Pending Approvals">
@@ -417,7 +498,7 @@ export default function ApprovalsPage() {
                       onClick={handleApprove}
                       disabled={isActing}
                       className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                    >Approve</button>}
+                    >{requiresDeputySelection ? 'Approve & Forward' : 'Approve'}</button>}
                   </div>
                 ) : (
                   <span className="text-xs text-slate-400">
@@ -444,7 +525,9 @@ export default function ApprovalsPage() {
               </div>
 
               {/* Document Preview */}
-              {activeTab === 'preview' && (
+              {isDetailLoading ? (
+                <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">Loading document details…</div>
+              ) : activeTab === 'preview' && (
                 <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-slate-200 p-6">
                   {isEditing && letterEdit ? (
                     <div className="mx-auto max-w-4xl space-y-5 rounded-lg bg-white p-6">
@@ -512,32 +595,28 @@ export default function ApprovalsPage() {
                         <div className="flex h-full items-center justify-center text-sm text-slate-500">The minute PDF preview is not available.</div>
                       )}
                     </div>
-                  ) : selectedDoc.document_type === 'letter' && selectedDoc.source_letter ? (
-                    <div className="mx-auto min-h-[70vh] w-full max-w-4xl bg-white p-10 shadow-xl">
-                      <div className="mb-10 flex justify-between gap-6 text-sm">
-                        <span>{selectedDoc.subject_code ?? '—'}</span>
-                        <span>{selectedDoc.source_letter.signature_date ? new Date(selectedDoc.source_letter.signature_date).toLocaleDateString() : ''}</span>
-                      </div>
-                      <div className="mb-8 space-y-1 text-sm">
-                        {(selectedDoc.source_letter.recipients ?? []).map((recipient) => (
-                          <p key={recipient.letter_recipient_id}>
-                            {recipient.recipient_label ?? recipient.user?.designation ?? recipient.organization?.organization_name ?? ''}
-                            {!recipient.recipient_label && recipient.user?.organization?.organization_name ? `, ${recipient.user.organization.organization_name}` : ''}
-                          </p>
-                        ))}
-                      </div>
-                      <h3 className="mb-8 text-center text-lg font-bold underline">{htmlToPlainText(selectedDoc.source_letter.title)}</h3>
-                      <p className="whitespace-pre-wrap text-justify text-sm leading-7">{htmlToPlainText(selectedDoc.source_letter.content)}</p>
-                      <div className="mt-12 space-y-1 text-sm">
-                        <p>{htmlToPlainText(selectedDoc.source_letter.signatory_name)}</p>
-                        <p>{htmlToPlainText(selectedDoc.source_letter.designation)}</p>
-                      </div>
-                    </div>
                   ) : hasHtml(selectedDoc.full_content) ? (
-                    <div
-                      className="mx-auto shrink-0 box-border bg-white px-[20mm] pb-[25mm] pl-[30mm] pt-[30mm] shadow-xl"
-                      style={{ width: '8.27in', minHeight: '11.69in', fontFamily: "'Noto Sans Sinhala', 'DejaVu Sans', sans-serif", fontSize: '12pt', lineHeight: '1.75' }}
-                      dangerouslySetInnerHTML={{ __html: sanitizeDocumentHtml(selectedDoc.full_content ?? '') }}
+                    <LetterPreviewDocument
+                      html={selectedDoc.full_content ?? ''}
+                      letter={{
+                        subject: { id: 0, code: selectedDoc.subject_code ?? '', title: selectedDoc.subject },
+                        meeting_code: selectedDoc.subject_code ?? null,
+                        signature_date: selectedDoc.source_letter?.signature_date ?? selectedDoc.created_at ?? null,
+                        your_ref: '',
+                      }}
+                    />
+                  ) : selectedDoc.document_type === 'letter' && selectedDoc.source_letter ? (
+                    <LetterPreviewDocument
+                      html={selectedDoc.source_letter.content}
+                      letter={{
+                        subject: { id: 0, code: selectedDoc.subject_code ?? '', title: selectedDoc.subject },
+                        meeting_code: selectedDoc.subject_code ?? null,
+                        signature_date: selectedDoc.source_letter.signature_date ?? selectedDoc.created_at ?? null,
+                        title: selectedDoc.source_letter.title,
+                        designation: selectedDoc.source_letter.designation ?? undefined,
+                        signatory_name: selectedDoc.source_letter.signatory_name ?? undefined,
+                        your_ref: '',
+                      }}
                     />
                   ) : (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-8">
@@ -645,6 +724,39 @@ export default function ApprovalsPage() {
           )}
         </div>
       </div>
+      {forwardMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="select-deputy-title" className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+            <h2 id="select-deputy-title" className="text-lg font-bold text-slate-900">Select Deputy Chief Secretary</h2>
+            <p className="mt-2 text-sm text-slate-600">Choose the Deputy Chief Secretary who should receive this document for the next approval stage.</p>
+            <label htmlFor="approval-deputy" className="mt-5 block text-sm font-medium text-slate-700">Deputy Chief Secretary</label>
+            <select
+              id="approval-deputy"
+              value={selectedDeputyId}
+              onChange={(event) => setSelectedDeputyId(event.target.value)}
+              disabled={isLoadingDeputies || isActing}
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="">{isLoadingDeputies ? 'Loading eligible deputies…' : 'Select a deputy'}</option>
+              {eligibleDeputies.map((deputy) => (
+                <option key={deputy.user_id} value={deputy.user_id}>
+                  {deputy.full_name}{deputy.designation ? ` — ${deputy.designation}` : ''}{deputy.organization?.organization_name ? ` · ${deputy.organization.organization_name}` : ''}
+                </option>
+              ))}
+            </select>
+            {deputyLookupError && <p role="alert" className="mt-3 text-sm text-red-700">{deputyLookupError}</p>}
+            {eligibleDeputies.length === 0 && !isLoadingDeputies && !deputyLookupError && (
+              <p role="status" className="mt-3 text-sm text-amber-700">No active Deputy Chief Secretaries are available.</p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setForwardMode(null)} disabled={isActing} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={confirmForward} disabled={!selectedDeputyId || isLoadingDeputies || isActing} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                {isActing ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       <ConfirmDialog
         open={showRejectConfirmation}
         title={`Reject ${selectedDoc?.document_type === 'letter' ? 'letter' : selectedDoc?.document_type === 'minute' ? 'minute' : 'document'}?`}

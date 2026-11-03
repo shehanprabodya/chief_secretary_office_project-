@@ -29,6 +29,7 @@ export interface LetterRecipientOption {
 export interface MeetingMinute {
   minute_id: number;
   meeting_id: number;
+  created_by?: number | null;
   meeting_description: string | null;
   discussion_summary: string | null;
   closing_remarks: string | null;
