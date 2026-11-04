@@ -16,6 +16,7 @@
         .fact-label { width: 16%; font-weight: bold; }
         .intro { margin: 8px 0 10px; text-align: left; }
         .section-title { font-size: 14pt; font-weight: bold; margin: 10px 0 4px; page-break-after: avoid; }
+        .new-page { page-break-before: always; }
         table.grid { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0; }
         table.grid th, table.grid td { border: 1px solid #555; padding: 2px 4px; vertical-align: top; text-align: left; line-height: 1.15; white-space: normal; overflow-wrap: break-word; word-wrap: break-word; }
         table.grid th { background: #efefef; text-align: center; font-weight: bold; }
@@ -95,7 +96,9 @@
     </table>
 
     @if($minute->discussion_summary)
-        <div class="intro">{!! nl2br(e($minute->discussion_summary)) !!}</div>
+        <div class="intro new-page">{!! nl2br(e($minute->discussion_summary)) !!}</div>
+    @else
+        <div class="new-page"></div>
     @endif
 
     <div class="section-title">සාකච්ඡා කරන ලද කරුණු හා ගනු ලැබූ තීරණ</div>
@@ -144,15 +147,19 @@
         <div class="closing">{!! nl2br(e($minute->closing_remarks)) !!}</div>
     @endif
 
-    @if($minute->signatory_name || $minute->signatory_designation)
+    @if(($signatoryName ?? $minute->signatory_name) || ($signatoryDesignation ?? $minute->signatory_designation) || !empty($signatureDataUri))
         <div class="signature">
             @if (!empty($signatureDataUri))
                 <img src="{{ $signatureDataUri }}" alt="Official signature" style="max-height: 52px; max-width: 170px; display: block; margin-bottom: 8px; object-fit: contain;" />
             @else
                 <div class="signature-line">........................................................</div>
             @endif
-            <strong>{{ $minute->signatory_name }}</strong><br>
-            {{ $minute->signatory_designation }}<br>
+            @if (!empty($isDelegatedSignature) && !empty($delegatedPrefixLine))
+                {{ $delegatedPrefixLine }}<br>
+            @endif
+            <strong>{{ $signatoryName ?? $minute->signatory_name }}</strong><br>
+            {{ $signatoryDesignation ?? $minute->signatory_designation }}<br>
+            {{ $signatoryOffice ?? 'දකුණු පළාත' }}<br>
             දිනය: {{ optional($meeting->meeting_date)->format('Y.m.d') ?? '-' }}
         </div>
     @endif

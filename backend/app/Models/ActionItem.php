@@ -21,4 +21,9 @@ class ActionItem extends Model
     {
         return $this->belongsTo(User::class, 'responsible_officer_id', 'user_id');
     }
+
+    public function minute(): BelongsTo
+    {
+        return $this->belongsTo(MeetingMinute::class, 'minute_id', 'minute_id');
+    }
 }

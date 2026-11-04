@@ -1,5 +1,5 @@
 export type DocumentStatus = 'pending' | 'approved' | 'rejected';
-export type StepStatus = 'waiting' | 'pending' | 'approved' | 'rejected';
+export type StepStatus = 'waiting' | 'pending' | 'approved' | 'rejected' | 'not_required';
 
 export interface ApprovalStep {
   step_id: number;
@@ -32,6 +32,7 @@ export interface ApprovableDocument {
   document_id: number;
   reference_id: string;
   subject_code?: string | null;
+  subject_category?: string | null;
   document_type: string;
   source_id?: number | null;
   subject: string;
@@ -77,4 +78,17 @@ export interface ApprovableDocument {
     }>;
   } | null;
   created_at: string;
+}
+
+export interface ApprovalActivityItem {
+  event_id: string;
+  event_type: 'submit' | 'workflow' | 'signature';
+  action: string;
+  document_id: number;
+  document_type: string;
+  subject: string;
+  subject_code?: string | null;
+  subject_category?: string | null;
+  message: string;
+  at: string;
 }

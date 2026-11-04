@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Events\NotificationCreated;
 use App\Models\Notification;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class NotificationService
 {
@@ -17,7 +19,7 @@ class NotificationService
         ?int $entityId = null,
         string $priority = 'normal',
     ): Notification {
-        return Notification::create([
+        $notification = Notification::create([
             'user_id' => $userId,
             'type' => $type,
             'title' => $title,
@@ -27,6 +29,12 @@ class NotificationService
             'entity_id' => $entityId,
             'priority' => $priority,
         ]);
+
+        DB::afterCommit(function () use ($notification): void {
+            broadcast(new NotificationCreated($notification));
+        });
+
+        return $notification;
     }
 
     public function sendToRole(

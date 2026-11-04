@@ -1,3 +1,5 @@
+import type { Meeting } from './meeting';
+
 export interface MinuteDecision {
   decision_id: number;
   decision_order: number;
@@ -37,4 +39,5 @@ export interface MeetingMinute {
   signatory_designation: string | null;
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   decisions: MinuteDecision[];
+  meeting?: Meeting;
 }

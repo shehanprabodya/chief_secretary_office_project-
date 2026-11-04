@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { AuthContextType, AuthUser, LoginCredentials } from '../types/auth';
 import { authService } from '../services/authService';
+import i18n from '../i18n';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -22,6 +23,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { user } = await authService.getCurrentUser();
         setUser(user);
+        const locale = user.preferred_locale === 'si' ? 'si' : 'en';
+        localStorage.setItem('appLanguage', locale);
+        void i18n.changeLanguage(locale);
       } catch {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
@@ -41,6 +45,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await authService.login(credentials);
       setUser(response.user);
+      const locale = response.user.preferred_locale === 'si' ? 'si' : 'en';
+      localStorage.setItem('appLanguage', locale);
+      void i18n.changeLanguage(locale);
 
       localStorage.setItem('authToken', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));

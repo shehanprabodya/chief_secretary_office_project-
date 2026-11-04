@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApprovableDocument;
 use App\Models\Letter;
 use App\Models\MeetingMinute;
 use App\Models\SigningDelegation;
@@ -162,8 +163,18 @@ class SignatureManagementController extends Controller
                 (string) $request->input('password', ''),
             );
 
+            $autoApproved = $this->attemptDeputyAutoApproval(
+                $request,
+                $documentType,
+                (int) $documentSignature->document_id,
+                (int) ($documentSignature->getAttribute('approval_document_id') ?? 0),
+            );
+
             return response()->json([
-                'message' => 'Document signed successfully.',
+                'message' => $autoApproved
+                    ? 'නියෝජ්‍ය ප්‍රධාන ලේකම් විසින් ප්‍රධාන ලේකම් වෙනුවෙන් ලේඛනය අත්සන් කර සාර්ථකව අනුමත කරන ලදී.'
+                    : 'Document signed successfully.',
+                'auto_approved' => $autoApproved,
                 'document_signature' => $documentSignature,
             ], 200);
         } catch (ValidationException $exception) {
@@ -172,5 +183,48 @@ class SignatureManagementController extends Controller
                 'errors' => $exception->errors(),
             ], 422);
         }
+    }
+
+    private function attemptDeputyAutoApproval(Request $request, string $documentType, int $sourceDocumentId, int $approvalDocumentId = 0): bool
+    {
+        if (!$request->user()?->hasRole('deputy')) {
+            return false;
+        }
+
+        $approvalDocument = $approvalDocumentId > 0
+            ? ApprovableDocument::query()->whereKey($approvalDocumentId)->first()
+            : null;
+
+        if (!$approvalDocument) {
+            $approvalDocument = ApprovableDocument::query()
+                ->where('document_type', $documentType)
+                ->where('source_id', $sourceDocumentId)
+                ->where('status', 'pending')
+                ->where('current_step_order', 3)
+                ->whereHas('steps', function ($query) use ($request) {
+                    $query->where('step_order', 3)
+                        ->where('required_role', 'deputy')
+                        ->where('status', 'pending')
+                        ->where(function ($assignment) use ($request) {
+                            $assignment->whereNull('assigned_to')
+                                ->orWhere('assigned_to', $request->user()->user_id);
+                        });
+                })
+                ->latest('document_id')
+                ->first();
+        }
+
+        if (!$approvalDocument) {
+            return false;
+        }
+
+        $approveRequest = Request::create('/api/approvals/' . $approvalDocument->document_id . '/approve', 'POST', [
+            'notes' => 'Auto-approved after delegated deputy signing.',
+        ]);
+        $approveRequest->setUserResolver(fn () => $request->user());
+
+        app(ApprovalController::class)->approve($approveRequest, (int) $approvalDocument->document_id);
+
+        return true;
     }
 }

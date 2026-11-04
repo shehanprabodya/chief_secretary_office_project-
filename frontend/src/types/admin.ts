@@ -32,11 +32,13 @@ export interface ActivityItem {
 export interface AdminUser {
   user_id: number;
   full_name: string;
+  full_name_si?: string | null;
   email: string;
   username: string;
   status: 'ACTIVE' | 'INACTIVE';
   role: { role_id: number; role_name: string };
   designation: string | null;
+  designation_si?: string | null;
   organization: {organization_id: number;organization_name: string;abbreviation: string | null;} | null;
   created_at: string;
 }
@@ -50,13 +52,37 @@ export interface Role {
 
 export interface CreateUserPayload {
   full_name: string;
+  full_name_si?: string;
   email: string;
   username: string;
-  password: string;
+  password?: string;
+  send_invitation?: boolean;
+  locale?: 'en' | 'si';
   role_id: number;
   designation?: string;
+  designation_si?: string;
   organization_id?: number | null;
   status?: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface BackupArchiveRecord {
+  backup_id: number;
+  type: 'database' | 'files' | 'full';
+  storage_disk: string;
+  storage_path: string;
+  size_bytes: number | null;
+  sha256_checksum: string;
+  status: 'available' | 'restored' | 'deleted' | 'failed';
+  retention_until: string | null;
+  restored_at: string | null;
+  created_at: string;
+}
+
+export interface PaginatedBackups {
+  data: BackupArchiveRecord[];
+  current_page: number;
+  last_page: number;
+  total: number;
 }
 
 export interface PaginatedUsers {

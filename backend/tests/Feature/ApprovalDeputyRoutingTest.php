@@ -40,7 +40,7 @@ class ApprovalDeputyRoutingTest extends TestCase
         $this->actingAs($otherDeputy)->postJson("/api/approvals/{$document->document_id}/approve")->assertForbidden();
     }
 
-    public function test_department_head_can_assign_minutes_and_assigned_deputy_advances_to_chief_secretary(): void
+    public function test_assigned_deputy_cannot_approve_minute_without_signing_first(): void
     {
         $departmentHead = $this->makeUser('dept_head');
         $officer = $this->makeUser('officer');
@@ -52,20 +52,19 @@ class ApprovalDeputyRoutingTest extends TestCase
         ])->assertOk();
 
         $this->actingAs($selectedDeputy)->postJson("/api/approvals/{$document->document_id}/approve")
-            ->assertOk()
-            ->assertJsonPath('document.current_step_order', 4);
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Please sign the document before approving it.');
 
         $this->assertDatabaseHas('approval_workflow_steps', [
             'document_id' => $document->document_id,
             'step_order' => 3,
-            'status' => 'approved',
-            'actioned_by' => $selectedDeputy->user_id,
+            'status' => 'pending',
             'assigned_to' => $selectedDeputy->user_id,
         ]);
         $this->assertDatabaseHas('approval_workflow_steps', [
             'document_id' => $document->document_id,
             'step_order' => 4,
-            'status' => 'pending',
+            'status' => 'waiting',
         ]);
     }
 

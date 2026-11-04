@@ -9,12 +9,15 @@ export interface LoginCredentials {
 export interface AuthUser {
     id: string;
     full_name: string;
+  full_name_si?: string | null;
     email: string;
     username: string;
     role: UserRole;
     organization?: string | null;
     designation?: string | null;
+  designation_si?: string | null;
     status: 'ACTIVE' | 'INACTIVE';
+    preferred_locale?: 'en' | 'si';
 }
 
 export interface AuthResponse {

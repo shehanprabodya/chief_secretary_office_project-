@@ -22,6 +22,12 @@ import SignatureManagementPage from './pages/SignatureManagementPage';
 import DeptHeadLettersPage from './pages/DeptHeadLettersPage';
 import DeptHeadAttendancePage from './pages/DeptHeadAttendancePage';
 import DeptHeadMinutesPage from './pages/DeptHeadMinutesPage';
+import BackupManagementPage from './pages/BackupManagementPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
+import AcceptInvitationPage from './pages/AcceptInvitationPage';
+import ActivityLogPage from './pages/ActivityLogPage';
 
 export default function App() {
   return (
@@ -30,12 +36,16 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/dashboard/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UserManagementPage />} />
             <Route path="/admin/subjects" element={<SubjectManagementPage />} />
             <Route path="/admin/signatures" element={<SignatureManagementPage />} />
+            <Route path="/admin/backups" element={<BackupManagementPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['officer']} />}>
@@ -79,6 +89,14 @@ export default function App() {
           {/* Approvals visible to ALL roles that participate in workflow */}
           <Route element={<ProtectedRoute allowedRoles={['admin', 'officer', 'dept_head', 'deputy', 'chief_secretary']} />}>
             <Route path="/approvals" element={<ApprovalsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['officer', 'dept_head', 'deputy', 'chief_secretary']} />}>
+            <Route path="/activity-log" element={<ActivityLogPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'officer', 'dept_head', 'deputy', 'chief_secretary', 'external_officer']} />}>
+            <Route path="/account/password" element={<ChangePasswordPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

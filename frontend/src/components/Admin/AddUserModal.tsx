@@ -19,11 +19,15 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
 
   const [form, setForm] = useState<CreateUserPayload>({
     full_name: editUser?.full_name ?? '',
+    full_name_si: editUser?.full_name_si ?? '',
     email: editUser?.email ?? '',
     username: editUser?.username ?? '',
     password: '',
+    send_invitation: true,
+    locale: 'en',
     role_id: editUser?.role.role_id ?? 0,
     designation: editUser?.designation ?? '',
+    designation_si: editUser?.designation_si ?? '',
     organization_id: editUser?.organization?.organization_id ?? null,
     status: editUser?.status ?? 'ACTIVE',
   });
@@ -51,7 +55,7 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
     fetchOptions();
   }, []);
 
-  const handleChange = (field: keyof CreateUserPayload, value: string | number | null) => {
+  const handleChange = (field: keyof CreateUserPayload, value: string | number | boolean | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (error) setError(null);
   };
@@ -62,11 +66,10 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
       setError('Please fill in all required fields');
       return;
     }
-    if (!editUser && !form.password) {
-      setError('Password is required for new users');
+    if (!editUser && form.send_invitation === false && !(form.password && form.password.length >= 12)) {
+      setError('Provide a strong temporary password (minimum 12 characters) when invitation is disabled.');
       return;
     }
-
     setIsSaving(true);
     setError(null);
 
@@ -132,6 +135,17 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
               />
             </div>
 
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Full Name (Sinhala)</label>
+              <input
+                type="text"
+                value={form.full_name_si ?? ''}
+                onChange={(e) => handleChange('full_name_si', e.target.value)}
+                placeholder="සිංහල නම"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Email *</label>
               <input
@@ -156,14 +170,40 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
 
             {!editUser && (
               <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">Password *</label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => handleChange('password', e.target.value)}
-                  placeholder="Minimum 8 characters"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Account Setup Method</label>
+                <div className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+                  <label className="flex items-center gap-2 text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.send_invitation)}
+                      onChange={(e) => handleChange('send_invitation', e.target.checked)}
+                    />
+                    Send secure invitation email (recommended)
+                  </label>
+                  {!form.send_invitation && (
+                    <div className="mt-3">
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">Temporary Password *</label>
+                      <input
+                        type="password"
+                        value={form.password ?? ''}
+                        onChange={(e) => handleChange('password', e.target.value)}
+                        placeholder="Strong temporary password"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                      />
+                    </div>
+                  )}
+                  <div className="mt-3">
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Invitation Language</label>
+                    <select
+                      value={form.locale ?? 'en'}
+                      onChange={(e) => handleChange('locale', e.target.value as 'en' | 'si')}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                    >
+                      <option value="en">English</option>
+                      <option value="si">Sinhala</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -199,6 +239,18 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 />
             </div>   
+
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Designation (Sinhala)</label>
+
+                <input
+                type="text"
+                value={form.designation_si ?? ''}
+                onChange={(e)=>handleChange('designation_si',e.target.value)}
+                placeholder="නියෝජ්‍ය ප්‍රධාන ලේකම් (පරිපාලන)"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                />
+              </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Organization</label>
 

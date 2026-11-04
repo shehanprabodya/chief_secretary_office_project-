@@ -3,18 +3,31 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PasswordChangedMail;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserInvitation;
+use App\Services\InvitationService;
+use App\Services\SecurityAuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Support\Str;
 
 class UserManagementController extends Controller
 {
+    public function __construct(
+        private readonly InvitationService $invitationService,
+        private readonly SecurityAuditService $securityAuditService,
+    ) {
+    }
+
     /**
      * Stats summary bar (Total Users / Admins / Departments / Inactive)
      */
@@ -188,12 +201,15 @@ class UserManagementController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'full_name' => 'required|string|max:255',
+            'full_name_si' => 'nullable|string|max:255',
             'email' => 'required|email|unique:users,email',
             'username' => 'required|string|max:100|unique:users,username',
-            'password' => 'required|string|min:8',
+            'password' => ['nullable', 'string', 'min:12', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
             'role_id' => 'required|exists:roles,role_id',
             'organization_id' => 'nullable|exists:organizations,organization_id',
             'status' => 'nullable|in:ACTIVE,INACTIVE',
+            'send_invitation' => 'nullable|boolean',
+            'locale' => 'nullable|in:en,si',
         ]);
 
         if ($validator->fails()) {
@@ -203,16 +219,44 @@ class UserManagementController extends Controller
             ], 422);
         }
 
-        $user = User::create([
-            'full_name'=>$request->full_name,
-            'email'=>$request->email,
-            'username'=>$request->username,
-            'password_hash'=>Hash::make($request->password),
-            'designation'=>$request->designation,
-            'role_id'=>$request->role_id,
-            'organization_id'=>$request->organization_id,
-            'status'=>$request->status ?? 'ACTIVE',
-        ]);
+        $sendInvitation = $request->boolean('send_invitation', true);
+        $rawPassword = (string) ($request->input('password') ?? Str::random(40));
+
+        $user = DB::transaction(function () use ($request, $rawPassword, $sendInvitation) {
+            $user = User::create([
+                'full_name' => $request->full_name,
+                'email' => $request->email,
+                'username' => $request->username,
+                'password_hash' => Hash::make($rawPassword),
+                'designation' => $request->designation,
+                'designation_si' => $request->designation_si,
+                'full_name_si' => $request->full_name_si,
+                'role_id' => $request->role_id,
+                'organization_id' => $request->organization_id,
+                'status' => $request->status ?? 'ACTIVE',
+                'invitation_pending' => $sendInvitation,
+                'invited_at' => $sendInvitation ? now() : null,
+                'preferred_locale' => in_array((string) $request->input('locale'), ['en', 'si'], true)
+                    ? (string) $request->input('locale')
+                    : 'en',
+            ]);
+
+            if ($sendInvitation) {
+                /** @var User $admin */
+                $admin = $request->user();
+                $this->invitationService->createAndSend($user, $admin, $user->preferred_locale);
+            }
+
+            $this->securityAuditService->log(
+                eventType: 'admin.user.created',
+                actor: $request->user(),
+                target: $user,
+                request: $request,
+                metadata: ['invitation_sent' => $sendInvitation]
+            );
+
+            return $user;
+        });
 
         return response()->json([
             'message' => 'User created successfully',
@@ -229,10 +273,12 @@ class UserManagementController extends Controller
 
         $validator = Validator::make($request->all(), [
             'full_name' => 'sometimes|string|max:255',
+            'full_name_si' => 'sometimes|nullable|string|max:255',
             'email' => "sometimes|email|unique:users,email,{$id},user_id",
             'username' => "sometimes|string|max:100|unique:users,username,{$id},user_id",
             'role_id' => 'sometimes|exists:roles,role_id',
             'designation'=>'nullable|string|max:150',
+            'designation_si'=>'nullable|string|max:255',
             'organization_id' => 'nullable|exists:organizations,organization_id',
             'status' => 'sometimes|in:ACTIVE,INACTIVE',
         ]);
@@ -258,7 +304,7 @@ class UserManagementController extends Controller
     public function resetPassword(Request $request, int $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'new_password' => 'required|string|min:8',
+            'new_password' => ['required', 'confirmed', 'string', 'min:12', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
         ]);
 
         if ($validator->fails()) {
@@ -268,11 +314,72 @@ class UserManagementController extends Controller
             ], 422);
         }
 
-        User::findOrFail($id)->update([
-            'password_hash' => Hash::make($request->new_password),
-        ]);
+        /** @var User $admin */
+        $admin = $request->user();
+        $target = User::findOrFail($id);
+
+        DB::transaction(function () use ($request, $target, $admin) {
+            $target->update([
+                'password_hash' => Hash::make((string) $request->input('new_password')),
+                'password_changed_at' => now(),
+                'invitation_pending' => false,
+            ]);
+
+            $target->tokens()->delete();
+
+            if (!app()->runningUnitTests()) {
+                Mail::to($target->email)->send(new PasswordChangedMail($target, $target->preferred_locale ?? 'en'));
+            }
+
+            $this->securityAuditService->log(
+                eventType: 'admin.user.password_reset',
+                actor: $admin,
+                target: $target,
+                request: $request,
+                severity: 'warning'
+            );
+        });
 
         return response()->json(['message' => 'Password reset successfully']);
+    }
+
+    public function resendInvitation(Request $request, int $id): JsonResponse
+    {
+        $user = User::with('invitations')->findOrFail($id);
+
+        /** @var UserInvitation|null $latest */
+        $latest = $user->invitations()
+            ->whereNull('accepted_at')
+            ->latest('created_at')
+            ->first();
+
+        if ($latest === null) {
+            return response()->json([
+                'message' => 'No pending invitation found for this user.',
+            ], 404);
+        }
+
+        /** @var User $admin */
+        $admin = $request->user();
+        $newInvitation = $this->invitationService->resend($latest, $admin);
+
+        $this->securityAuditService->log(
+            eventType: 'admin.user.invitation_resent',
+            actor: $admin,
+            target: $user,
+            request: $request,
+            metadata: ['invitation_id' => $newInvitation->invitation_id]
+        );
+
+        return response()->json([
+            'message' => 'Invitation sent successfully.',
+            'invitation' => [
+                'id' => $newInvitation->invitation_id,
+                'expires_at' => $newInvitation->expires_at,
+                'email' => $newInvitation->email,
+                'resent_count' => $newInvitation->resent_count,
+            ],
+        ]);
     }
 
     /**

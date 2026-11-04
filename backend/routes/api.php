@@ -13,14 +13,21 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DepartmentHeadRecordController;
 use App\Http\Controllers\Api\SignatureManagementController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\Admin\BackupController;
 use App\Http\Controllers\Api\Admin\UserManagementController;
 use App\Http\Controllers\Api\Admin\SubjectManagementController;
 
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-recovery');
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-recovery');
+Route::get('/auth/invitations/{invitationId}/validate', [AuthController::class, 'validateInvitation'])->middleware('throttle:password-recovery');
+Route::post('/auth/invitations/{invitationId}/accept', [AuthController::class, 'acceptInvitation'])->middleware('throttle:password-recovery');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
+    Route::post('/auth/change-password', [AuthController::class, 'changePassword'])->middleware('throttle:password-recovery');
+    Route::patch('/auth/language', [AuthController::class, 'setLanguage']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -56,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:dept_head');
     Route::post('/approvals/submit-letter/{letterId}', [ApprovalController::class, 'submitLetter']);
     Route::get('/approvals', [ApprovalController::class, 'index']);
+    Route::get('/approvals/activity-log', [ApprovalController::class, 'activityLog']);
     Route::get('/approvals/{id}', [ApprovalController::class, 'show']);
     Route::post('/approvals', [ApprovalController::class, 'store']);
     Route::post('/approvals/{id}/approve', [ApprovalController::class, 'approve']);
@@ -63,7 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/approvals/{id}/reject', [ApprovalController::class, 'reject']);
     Route::post('/approvals/{id}/comments', [ApprovalController::class, 'addComment']);
 
-    Route::middleware('role:officer,dept_head,deputy,chief_secretary')->group(function () {
+    Route::middleware('role:officer,dept_head,deputy,chief_secretary,external_officer')->group(function () {
         Route::get('/minutes/{id}/download/pdf', [MinuteController::class, 'downloadPdf']);
     });
 
@@ -87,6 +95,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/{id}', [UserManagementController::class, 'update']);
 
             Route::post('/{id}/reset-password', [UserManagementController::class, 'resetPassword']);
+            Route::post('/{id}/resend-invitation', [UserManagementController::class, 'resendInvitation']);
 
             Route::patch('/{id}/toggle-status', [UserManagementController::class, 'toggleStatus']);
 
@@ -103,6 +112,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('subjects', SubjectManagementController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        Route::get('/backups', [BackupController::class, 'index']);
+        Route::post('/backups', [BackupController::class, 'store']);
+        Route::get('/backups/{backupId}/download', [BackupController::class, 'download']);
+        Route::delete('/backups/{backupId}', [BackupController::class, 'destroy']);
+        Route::post('/backups/{backupId}/restore', [BackupController::class, 'restore']);
     });
 
    

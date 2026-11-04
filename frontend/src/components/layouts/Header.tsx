@@ -1,8 +1,18 @@
 import { Bell, Globe, UserCircle } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from 'react-i18next';
 
 export default function Header() {
-  const [language, setLanguage] = useState<"si" | "en">("en");
+  const { t, i18n } = useTranslation();
+  const [language, setLanguage] = useState<"si" | "en">(
+    () => (localStorage.getItem('appLanguage') === 'si' ? 'si' : 'en')
+  );
+
+  const switchLanguage = (locale: 'si' | 'en') => {
+    setLanguage(locale);
+    localStorage.setItem('appLanguage', locale);
+    void i18n.changeLanguage(locale);
+  };
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-[var(--color-primary)]">
@@ -30,27 +40,27 @@ export default function Header() {
             <Globe size={16} />
 
             <button
-              onClick={() => setLanguage("si")}
+              onClick={() => switchLanguage('si')}
               className={`text-sm transition ${
                 language === "si"
                   ? "font-semibold text-white"
                   : "text-white/60"
               }`}
             >
-              සිංහල
+              {t('language.si')}
             </button>
 
             <span className="text-white/40">|</span>
 
             <button
-              onClick={() => setLanguage("en")}
+              onClick={() => switchLanguage('en')}
               className={`text-sm transition ${
                 language === "en"
                   ? "font-semibold text-white"
                   : "text-white/60"
               }`}
             >
-              English
+              {t('language.en')}
             </button>
           </div>
 

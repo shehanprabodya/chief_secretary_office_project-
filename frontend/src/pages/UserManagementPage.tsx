@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Search, Filter, Download, Users, Shield,
   Building2, UserX, Pencil, RotateCcw, UserMinus, UserCheck, UserPlus
-  , History, Clock3, KeyRound
+  , History, Clock3, KeyRound, Mail
 } from 'lucide-react';
 
 import AddUserModal from '../components/Admin/AddUserModal';
@@ -164,6 +164,10 @@ export default function UserManagementPage() {
     setEditOrganization(null);
   };
 
+  const handleResendInvitation = async (userId: number) => {
+    await adminService.resendInvitation(userId);
+  };
+
   const handleDeleteOrganization = async () => {
     if (!deleteOrganization) return;
     setIsDeletingOrganization(true);
@@ -322,6 +326,14 @@ export default function UserManagementPage() {
                               title="Reset password"
                             >
                               <RotateCcw className="h-4 w-4" />
+                            </button>
+                            {/* Resend invitation */}
+                            <button
+                              onClick={() => void handleResendInvitation(u.user_id)}
+                              className="rounded-lg p-1.5 text-indigo-500 hover:bg-indigo-50"
+                              title="Resend invitation"
+                            >
+                              <Mail className="h-4 w-4" />
                             </button>
                             {/* Toggle active/inactive */}
                             <button

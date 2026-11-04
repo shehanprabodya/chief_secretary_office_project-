@@ -1,0 +1,93 @@
+{
+  "language": {
+    "en": "English",
+    "si": "Sinhala",
+    "switchLabel": "Language"
+  },
+  "topbar": {
+    "notifications": "Notifications",
+    "unread": "unread",
+    "markAllRead": "Mark all read",
+    "none": "No notifications yet.",
+    "logout": "Logout",
+    "changePassword": "Change Password",
+    "openSidebarMenu": "Open sidebar menu",
+    "unreadNotificationsAria": "{{count}} unread notifications",
+    "defaultPageTitle": "Development Division"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "officer": "Development Officer",
+    "deptHead": "Department Head",
+    "deputy": "Deputy Secretary",
+    "chiefSecretary": "Chief Secretary",
+    "externalOfficer": "External Officer"
+  },
+  "sidebar": {
+    "appName": "MMCS",
+    "logout": "Logout"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "subjects": "Subjects",
+    "signatureUpload": "Signature Upload",
+    "backups": "Backups",
+    "meetings": "Meetings",
+    "approvals": "Approvals",
+    "minutes": "Minutes",
+    "attendance": "Attendance",
+    "meetingLetters": "Meeting Letters",
+    "myMeetings": "My Meetings",
+    "activityLog": "Activity Log"
+  },
+  "auth": {
+    "signInToMMCS": "Sign In to MMCS",
+    "southernProvincialCouncil": "Southern Provincial Council",
+    "emailOrUsername": "Email or Username",
+    "password": "Password",
+    "rememberWorkstation": "Remember this workstation",
+    "signingIn": "Signing in...",
+    "signIn": "Sign In",
+    "loginFailed": "Login failed. Please try again.",
+    "missingCredentials": "Please enter your email/username and password",
+    "closeLoginModal": "Close login modal",
+    "forgotPassword": "Forgot password?",
+    "requestReset": "Request password reset",
+    "email": "Email",
+    "resetPassword": "Reset password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "submit": "Submit",
+    "backToLogin": "Back to login",
+    "changePassword": "Change password",
+    "currentPassword": "Current password"
+  },
+  "backup": {
+    "title": "Backup Management",
+    "description": "Encrypted backups with integrity validation and restore controls.",
+    "create": "Create Backup",
+    "restore": "Restore",
+    "download": "Download",
+    "delete": "Delete",
+    "id": "ID",
+    "type": "Type",
+    "created": "Created",
+    "status": "Status",
+    "retention": "Retention",
+    "actions": "Actions",
+    "loading": "Loading...",
+    "noneAvailable": "No backups available",
+    "unableLoad": "Unable to load backups.",
+    "unableCreate": "Unable to create backup.",
+    "unableDelete": "Unable to delete backup.",
+    "unableRestore": "Unable to restore backup.",
+    "restorePrompt": "Enter your administrator password to confirm restore:",
+    "statusAvailable": "Available",
+    "statusRestored": "Restored",
+    "statusDeleted": "Deleted",
+    "typeFull": "Full",
+    "typeDatabase": "Database",
+    "typeFiles": "Files"
+  }
+}

@@ -1,7 +1,9 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Eye, EyeOff, User as UserIcon, Lock, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardPathForRole } from '../../utils/roleRoutes';
 import type { LoginCredentials } from '../../types/auth';
@@ -13,6 +15,7 @@ interface LoginModalProps {
 
 export default function LoginModal({ onClose }: LoginModalProps) {
   const { login, isLoading, error: authError } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -39,7 +42,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
     setFormError(null);
 
     if (!credentials.identifier || !credentials.password) {
-      setFormError('Please enter your email/username and password');
+      setFormError(t('auth.missingCredentials'));
       return;
     }
 
@@ -57,7 +60,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
       onClose();
       navigate(getDashboardPathForRole(loggedInUser.role), { replace: true });
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+      setFormError(err instanceof Error ? err.message : t('auth.loginFailed'));
     }
   };
 
@@ -73,7 +76,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
         <button
           onClick={onClose}
           className="absolute right-4 top-4 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-          aria-label="Close login modal"
+          aria-label={t('auth.closeLoginModal')}
         >
           <X className="h-6 w-6 text-gray-600 dark:text-gray-400" />
         </button>
@@ -81,8 +84,8 @@ export default function LoginModal({ onClose }: LoginModalProps) {
         <div className="mb-8 flex flex-col items-center gap-4">
           <img src={logo} alt="Southern Province Emblem" className="h-16 w-auto" />
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Sign In to MMCS</h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Southern Provincial Council</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('auth.signInToMMCS')}</h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('auth.southernProvincialCouncil')}</p>
           </div>
         </div>
 
@@ -95,7 +98,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div>
             <label htmlFor="identifier" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Email or Username
+              {t('auth.emailOrUsername')}
             </label>
             <div className="relative">
               <UserIcon className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
@@ -115,7 +118,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Password
+              {t('auth.password')}
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
@@ -151,8 +154,14 @@ export default function LoginModal({ onClose }: LoginModalProps) {
               className="h-4 w-4 rounded border-slate-300 text-blue-600"
             />
             <label htmlFor="remember" className="text-sm text-slate-700 dark:text-slate-300">
-              Remember this workstation
+              {t('auth.rememberWorkstation')}
             </label>
+          </div>
+
+          <div className="-mt-2 text-right">
+            <Link to="/forgot-password" onClick={onClose} className="text-xs font-medium text-blue-600 hover:underline">
+              {t('auth.forgotPassword')}
+            </Link>
           </div>
 
           <button
@@ -160,7 +169,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
             disabled={isLoading}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 font-medium text-white transition-all hover:bg-blue-700 disabled:bg-slate-400"
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? t('auth.signingIn') : t('auth.signIn')}
           </button>
         </form>
       </div>

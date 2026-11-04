@@ -1,0 +1,93 @@
+{
+  "language": {
+    "en": "ඉංග්රීසි",
+    "si": "සිංහල",
+    "switchLabel": "භාෂාව"
+  },
+  "topbar": {
+    "notifications": "දැනුම්දීම්",
+    "unread": "නොකියවූ",
+    "markAllRead": "සියල්ල කියවූ ලෙස සලකුණු කරන්න",
+    "none": "තවමත් දැනුම්දීම් නොමැත.",
+    "logout": "ඉවත්වන්න",
+    "changePassword": "මුරපදය වෙනස් කරන්න",
+    "openSidebarMenu": "පැති මෙනුව විවෘත කරන්න",
+    "unreadNotificationsAria": "නොකියවූ දැනුම්දීම් {{count}}",
+    "defaultPageTitle": "සංවර්ධන අංශය"
+  },
+  "roles": {
+    "admin": "පරිපාලක",
+    "officer": "සංවර්ධන නිලධාරී",
+    "deptHead": "අංශ ප්රධානී",
+    "deputy": "නියෝජ්ය ලේකම්",
+    "chiefSecretary": "ප්රධාන ලේකම්",
+    "externalOfficer": "බාහිර නිලධාරී"
+  },
+  "sidebar": {
+    "appName": "MMCS",
+    "logout": "ඉවත්වන්න"
+  },
+  "nav": {
+    "dashboard": "උපකරණ පුවරුව",
+    "users": "පරිශීලකයන්",
+    "subjects": "විෂයයන්",
+    "signatureUpload": "අත්සන උඩුගත කිරීම",
+    "backups": "උපස්ථ",
+    "meetings": "රැස්වීම්",
+    "approvals": "අනුමැතියන්",
+    "minutes": "වාර්තා",
+    "attendance": "පැමිණීම",
+    "meetingLetters": "රැස්වීම් ලිපි",
+    "myMeetings": "මගේ රැස්වීම්",
+    "activityLog": "ක්රියාකාරකම් ලොගය"
+  },
+  "auth": {
+    "signInToMMCS": "MMCS වෙත පිවිසෙන්න",
+    "southernProvincialCouncil": "දකුණු පළාත් සභාව",
+    "emailOrUsername": "විද්යුත් තැපෑල හෝ පරිශීලක නාමය",
+    "password": "මුරපදය",
+    "rememberWorkstation": "මෙම උපාංගය මතක තබා ගන්න",
+    "signingIn": "පිවිසෙමින්...",
+    "signIn": "පිවිසෙන්න",
+    "loginFailed": "පිවිසුම අසාර්ථකයි. නැවත උත්සාහ කරන්න.",
+    "missingCredentials": "ඔබගේ විද්යුත් තැපෑල/පරිශීලක නාමය සහ මුරපදය ඇතුළත් කරන්න",
+    "closeLoginModal": "පිවිසුම් කවුළුව වසන්න",
+    "forgotPassword": "මුරපදය අමතකද?",
+    "requestReset": "මුරපදය යළි සැකසීම ඉල්ලන්න",
+    "email": "විද්යුත් තැපෑල",
+    "resetPassword": "මුරපදය යළි සකසන්න",
+    "newPassword": "නව මුරපදය",
+    "confirmPassword": "මුරපදය තහවුරු කරන්න",
+    "submit": "යවන්න",
+    "backToLogin": "පිවිසුමට ආපසු",
+    "changePassword": "මුරපදය වෙනස් කරන්න",
+    "currentPassword": "වත්මන් මුරපදය"
+  },
+  "backup": {
+    "title": "උපස්ථ කළමනාකරණය",
+    "description": "ආරක්ෂිත සංකේතනය සහ අඛණ්ඩතා සත්යාපනය සමඟ උපස්ථ සහ ප්රතිස්ථාපන පාලන.",
+    "create": "උපස්ථය සාදන්න",
+    "restore": "ප්රතිස්ථාපනය",
+    "download": "බාගත කරන්න",
+    "delete": "මකන්න",
+    "id": "අංකය",
+    "type": "වර්ගය",
+    "created": "සාදන ලදි",
+    "status": "තත්ත්වය",
+    "retention": "රඳවා තබාගැනීම",
+    "actions": "ක්රියා",
+    "loading": "පූරණය වෙමින්...",
+    "noneAvailable": "ලබා ගත හැකි උපස්ථ නොමැත",
+    "unableLoad": "උපස්ථ පූරණය කළ නොහැක.",
+    "unableCreate": "උපස්ථය සෑදිය නොහැක.",
+    "unableDelete": "උපස්ථය මැකිය නොහැක.",
+    "unableRestore": "උපස්ථය ප්රතිස්ථාපනය කළ නොහැක.",
+    "restorePrompt": "ප්රතිස්ථාපනය තහවුරු කිරීම සඳහා පරිපාලක මුරපදය ඇතුළත් කරන්න:",
+    "statusAvailable": "ලබා ගත හැක",
+    "statusRestored": "ප්රතිස්ථාපනය කරන ලදි",
+    "statusDeleted": "මකා ඇත",
+    "typeFull": "සම්පූර්ණ",
+    "typeDatabase": "දත්ත සමුදාය",
+    "typeFiles": "ගොනු"
+  }
+}
