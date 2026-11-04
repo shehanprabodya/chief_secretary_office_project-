@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Models\DocumentSignature;
+use App\Models\ApprovableDocument;
 use App\Models\Letter;
 use App\Models\MeetingMinute;
 use App\Models\SigningDelegation;
 use App\Models\User;
 use App\Models\UserSignature;
+use RuntimeException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
@@ -172,14 +174,52 @@ class SignatureManagementService
         }
 
         $resolvedDocumentId = $documentId;
+        $approvalDocument = null;
 
-        $approvableDocument = \App\Models\ApprovableDocument::query()
+        $approvableDocument = ApprovableDocument::query()
             ->where('document_type', $documentType)
             ->whereKey($documentId)
             ->first();
 
         if ($approvableDocument && !empty($approvableDocument->source_id)) {
             $resolvedDocumentId = (int) $approvableDocument->source_id;
+            $approvalDocument = $approvableDocument->load('steps');
+        } else {
+            $approvalDocument = ApprovableDocument::query()
+                ->where('document_type', $documentType)
+                ->where('source_id', $resolvedDocumentId)
+                ->latest('document_id')
+                ->with('steps')
+                ->first();
+        }
+
+        if ($approvalDocument && $approvalDocument->status !== 'pending') {
+            throw ValidationException::withMessages([
+                'approval' => ['This document is already finalized and cannot be signed again.'],
+            ]);
+        }
+
+        $currentStep = null;
+        if ($approvalDocument) {
+            $currentStep = $approvalDocument->steps->firstWhere('step_order', $approvalDocument->current_step_order);
+
+            if (!$currentStep || $currentStep->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'approval' => ['This document is not currently eligible for signing.'],
+                ]);
+            }
+
+            if ($currentStep->required_role !== $actor->role?->role_name) {
+                throw ValidationException::withMessages([
+                    'approval' => ['Only the approver assigned to the current workflow stage can sign this document.'],
+                ]);
+            }
+
+            if ($currentStep->assigned_to && (int) $currentStep->assigned_to !== (int) $actor->user_id) {
+                throw ValidationException::withMessages([
+                    'approval' => ['This document is assigned to another approver.'],
+                ]);
+            }
         }
 
         $document = $documentModel::query()->findOrFail($resolvedDocumentId);
@@ -189,14 +229,17 @@ class SignatureManagementService
         $signingType = 'PRIMARY';
 
         if ($actor->hasRole('deputy')) {
-            $delegation = $this->activeDelegationFor($actor);
-            if (!$delegation) {
+            if (!$approvalDocument || !$currentStep || $currentStep->required_role !== 'deputy' || $currentStep->status !== 'pending') {
                 throw ValidationException::withMessages([
-                    'delegation' => ['No active delegation authorizes this deputy to sign.'],
+                    'role' => ['Deputy signing is allowed only at the assigned deputy approval stage.'],
                 ]);
             }
 
-            $primarySigner = User::query()->findOrFail($delegation->primary_signer_id);
+            $primarySigner = User::query()
+                ->where('status', 'ACTIVE')
+                ->whereHas('role', fn ($query) => $query->where('role_name', 'chief_secretary'))
+                ->orderBy('user_id')
+                ->first() ?? $actor;
             $signingType = 'DELEGATED';
         } elseif (!$actor->hasRole('chief_secretary')) {
             throw ValidationException::withMessages([
@@ -216,6 +259,9 @@ class SignatureManagementService
             : ($document->meeting_code ?? ('MINUTE-' . $document->minute_id));
 
         $documentHash = hash('sha256', $documentType . ':' . $resolvedDocumentId . ':' . ($document->updated_at?->toDateTimeString() ?? now()->toDateTimeString()));
+        $signerNameSnapshot = $actor->displayNameSinhala();
+        $signerDesignationSnapshot = $actor->designationSinhala();
+        $signerOfficeSnapshot = 'දකුණු පළාත';
 
         $documentSignature = DocumentSignature::query()->create([
             'document_type' => $documentType,
@@ -226,14 +272,80 @@ class SignatureManagementService
             'signing_type' => $signingType,
             'delegation_id' => $delegation?->id,
             'document_reference' => $documentReference,
+            'signer_name_snapshot' => $signerNameSnapshot,
+            'signer_designation_snapshot' => $signerDesignationSnapshot,
+            'signer_office_snapshot' => $signerOfficeSnapshot,
             'document_hash' => $documentHash,
             'signed_at' => now(),
             'authentication_method' => 'password',
         ]);
 
+        try {
+            $signedPdf = $this->generateSignedPdf($documentType, $resolvedDocumentId);
+            [$signedPdfPath, $signedPdfSha256] = $this->storeSignedPdf(
+                $documentType,
+                $resolvedDocumentId,
+                (int) $documentSignature->id,
+                $signedPdf,
+            );
+
+            $documentSignature->update([
+                'signed_pdf_path' => $signedPdfPath,
+                'signed_pdf_sha256' => $signedPdfSha256,
+            ]);
+        } catch (\Throwable $exception) {
+            $documentSignature->delete();
+            throw ValidationException::withMessages([
+                'signing' => ['The document was signed but the final signed PDF could not be preserved. Please retry.'],
+            ]);
+        }
+
         $documentSignature->load(['signature', 'delegation', 'signer', 'primarySigner']);
+        if ($approvalDocument) {
+            $documentSignature->setAttribute('approval_document_id', (int) $approvalDocument->document_id);
+        }
 
         return $documentSignature;
+    }
+
+    private function generateSignedPdf(string $documentType, int $resolvedDocumentId): string
+    {
+        if ($documentType === 'letter') {
+            $letter = Letter::with('recipients.organization', 'recipients.user.organization', 'subject', 'creator')
+                ->findOrFail($resolvedDocumentId);
+            $html = app(\App\Http\Controllers\Api\LetterController::class)->renderSignedLetterHtml($letter, true, false);
+            return app(LetterPdfService::class)->generate($html);
+        }
+
+        if ($documentType === 'minute') {
+            $minute = MeetingMinute::with('meeting.attendees.organization', 'decisions')->findOrFail($resolvedDocumentId);
+            $html = app(\App\Http\Controllers\Api\MinuteController::class)->renderSignedMinuteHtml($minute);
+            return app(LetterPdfService::class)->generate($html);
+        }
+
+        throw new RuntimeException('Unsupported document type for signed PDF generation.');
+    }
+
+    /** @return array{0: string, 1: string} */
+    private function storeSignedPdf(string $documentType, int $documentId, int $documentSignatureId, string $pdf): array
+    {
+        $directory = storage_path('app/private/signed-documents/' . $documentType . '/' . $documentId);
+        if (!is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+
+        $filename = 'signed-' . now()->format('YmdHis') . '-' . $documentSignatureId . '.pdf';
+        $fullPath = $directory . '/' . $filename;
+        $written = file_put_contents($fullPath, $pdf, LOCK_EX);
+
+        if ($written === false) {
+            throw new RuntimeException('Unable to write the signed PDF file.');
+        }
+
+        return [
+            'private/signed-documents/' . $documentType . '/' . $documentId . '/' . $filename,
+            hash('sha256', $pdf),
+        ];
     }
 
     protected function extensionFromMime(string $mimeType): string

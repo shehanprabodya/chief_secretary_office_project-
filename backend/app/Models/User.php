@@ -23,18 +23,29 @@ class User extends Authenticatable
 
     protected $fillable = [
         'full_name',
+        'full_name_si',
         'email',
         'username',
         'password_hash',
         'designation',
+        'designation_si',
         'role_id',
         'organization_id',
         'status',
+        'preferred_locale',
+        'invitation_pending',
+        'invited_at',
+        'password_changed_at',
+        'last_login_at',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'invitation_pending' => 'boolean',
+        'invited_at' => 'datetime',
+        'password_changed_at' => 'datetime',
+        'last_login_at' => 'datetime',
     ];
 
     /**
@@ -75,6 +86,11 @@ class User extends Authenticatable
         return $this->hasMany(AdditionalAttendee::class, 'user_id', 'user_id');
     }
 
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(UserInvitation::class, 'user_id', 'user_id');
+    }
+
     public function addedAttendanceEntries(): HasMany
     {
         return $this->hasMany(AdditionalAttendee::class, 'added_by', 'user_id');
@@ -94,5 +110,16 @@ class User extends Authenticatable
         }
 
         return $this->role->role_name === $roleNames;
+    }
+
+    public function displayNameSinhala(): string
+    {
+        return trim((string) ($this->full_name_si ?: $this->full_name));
+    }
+
+    public function designationSinhala(): ?string
+    {
+        $designation = trim((string) ($this->designation_si ?: $this->designation));
+        return $designation !== '' ? $designation : null;
     }
 }   

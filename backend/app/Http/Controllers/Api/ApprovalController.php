@@ -4,14 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApprovableDocument;
+use App\Models\ApprovalWorkflowStep;
+use App\Models\DocumentSignature;
 use App\Models\Letter;
 use App\Models\Meeting;
 use App\Models\MeetingMinute;
 use App\Services\NotificationService;
+use App\Services\SignatureManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class ApprovalController extends Controller
 {
@@ -44,8 +48,9 @@ public function index(Request $request): JsonResponse
             'submitter.role:role_id,role_name',
             'steps:step_id,document_id,step_label,step_order,required_role,assigned_to,status,actioned_by,actioned_at',
             'steps.assignee:user_id,full_name',
-            'sourceLetter:letter_id,subject_id',
-            'sourceLetter.subject:id,code',
+            'sourceLetter:letter_id,subject_id,meeting_id,meeting_code',
+            'sourceLetter.subject:id,code,title',
+            'sourceLetter.meeting:meeting_id,meeting_code',
             'sourceMinute:minute_id,meeting_id',
             'sourceMinute.meeting:meeting_id,meeting_code',
         ]);
@@ -460,7 +465,7 @@ public function index(Request $request): JsonResponse
     {
         $actor = $request->user();
         $notes = $request->input('notes');
-        $updatedDocument = DB::transaction(function () use ($request, $id, $actor, $notes) {
+        $approvalContext = DB::transaction(function () use ($request, $id, $actor, $notes) {
             $document = ApprovableDocument::lockForUpdate()->findOrFail($id);
             $currentStep = $document->steps()->where('step_order', $document->current_step_order)->lockForUpdate()->first();
             abort_unless(
@@ -472,6 +477,44 @@ public function index(Request $request): JsonResponse
                 403,
                 'You are not authorized to approve this step.'
             );
+
+            $isDelegatedDeputyAutoApproval = false;
+            $isLetterOrMinute = in_array($document->document_type, ['letter', 'minute'], true);
+            $sourceDocumentId = (int) ($document->source_id ?? 0);
+
+            if ($isLetterOrMinute && $currentStep->required_role === 'chief_secretary') {
+                $chiefSignature = DocumentSignature::query()
+                    ->where('document_type', $document->document_type)
+                    ->where('document_id', $sourceDocumentId)
+                    ->where('signer_id', $actor->user_id)
+                    ->where('signing_type', 'PRIMARY')
+                    ->latest('signed_at')
+                    ->first();
+
+                abort_unless(
+                    $chiefSignature,
+                    422,
+                    'Please sign the document before approving it.'
+                );
+            }
+
+            if ($isLetterOrMinute && $currentStep->required_role === 'deputy') {
+                $delegatedSignature = DocumentSignature::query()
+                    ->where('document_type', $document->document_type)
+                    ->where('document_id', $sourceDocumentId)
+                    ->where('signer_id', $actor->user_id)
+                    ->where('signing_type', 'DELEGATED')
+                    ->latest('signed_at')
+                    ->first();
+
+                abort_unless(
+                    $delegatedSignature,
+                    422,
+                    'Please sign the document before approving it.'
+                );
+
+                $isDelegatedDeputyAutoApproval = true;
+            }
 
             $nextStep = $document->steps()->where('step_order', $currentStep->step_order + 1)->lockForUpdate()->first();
             $selectedDeputyId = null;
@@ -495,7 +538,28 @@ public function index(Request $request): JsonResponse
                 'actioned_at' => now(),
             ]);
 
-            if ($nextStep) {
+            if ($isDelegatedDeputyAutoApproval) {
+                $chiefStep = $document->steps()->where('step_order', $currentStep->step_order + 1)->lockForUpdate()->first();
+                if ($chiefStep && $chiefStep->required_role === 'chief_secretary') {
+                    $chiefStep->update([
+                        'status' => 'not_required',
+                        'actioned_by' => $actor->user_id,
+                        'actioned_at' => now(),
+                    ]);
+                }
+
+                $document->update([
+                    'status' => 'approved',
+                    'current_step_order' => $chiefStep?->step_order ?? $currentStep->step_order,
+                ]);
+
+                if ($document->document_type === 'letter' && $document->source_id) {
+                    Letter::where('letter_id', $document->source_id)->update(['status' => 'approved']);
+                }
+                if ($document->document_type === 'minute' && $document->source_id) {
+                    MeetingMinute::where('minute_id', $document->source_id)->update(['status' => 'approved']);
+                }
+            } elseif ($nextStep) {
                 $nextStep->update([
                     'status' => 'pending',
                     'assigned_to' => $selectedDeputyId,
@@ -515,8 +579,15 @@ public function index(Request $request): JsonResponse
                 $document->comments()->create(['user_id' => $actor->user_id, 'comment' => $notes]);
             }
 
-            return $document->fresh();
+            return [
+                'document' => $document->fresh(),
+                'delegated_auto_approved' => $isDelegatedDeputyAutoApproval,
+            ];
         });
+
+        /** @var ApprovableDocument $updatedDocument */
+        $updatedDocument = $approvalContext['document'];
+        $delegatedAutoApproved = (bool) ($approvalContext['delegated_auto_approved'] ?? false);
 
         $nextStep = $updatedDocument->steps()->where('step_order', $updatedDocument->current_step_order)->first();
         [$entityName, $entityCode] = $this->notificationIdentity($updatedDocument);
@@ -526,13 +597,17 @@ public function index(Request $request): JsonResponse
                 $updatedDocument->submitted_by,
                 'approval_step_approved',
                 $nextStep ? "{$entityName} approved and forwarded" : "{$entityName} approved",
-                $nextStep
+                $nextStep && !$delegatedAutoApproved
                     ? "{$entityName} {$entityCode} was approved by {$actor->full_name} on {$actionDate} and forwarded to {$this->roleLabel($nextStep->required_role)}."
-                    : "{$entityName} {$entityCode} received final approval from {$actor->full_name} on {$actionDate}.",
+                    : (
+                        $delegatedAutoApproved
+                        ? 'නියෝජ්‍ය ප්‍රධාන ලේකම් විසින් ප්‍රධාන ලේකම් වෙනුවෙන් ලේඛනය අත්සන් කර අනුමත කර ඇත.'
+                        : "{$entityName} {$entityCode} received final approval from {$actor->full_name} on {$actionDate}."
+                    ),
                 '/approvals', 'approval_document', $updatedDocument->document_id, 'important',
             );
         }
-        if ($nextStep) {
+        if ($nextStep && !$delegatedAutoApproved) {
             $message = "{$entityName} {$entityCode} was forwarded by {$actor->full_name} on {$actionDate} and is ready for your review.";
             if ($nextStep->assigned_to) {
                 $this->notifications->sendToUser(
@@ -553,6 +628,19 @@ public function index(Request $request): JsonResponse
             }
         } elseif ($updatedDocument->document_type === 'minute') {
             $this->notifyApprovedMinuteTargets($updatedDocument);
+        }
+
+        if ($delegatedAutoApproved && (int) $updatedDocument->submitted_by !== (int) $actor->user_id) {
+            $this->notifications->sendToUser(
+                $updatedDocument->submitted_by,
+                'deputy_delegated_approved',
+                'Delegated Deputy Approval Completed',
+                'නියෝජ්‍ය ප්‍රධාන ලේකම් විසින් ප්‍රධාන ලේකම් වෙනුවෙන් ලේඛනය අත්සන් කර අනුමත කර ඇත.',
+                '/approvals',
+                'approval_document',
+                $updatedDocument->document_id,
+                'important',
+            );
         }
 
         $updatedDocument->load('submitter.role', 'steps.actionedBy', 'steps.assignee.organization', 'comments.user', 'sourceLetter.subject', 'sourceLetter.recipients.organization', 'sourceLetter.recipients.user.organization', 'sourceMinute.meeting.attendees', 'sourceMinute.decisions');
@@ -600,7 +688,7 @@ public function index(Request $request): JsonResponse
                     'signatory_name' => 'nullable|string|max:255',
                     'signatory_designation' => 'nullable|string|max:255',
                     'decisions' => 'required|array',
-                    'decisions.*.decision_id' => 'required|integer',
+                    'decisions.*.decision_id' => 'nullable|integer',
                     'decisions.*.topic' => 'nullable|string|max:500',
                     'decisions.*.decision_text' => 'required|string',
                     'decisions.*.responsibility' => 'nullable|string|max:1000',
@@ -685,14 +773,33 @@ public function index(Request $request): JsonResponse
                     'signatory_name', 'signatory_designation',
                 ])->all());
 
-                $decisionIds = collect($validated['decisions'])->pluck('decision_id')->map(fn ($id) => (int) $id);
-                $existingIds = $minute->decisions()->pluck('decision_id')->map(fn ($id) => (int) $id);
-                abort_unless($decisionIds->sort()->values()->all() === $existingIds->sort()->values()->all(), 422, 'The submitted decisions do not match this minute.');
+                $existingIds = $minute->decisions()->pluck('decision_id')->map(fn ($id) => (int) $id)->all();
+                $submittedIds = collect($validated['decisions'])
+                    ->pluck('decision_id')
+                    ->filter(fn ($id) => $id !== null)
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                $unknownIds = array_values(array_diff($submittedIds, $existingIds));
+                abort_unless($unknownIds === [], 422, 'The submitted decisions contain unknown entries for this minute.');
+
+                $maxOrder = (int) ($minute->decisions()->max('decision_order') ?? 0);
 
                 foreach ($validated['decisions'] as $decision) {
-                    $minute->decisions()->where('decision_id', $decision['decision_id'])->update(collect($decision)->only([
+                    $decisionData = collect($decision)->only([
                         'topic', 'decision_text', 'responsibility',
-                    ])->all());
+                    ])->all();
+
+                    if (!empty($decision['decision_id'])) {
+                        $minute->decisions()->where('decision_id', (int) $decision['decision_id'])->update($decisionData);
+                        continue;
+                    }
+
+                    $maxOrder++;
+                    $minute->decisions()->create([
+                        ...$decisionData,
+                        'decision_order' => $maxOrder,
+                    ]);
                 }
 
                 $document->update([
@@ -830,14 +937,22 @@ public function index(Request $request): JsonResponse
 
     private function withSubjectCode(ApprovableDocument $document): ApprovableDocument
     {
-        $document->setAttribute(
-            'subject_code',
-            match ($document->document_type) {
-                'letter' => $document->sourceLetter?->subject?->code,
-                'minute' => $document->sourceMinute?->meeting?->meeting_code ?? $document->subject,
-                default => null,
-            }
-        );
+        $subjectCode = null;
+        $subjectCategory = null;
+
+        if ($document->document_type === 'letter') {
+            $subjectCode = $document->sourceLetter?->subject?->code
+                ?? $document->sourceLetter?->meeting_code
+                ?? $document->sourceLetter?->meeting?->meeting_code
+                ?? null;
+            $subjectCategory = $document->sourceLetter?->subject?->title;
+        } elseif ($document->document_type === 'minute') {
+            $subjectCode = $document->sourceMinute?->meeting?->meeting_code
+                ?? null;
+        }
+
+        $document->setAttribute('subject_code', $subjectCode);
+        $document->setAttribute('subject_category', $subjectCategory);
 
         return $document;
     }
@@ -893,6 +1008,150 @@ public function index(Request $request): JsonResponse
         }
 
         return response()->json(['comment' => $comment->load('user')], 201);
+    }
+
+    public function activityLog(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $limit = min(max((int) $request->input('limit', 20), 1), 100);
+
+        $submitted = ApprovableDocument::query()
+            ->where('submitted_by', $user->user_id)
+            ->select(['document_id', 'document_type', 'subject', 'created_at'])
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        $stepActions = ApprovalWorkflowStep::query()
+            ->where('actioned_by', $user->user_id)
+            ->whereNotNull('actioned_at')
+            ->select(['step_id', 'document_id', 'step_label', 'status', 'actioned_at'])
+            ->orderByDesc('actioned_at')
+            ->limit($limit)
+            ->get();
+
+        $signatureActions = DocumentSignature::query()
+            ->where('signer_id', $user->user_id)
+            ->select(['id', 'document_type', 'document_id', 'signing_type', 'signed_at'])
+            ->orderByDesc('signed_at')
+            ->limit($limit)
+            ->get();
+
+        $approvalBySource = ApprovableDocument::query()
+            ->whereIn('document_type', ['letter', 'minute'])
+            ->whereNotNull('source_id')
+            ->select(['document_id', 'document_type', 'source_id'])
+            ->get()
+            ->groupBy(fn (ApprovableDocument $doc) => $doc->document_type . ':' . $doc->source_id);
+
+        $documentIds = collect()
+            ->merge($submitted->pluck('document_id'))
+            ->merge($stepActions->pluck('document_id'));
+
+        foreach ($signatureActions as $signature) {
+            $match = $approvalBySource->get($signature->document_type . ':' . $signature->document_id)?->first();
+            if ($match) {
+                $documentIds->push($match->document_id);
+            }
+        }
+
+        $documentMap = ApprovableDocument::query()
+            ->whereIn('document_id', $documentIds->unique()->values())
+            ->with([
+                'sourceLetter:letter_id,subject_id,meeting_id,meeting_code',
+                'sourceLetter.subject:id,code,title',
+                'sourceLetter.meeting:meeting_id,meeting_code',
+                'sourceMinute:minute_id,meeting_id',
+                'sourceMinute.meeting:meeting_id,meeting_code',
+            ])
+            ->get()
+            ->keyBy('document_id');
+
+        $events = collect();
+
+        foreach ($submitted as $docRow) {
+            /** @var ApprovableDocument|null $document */
+            $document = $documentMap->get($docRow->document_id);
+            if (!$document) {
+                continue;
+            }
+            $document = $this->withSubjectCode($document);
+            $events->push([
+                'event_id' => 'submit-' . $document->document_id,
+                'event_type' => 'submit',
+                'action' => 'submitted',
+                'document_id' => $document->document_id,
+                'document_type' => $document->document_type,
+                'subject' => $document->subject,
+                'subject_code' => $document->getAttribute('subject_code'),
+                'subject_category' => $document->getAttribute('subject_category'),
+                'message' => 'Submitted ' . $document->document_type . ' for approval.',
+                'at' => $document->created_at?->toIso8601String(),
+            ]);
+        }
+
+        foreach ($stepActions as $stepRow) {
+            /** @var ApprovableDocument|null $document */
+            $document = $documentMap->get($stepRow->document_id);
+            if (!$document) {
+                continue;
+            }
+            $document = $this->withSubjectCode($document);
+            $action = match ($stepRow->status) {
+                'approved' => 'approved',
+                'rejected' => 'rejected',
+                'not_required' => 'marked-unavailable',
+                default => 'updated',
+            };
+            $events->push([
+                'event_id' => 'step-' . $stepRow->step_id,
+                'event_type' => 'workflow',
+                'action' => $action,
+                'document_id' => $document->document_id,
+                'document_type' => $document->document_type,
+                'subject' => $document->subject,
+                'subject_code' => $document->getAttribute('subject_code'),
+                'subject_category' => $document->getAttribute('subject_category'),
+                'message' => trim(($stepRow->step_label ?: 'Workflow step') . ' ' . $action . '.'),
+                'at' => Carbon::parse($stepRow->actioned_at)->toIso8601String(),
+            ]);
+        }
+
+        foreach ($signatureActions as $signature) {
+            $documentIndex = $approvalBySource->get($signature->document_type . ':' . $signature->document_id)?->first();
+            if (!$documentIndex) {
+                continue;
+            }
+
+            /** @var ApprovableDocument|null $document */
+            $document = $documentMap->get($documentIndex->document_id);
+            if (!$document) {
+                continue;
+            }
+            $document = $this->withSubjectCode($document);
+            $events->push([
+                'event_id' => 'sign-' . $signature->id,
+                'event_type' => 'signature',
+                'action' => strtolower((string) $signature->signing_type),
+                'document_id' => $document->document_id,
+                'document_type' => $document->document_type,
+                'subject' => $document->subject,
+                'subject_code' => $document->getAttribute('subject_code'),
+                'subject_category' => $document->getAttribute('subject_category'),
+                'message' => $signature->signing_type === 'DELEGATED'
+                    ? 'Signed on behalf of Chief Secretary.'
+                    : 'Signed document.',
+                'at' => Carbon::parse($signature->signed_at)->toIso8601String(),
+            ]);
+        }
+
+        return response()->json([
+            'activities' => $events
+                ->sortByDesc('at')
+                ->values()
+                ->take($limit)
+                ->all(),
+        ]);
     }
 
     private function notifyCurrentReviewer(ApprovableDocument $document, int $actorUserId, bool $resubmitted = false): void

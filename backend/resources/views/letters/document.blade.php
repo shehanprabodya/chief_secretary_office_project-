@@ -18,6 +18,9 @@
         @if (!empty($signatureDataUri))
             <img src="{{ $signatureDataUri }}" alt="Official signature" style="max-height: 52px; max-width: 180px; display: block; margin-bottom: 0.25cm; object-fit: contain;" />
         @endif
+        @if (!empty($isDelegatedSignature) && !empty($delegatedPrefixLine))
+            <span>{{ $delegatedPrefixLine }}</span><br>
+        @endif
         <span>{{ $signatoryName }}</span><br>
         <span>{{ $designation }}</span><br>
         <span>{{ $office }}</span>
@@ -206,6 +209,9 @@
                 <div class="signature">
                     @if (!empty($signatureDataUri))
                         <img src="{{ $signatureDataUri }}" alt="Official signature" style="max-height: 52px; max-width: 180px; display: block; margin-bottom: 0.25cm; object-fit: contain;" />
+                    @endif
+                    @if (!empty($isDelegatedSignature) && !empty($delegatedPrefixLine))
+                        <span>{{ $delegatedPrefixLine }}</span><br>
                     @endif
                     <span>{{ $signatoryName }}</span><br>
                     <span>{{ $designation }}</span><br>

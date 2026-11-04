@@ -181,6 +181,12 @@ class LetterController extends Controller
                 ->where('created_by', $user->user_id)
                 ->firstOrFail();
 
+            if (in_array($letter->status, ['approved', 'dispatched'], true)) {
+                return response()->json([
+                    'message' => 'Approved or dispatched letters are read-only and cannot be edited.',
+                ], 409);
+            }
+
             $approvalStatus = ApprovableDocument::where('document_type', 'letter')
                 ->where('source_id', $letter->letter_id)
                 ->latest('document_id')
@@ -868,6 +874,11 @@ class LetterController extends Controller
      * Build formatted letter HTML — the core generation logic.
      * Matches the official Sri Lanka government letter format.
      */
+    public function renderSignedLetterHtml(Letter $letter, bool $standalone = true, bool $preview = false): string
+    {
+        return $this->buildLetterHtml($letter, $standalone, $preview);
+    }
+
     private function buildLetterHtml(Letter $letter, bool $standalone = false, bool $preview = false): string
     {
         $date = $letter->signature_date
@@ -913,15 +924,27 @@ class LetterController extends Controller
         $designation = $letter->designation ?? 'ප්‍රධාන ලේකම්';
         $office = 'දකුණු පළාත';
         $signatureDataUri = null;
+        $isDelegatedSignature = false;
+        $delegatedPrefixLine = null;
 
         $documentSignature = DocumentSignature::query()
             ->where('document_type', 'letter')
             ->where('document_id', $letter->letter_id)
+            ->with('signer.role')
             ->latest('signed_at')
             ->first();
 
         if ($documentSignature && $documentSignature->signer) {
             $signatureDataUri = app(SignatureManagementService::class)->dataUriForUser($documentSignature->signer);
+
+            if ($documentSignature->signing_type === 'DELEGATED') {
+                $isDelegatedSignature = true;
+                $delegatedPrefixLine = 'ප්‍රධාන ලේකම් වෙනුවෙන්,';
+                $signatoryName = $documentSignature->signer_name_snapshot ?: $documentSignature->signer->displayNameSinhala();
+                $designation = $documentSignature->signer_designation_snapshot
+                    ?: ($documentSignature->signer->designationSinhala() ?? 'නියෝජ්‍ය ප්‍රධාන ලේකම්');
+                $office = $documentSignature->signer_office_snapshot ?: 'දකුණු පළාත';
+            }
         }
 
         $fontFace = $this->letterPdfService->fontFaceCss();
@@ -939,6 +962,8 @@ class LetterController extends Controller
             'designation',
             'office',
             'signatureDataUri',
+            'isDelegatedSignature',
+            'delegatedPrefixLine',
         ))->render();
     }
 

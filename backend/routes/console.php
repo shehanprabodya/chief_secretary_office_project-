@@ -15,3 +15,13 @@ Schedule::call(function () {
     ->name('purge-old-access-logs')
     ->dailyAt('01:00')
     ->withoutOverlapping();
+
+Schedule::command('app:backup:run --type=full')
+    ->name('scheduled-full-backup')
+    ->dailyAt((string) config('backup.schedule', '03:00'))
+    ->withoutOverlapping();
+
+Schedule::command('app:backup:prune')
+    ->name('prune-expired-backups')
+    ->dailyAt('03:30')
+    ->withoutOverlapping();

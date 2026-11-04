@@ -180,3 +180,103 @@ npm run build
 
 Never commit `.env` files, application keys, database credentials, or other
 secrets. Use the tracked `.env.example` as the configuration template.
+
+## New Security And Operations Features
+
+The project now includes:
+
+- Encrypted backup management APIs for administrators
+- Secure invitation-based user onboarding
+- Password change/forgot/reset flows with token revocation and audit logs
+- Real-time notification broadcasting hooks with HTTP polling fallback
+- Sinhala/English frontend localization foundation with persisted language
+
+### Backend migration step
+
+Run migrations before using the new features:
+
+```bash
+cd backend
+php artisan migrate
+```
+
+### Required backend environment variables
+
+Set these in `backend/.env`:
+
+```env
+FRONTEND_URL=http://localhost:5173
+INVITATION_EXPIRE_HOURS=48
+
+BACKUP_LOCAL_DISK=backups
+BACKUP_OFFSITE_ENABLED=false
+BACKUP_OFFSITE_DISK=backups_offsite
+BACKUP_RETENTION_DAYS=14
+BACKUP_SCHEDULE=03:00
+BACKUP_INCLUDE_PATHS=storage/app/private,storage/app/public
+BACKUP_ENCRYPTION_KEY=base64:YOUR_32_BYTE_BASE64_KEY
+```
+
+Generate a backup key safely:
+
+```bash
+php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
+```
+
+### Queue and scheduler configuration
+
+Invitation emails and background work require a running queue worker:
+
+```bash
+cd backend
+php artisan queue:work
+```
+
+Backup automation requires scheduler execution:
+
+```bash
+cd backend
+php artisan schedule:work
+```
+
+Scheduled jobs include:
+
+- `app:backup:run --type=full`
+- `app:backup:prune`
+
+### SMTP configuration
+
+Configure a real SMTP provider in `backend/.env` for invitation and security emails:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=...
+MAIL_PORT=587
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=no-reply@your-domain
+MAIL_FROM_NAME="SPMMS"
+```
+
+### Realtime notifications (Reverb/Echo)
+
+Frontend expects these values in `frontend/.env`:
+
+```env
+VITE_API_URL=http://localhost:8000/api
+VITE_REVERB_APP_KEY=spmms-key
+VITE_REVERB_HOST=127.0.0.1
+VITE_REVERB_PORT=8080
+VITE_REVERB_SCHEME=http
+```
+
+If websocket infrastructure is unavailable, the UI automatically falls back to periodic HTTP polling.
+
+### Backup and restore safety notes
+
+- Backup archives are stored on private disks and never exposed as public URLs.
+- Archives use AES-256-GCM encryption with SHA-256 integrity verification.
+- Restore requires administrator password confirmation.
+- A safety backup is created before restoration.
+- Backup operations are written to security audit logs.

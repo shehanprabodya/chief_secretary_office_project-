@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Search, RefreshCw, Filter, Pencil, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import WorkflowTracker from '../components/Approvals/WorkflowTracker';
+import DecisionResponsibilityInput from '../components/Minutes/DecisionResponsibilityInput';
 import { approvalService } from '../services/approvalService';
 import { minuteService } from '../services/minuteService';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +14,7 @@ import type { EligibleDeputy } from '../types/approval';
 import type { DepartmentHeadEditPayload } from '../services/approvalService';
 import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import type { Organization, RecipientTag } from '../types/letter';
+import type { MeetingAttendee } from '../types/meeting';
 
 type LetterEdit = Extract<DepartmentHeadEditPayload, { title: string }> & { recipients: RecipientTag[] };
 type MinuteEdit = {
@@ -22,11 +24,34 @@ type MinuteEdit = {
   signatory_name?: string | null;
   signatory_designation?: string | null;
   decisions: Array<{
-    decision_id: number;
+    row_key: string;
+    decision_id?: number;
     topic: string | null;
     decision_text: string;
     responsibility: string | null;
   }>;
+};
+
+const attendeeResponsibilityLabel = (attendee: MeetingAttendee) => [
+  `${attendee.full_name}${attendee.designation ? ` — ${attendee.designation}` : ''}`,
+  attendee.organization?.organization_name,
+  attendee.organization?.address,
+].filter(Boolean).join(', ');
+
+const selectedResponsibilityIds = (responsibility: string | null | undefined, attendees: MeetingAttendee[] = []): number[] => {
+  if (!responsibility) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(responsibility);
+    if (Array.isArray(parsed)) {
+      return parsed.map(Number).filter((id) => Number.isInteger(id));
+    }
+  } catch {
+    // Legacy responsibility values may be plain labels.
+  }
+
+  const legacyAttendee = attendees.find((attendee) => attendeeResponsibilityLabel(attendee) === responsibility);
+  return legacyAttendee ? [legacyAttendee.user_id] : [];
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -78,6 +103,7 @@ export default function ApprovalsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [letterEdit, setLetterEdit] = useState<LetterEdit | null>(null);
   const [minuteEdit, setMinuteEdit] = useState<MinuteEdit | null>(null);
+  const [minuteAttendees, setMinuteAttendees] = useState<MeetingAttendee[]>([]);
   const [recipientOrganizations, setRecipientOrganizations] = useState<Organization[]>([]);
   const [forwardMode, setForwardMode] = useState<'approve' | 'edit' | null>(null);
   const [eligibleDeputies, setEligibleDeputies] = useState<EligibleDeputy[]>([]);
@@ -88,8 +114,11 @@ export default function ApprovalsPage() {
   const [showSignDialog, setShowSignDialog] = useState(false);
   const [signPassword, setSignPassword] = useState('');
   const [signConfirmed, setSignConfirmed] = useState(false);
+  const [showChiefSignReminder, setShowChiefSignReminder] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const selectedDocumentId = useRef<number | null>(requestedDocumentId);
   const minutePdfUrlRef = useRef<string | null>(null);
+  const minuteRowCounter = useRef(0);
 
   const clearMinutePdfPreview = useCallback(() => {
     if (minutePdfUrlRef.current) URL.revokeObjectURL(minutePdfUrlRef.current);
@@ -147,6 +176,7 @@ export default function ApprovalsPage() {
       setIsEditing(false);
       setLetterEdit(null);
       setMinuteEdit(null);
+      setMinuteAttendees([]);
       setSelectedDoc(doc);
       setActiveTab('preview');
     } catch (detailError) {
@@ -166,6 +196,8 @@ export default function ApprovalsPage() {
   );
   const canEditSubmitted = Boolean(canAct && user?.role === 'dept_head' && ['letter', 'minute'].includes(selectedDoc?.document_type ?? ''));
   const requiresDeputySelection = Boolean(canAct && user?.role === 'dept_head' && ['letter', 'minute'].includes(selectedDoc?.document_type ?? ''));
+  const deputySinhalaName = user?.full_name_si?.trim() || user?.full_name || '';
+  const deputySinhalaDesignation = user?.designation_si?.trim() || user?.designation || 'නියෝජ්‍ය ප්‍රධාන ලේකම්';
 
   const openForwardDialog = async (mode: 'approve' | 'edit') => {
     setForwardMode(mode);
@@ -219,14 +251,21 @@ export default function ApprovalsPage() {
           })),
         });
       } else if (selectedDoc.document_type === 'minute' && selectedDoc.source_minute) {
-        const minute = selectedDoc.source_minute;
+        const minute = await approvalService.getDepartmentHeadMinute(selectedDoc.source_minute.minute_id);
+        setMinuteAttendees(minute.meeting?.attendees ?? []);
         setMinuteEdit({
           meeting_description: minute.meeting_description,
           discussion_summary: minute.discussion_summary,
           closing_remarks: minute.closing_remarks,
           signatory_name: minute.signatory_name,
           signatory_designation: minute.signatory_designation,
-          decisions: (minute.decisions ?? []).map((decision) => ({ ...decision })),
+          decisions: (minute.decisions ?? []).map((decision) => ({
+            row_key: `decision-${decision.decision_id}`,
+            decision_id: decision.decision_id,
+            topic: decision.topic,
+            decision_text: decision.decision_text,
+            responsibility: decision.responsibility,
+          })),
         });
       } else {
         setError('The original document could not be loaded for editing. Refresh and try again.');
@@ -245,17 +284,51 @@ export default function ApprovalsPage() {
     await openForwardDialog('edit');
   };
 
+  const addMinuteDecisionRow = () => {
+    setMinuteEdit((current) => {
+      if (!current) {
+        return current;
+      }
+
+      minuteRowCounter.current += 1;
+
+      return {
+        ...current,
+        decisions: [
+          ...current.decisions,
+          {
+            row_key: `new-decision-${minuteRowCounter.current}`,
+            topic: null,
+            decision_text: '',
+            responsibility: null,
+          },
+        ],
+      };
+    });
+  };
+
   const confirmForward = async () => {
     if (!selectedDoc || !selectedDeputyId) return;
+    const minuteForwardPayload = minuteEdit
+      ? {
+        ...minuteEdit,
+        decisions: minuteEdit.decisions.map((decision) => ({
+          decision_id: decision.decision_id,
+          topic: decision.topic,
+          decision_text: decision.decision_text,
+          responsibility: decision.responsibility,
+        })),
+      }
+      : null;
     setIsActing(true);
     setError(null);
     try {
       const updated = forwardMode === 'edit'
-        ? await approvalService.editAndForward(
+          ? await approvalService.editAndForward(
           selectedDoc.document_id,
           letterEdit
             ? { ...letterEdit, recipients: letterEdit.recipients.map(({ organization_id, user_id, recipient_label }) => ({ organization_id, user_id, recipient_label })) }
-            : minuteEdit as DepartmentHeadEditPayload,
+            : minuteForwardPayload as DepartmentHeadEditPayload,
           commentText || undefined,
           Number(selectedDeputyId),
         )
@@ -265,6 +338,7 @@ export default function ApprovalsPage() {
       setIsEditing(false);
       setLetterEdit(null);
       setMinuteEdit(null);
+      setMinuteAttendees([]);
       setCommentText('');
       await fetchList();
     } catch (err) {
@@ -282,7 +356,20 @@ export default function ApprovalsPage() {
       await openForwardDialog('approve');
       return;
     }
+
+    if (user?.role === 'chief_secretary' && canSignDocument && !isEditing) {
+      setShowChiefSignReminder(true);
+      return;
+    }
+
+    await performApprove();
+  };
+
+  const performApprove = async () => {
+    if (!selectedDoc) return;
     setIsActing(true);
+    setError(null);
+    setSuccessMessage(null);
     try {
       const updated = await approvalService.approve(selectedDoc.document_id, commentText || undefined);
       setSelectedDoc(updated);
@@ -290,7 +377,8 @@ export default function ApprovalsPage() {
       await fetchList();
     } catch (approveError) {
       console.error(approveError);
-      setError('Could not approve this document. It may have already moved to another stage. Refresh and try again.');
+      const maybeError = approveError as { response?: { data?: { message?: string } } };
+      setError(maybeError.response?.data?.message ?? 'Could not approve this document. It may have already moved to another stage. Refresh and try again.');
     } finally {
       setIsActing(false);
     }
@@ -315,8 +403,9 @@ export default function ApprovalsPage() {
 
     setIsActing(true);
     setError(null);
+    setSuccessMessage(null);
     try {
-      await approvalService.signDocument(
+      const result = await approvalService.signDocument(
         selectedDoc.document_type,
         selectedDoc.document_id,
         signPassword,
@@ -325,10 +414,19 @@ export default function ApprovalsPage() {
       setShowSignDialog(false);
       setSignPassword('');
       setSignConfirmed(false);
+      if (result.auto_approved) {
+        setSuccessMessage('නියෝජ්‍ය ප්‍රධාන ලේකම් විසින් ප්‍රධාන ලේකම් වෙනුවෙන් ලේඛනය අත්සන් කර සාර්ථකව අනුමත කරන ලදී.');
+      } else {
+        setSuccessMessage(result.message || 'Document signed successfully.');
+      }
       await fetchList();
     } catch (signError) {
       console.error(signError);
-      setError('Could not sign this document. Check your password, delegation status, or uploaded signature image.');
+      const maybeError = signError as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+      const firstValidationMessage = maybeError.response?.data?.errors
+        ? Object.values(maybeError.response.data.errors).flat()[0]
+        : null;
+      setError(firstValidationMessage || maybeError.response?.data?.message || 'Could not sign this document. Check your password, delegation status, or uploaded signature image.');
     } finally {
       setIsActing(false);
     }
@@ -456,6 +554,12 @@ export default function ApprovalsPage() {
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+                {successMessage}
               </div>
             )}
 
@@ -624,13 +728,35 @@ export default function ApprovalsPage() {
                         <label className="text-sm font-medium text-slate-700">Signatory designation<input value={minuteEdit.signatory_designation ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, signatory_designation: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" /></label>
                       </div>
                       <div className="space-y-4">
-                        <h4 className="font-semibold text-slate-800">Decisions and responsibilities</h4>
+                        <div className="flex items-center justify-between gap-3">
+                          <h4 className="font-semibold text-slate-800">Decisions and responsibilities</h4>
+                          <button
+                            type="button"
+                            onClick={addMinuteDecisionRow}
+                            className="rounded-md border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            Add decision row
+                          </button>
+                        </div>
                         {minuteEdit.decisions.map((decision, index) => (
-                          <div key={decision.decision_id} className="space-y-3 rounded-lg border border-slate-200 p-4">
+                          <div key={decision.row_key} className="space-y-3 rounded-lg border border-slate-200 p-4">
                             <p className="text-sm font-semibold text-slate-600">Decision {index + 1}</p>
-                            <input aria-label="Decision topic" placeholder="Topic" value={decision.topic ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.decision_id === decision.decision_id ? { ...item, topic: e.target.value || null } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
-                            <textarea aria-label="Decision text" rows={3} value={decision.decision_text} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.decision_id === decision.decision_id ? { ...item, decision_text: e.target.value } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
-                            <input aria-label="Responsibility" placeholder="Responsibility" value={decision.responsibility ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.decision_id === decision.decision_id ? { ...item, responsibility: e.target.value || null } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                            <input aria-label="Decision topic" placeholder="Topic" value={decision.topic ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.row_key === decision.row_key ? { ...item, topic: e.target.value || null } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                            <textarea aria-label="Decision text" rows={3} value={decision.decision_text} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.row_key === decision.row_key ? { ...item, decision_text: e.target.value } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                            {minuteAttendees.length > 0 ? (
+                              <DecisionResponsibilityInput
+                                attendees={minuteAttendees}
+                                selectedIds={selectedResponsibilityIds(decision.responsibility, minuteAttendees)}
+                                onChange={(selectedIds) => setMinuteEdit({
+                                  ...minuteEdit,
+                                  decisions: minuteEdit.decisions.map((item) => item.row_key === decision.row_key
+                                    ? { ...item, responsibility: selectedIds.length > 0 ? JSON.stringify(selectedIds) : null }
+                                    : item),
+                                })}
+                              />
+                            ) : (
+                              <input aria-label="Responsibility" placeholder="Responsibility" value={decision.responsibility ?? ''} onChange={(e) => setMinuteEdit({ ...minuteEdit, decisions: minuteEdit.decisions.map((item) => item.row_key === decision.row_key ? { ...item, responsibility: e.target.value || null } : item) })} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                            )}
                           </div>
                         ))}
                       </div>
@@ -819,6 +945,17 @@ export default function ApprovalsPage() {
               {selectedDoc.document_type === 'letter' ? 'This letter' : 'This minute'} will be signed with your official signature image and saved to the document record.
             </p>
 
+            {user?.role === 'deputy' && (
+              <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-800">
+                <div className="text-xs leading-6 text-violet-900">
+                  <p>ප්‍රධාන ලේකම් වෙනුවෙන්,</p>
+                  <p>{deputySinhalaName}</p>
+                  <p>{deputySinhalaDesignation}</p>
+                  <p>දකුණු පළාත් සභාව</p>
+                </div>
+              </div>
+            )}
+
             <label htmlFor="sign-password" className="mt-5 block text-sm font-medium text-slate-700">Your password</label>
             <input
               id="sign-password"
@@ -857,6 +994,17 @@ export default function ApprovalsPage() {
         variant="danger"
         onConfirm={confirmReject}
         onCancel={() => setShowRejectConfirmation(false)}
+      />
+      <ConfirmDialog
+        open={showChiefSignReminder}
+        title="Sign Document First"
+        message="Please sign the document first. Approving without signing is not allowed for Chief Secretary final approval."
+        confirmLabel="Open Sign Dialog"
+        onConfirm={() => {
+          setShowChiefSignReminder(false);
+          void handleSignDocument();
+        }}
+        onCancel={() => setShowChiefSignReminder(false)}
       />
     </DashboardLayout>
   );

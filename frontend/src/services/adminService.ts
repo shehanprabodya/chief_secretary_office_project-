@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs, PaginatedOrganizations, OrganizationPayload} from '../types/admin';
+import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs, PaginatedOrganizations, OrganizationPayload, PaginatedBackups} from '../types/admin';
 
 export interface UserFilters {
   search?: string;
@@ -53,7 +53,14 @@ export const adminService = {
   },
 
   async resetPassword(id: number, new_password: string): Promise<void> {
-    await api.post(`/admin/users/${id}/reset-password`, { new_password });
+    await api.post(`/admin/users/${id}/reset-password`, {
+      new_password,
+      new_password_confirmation: new_password,
+    });
+  },
+
+  async resendInvitation(id: number): Promise<void> {
+    await api.post(`/admin/users/${id}/resend-invitation`);
   },
 
   async toggleStatus(id: number): Promise<{ status: 'ACTIVE' | 'INACTIVE' }> {
@@ -162,5 +169,33 @@ export const adminService = {
 
   async deleteSignature(signatureId: number): Promise<void> {
     await api.delete(`/admin/signatures/${signatureId}`);
+  },
+
+  async getBackups(page = 1): Promise<PaginatedBackups> {
+    const { data } = await api.get<PaginatedBackups>('/admin/backups', { params: { page } });
+    return data;
+  },
+
+  async createBackup(type: 'database' | 'files' | 'full' = 'full', retention_days?: number): Promise<void> {
+    await api.post('/admin/backups', { type, retention_days });
+  },
+
+  async downloadBackup(backupId: number): Promise<Blob> {
+    const { data } = await api.get(`/admin/backups/${backupId}/download`, {
+      responseType: 'blob',
+    });
+
+    return data;
+  },
+
+  async deleteBackup(backupId: number): Promise<void> {
+    await api.delete(`/admin/backups/${backupId}`);
+  },
+
+  async restoreBackup(backupId: number, password: string): Promise<void> {
+    await api.post(`/admin/backups/${backupId}/restore`, {
+      confirmation: 'RESTORE',
+      password,
+    });
   },
 };

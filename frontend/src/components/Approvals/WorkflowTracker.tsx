@@ -17,6 +17,7 @@ export default function WorkflowTracker({ steps }: WorkflowTrackerProps) {
           const isApproved = step.status === 'approved';
           const isPending = step.status === 'pending';
           const isRejected = step.status === 'rejected';
+          const isSkipped = step.status === 'not_required';
           const isLast = idx === steps.length - 1;
           const statusLabel = isSubmitterStep && isApproved
             ? 'Submitted'
@@ -26,6 +27,8 @@ export default function WorkflowTracker({ steps }: WorkflowTrackerProps) {
             ? 'Pending'
             : isRejected
             ? 'Rejected'
+            : isSkipped
+            ? 'Unavailable'
             : 'Waiting';
 
           return (
@@ -39,6 +42,8 @@ export default function WorkflowTracker({ steps }: WorkflowTrackerProps) {
                       ? 'bg-red-600 text-white'
                       : isPending
                       ? 'bg-[var(--color-primary)] text-white ring-4 ring-blue-100'
+                      : isSkipped
+                      ? 'bg-amber-100 text-amber-700'
                       : 'bg-slate-200 text-slate-400'
                   }`}
                 >

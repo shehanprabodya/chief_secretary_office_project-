@@ -19,8 +19,12 @@ class DocumentSignature extends Model
         'signing_type',
         'delegation_id',
         'document_reference',
+        'signer_name_snapshot',
+        'signer_designation_snapshot',
+        'signer_office_snapshot',
         'document_hash',
         'signed_pdf_path',
+        'signed_pdf_sha256',
         'signed_at',
         'authentication_method',
     ];

@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Bell, Globe, ChevronDown, LogOut, UserRound } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { authService } from '../../services/authService';
 import { notificationService } from '../../services/notificationService';
+import { realtimeNotificationService } from '../../services/realtimeNotificationService';
 import type { AppNotification } from '../../types/notification';
 import logo from '../../assets/logo.svg';
 
@@ -13,24 +16,25 @@ interface TopNavbarProps {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrator',
-  officer: 'Development Officer',
-  dept_head: 'Department Head',
-  deputy: 'Deputy Secretary',
-  chief_secretary: 'Chief Secretary',
-  external_officer: 'External Officer',
+  admin: 'roles.admin',
+  officer: 'roles.officer',
+  dept_head: 'roles.deptHead',
+  deputy: 'roles.deputy',
+  chief_secretary: 'roles.chiefSecretary',
+  external_officer: 'roles.externalOfficer',
 };
 
-export default function TopNavbar({ onMenuClick, pageTitle = 'Development Division', showMenuButton = true }: TopNavbarProps) {
+export default function TopNavbar({ onMenuClick, pageTitle, showMenuButton = true }: TopNavbarProps) {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const [language, setLanguage] = useState<'si' | 'en'>('en');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const language: 'si' | 'en' = i18n.language.startsWith('si') ? 'si' : 'en';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -49,6 +53,7 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
   useEffect(() => {
     if (!user) return;
     let active = true;
+    let unsubscribe: (() => void) | undefined;
 
     const loadNotifications = async () => {
       try {
@@ -65,11 +70,38 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
     void loadNotifications();
     const timer = window.setInterval(loadNotifications, 30_000);
 
+    try {
+      unsubscribe = realtimeNotificationService.subscribe(Number(user.id), (event) => {
+        if (!active) {
+          return;
+        }
+
+        setNotifications((items) => [event.notification, ...items].slice(0, 50));
+        setUnreadCount((count) => count + 1);
+      });
+    } catch {
+      // Fallback polling continues if websocket setup is unavailable.
+    }
+
     return () => {
       active = false;
       window.clearInterval(timer);
+      unsubscribe?.();
     };
   }, [user]);
+
+  const updateLanguage = async (locale: 'en' | 'si') => {
+    localStorage.setItem('appLanguage', locale);
+    void i18n.changeLanguage(locale);
+
+    if (user) {
+      try {
+        await authService.updateLanguage(locale);
+      } catch {
+        // Keep local preference even if API call fails.
+      }
+    }
+  };
 
   const openNotifications = async () => {
     const nextOpen = !showNotifications;
@@ -121,7 +153,7 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
           {showMenuButton && <button
             onClick={onMenuClick}
             className="rounded-lg p-2 text-white transition hover:bg-white/10 lg:hidden"
-            aria-label="Open sidebar menu"
+            aria-label={t('topbar.openSidebarMenu')}
           >
             <Menu className="h-6 w-6" />
           </button>}
@@ -131,7 +163,7 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
             className="h-10 w-10 object-contain"
           />
           <h1 className="hidden text-lg font-semibold text-white lg:block">
-            {pageTitle}
+            {pageTitle ?? t('topbar.defaultPageTitle')}
           </h1>
         </div>
 
@@ -141,21 +173,21 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
           <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
             <Globe size={16} />
             <button
-              onClick={() => setLanguage('si')}
+              onClick={() => void updateLanguage('si')}
               className={`text-sm transition ${
                 language === 'si' ? 'font-semibold text-white' : 'text-white/60'
               }`}
             >
-              සිංහල
+              {t('language.si')}
             </button>
             <span className="text-white/40">|</span>
             <button
-              onClick={() => setLanguage('en')}
+              onClick={() => void updateLanguage('en')}
               className={`text-sm transition ${
                 language === 'en' ? 'font-semibold text-white' : 'text-white/60'
               }`}
             >
-              English
+              {t('language.en')}
             </button>
           </div>
 
@@ -164,7 +196,7 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
             <button
               onClick={openNotifications}
               className="relative rounded-lg p-2 transition hover:bg-white/10"
-              aria-label={`${unreadCount} unread notifications`}
+              aria-label={t('topbar.unreadNotificationsAria', { count: unreadCount })}
             >
               <Bell size={20} />
               {unreadCount > 0 && (
@@ -178,18 +210,18 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
               <div className="absolute right-0 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
                   <div>
-                    <h2 className="text-sm font-bold">Notifications</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{unreadCount} unread</p>
+                    <h2 className="text-sm font-bold">{t('topbar.notifications')}</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{unreadCount} {t('topbar.unread')}</p>
                   </div>
                   {unreadCount > 0 && (
                     <button onClick={markAllNotificationsRead} className="text-xs font-semibold text-[var(--color-primary)] hover:underline dark:text-blue-300">
-                      Mark all read
+                      {t('topbar.markAllRead')}
                     </button>
                   )}
                 </div>
                 <div className="max-h-96 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <p className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500">No notifications yet.</p>
+                    <p className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500">{t('topbar.none')}</p>
                   ) : notifications.map((notification) => (
                     <button
                       key={notification.notification_id}
@@ -237,16 +269,26 @@ export default function TopNavbar({ onMenuClick, pageTitle = 'Development Divisi
                   <p className="mt-0.5 text-xs text-slate-500">{user?.email}</p>
                   {user?.role && (
                     <span className="mt-2 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                      {ROLE_LABELS[user.role] ?? user.role}
+                      {t(ROLE_LABELS[user.role] ?? user.role)}
                     </span>
                   )}
                 </div>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    navigate('/account/password');
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
+                  <UserRound className="h-4 w-4" />
+                  {t('topbar.changePassword')}
+                </button>
                 <button
                   onClick={handleLogout}
                   className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-600 transition hover:bg-red-50"
                 >
                   <LogOut className="h-4 w-4" />
-                  Logout
+                  {t('topbar.logout')}
                 </button>
               </div>
             )}

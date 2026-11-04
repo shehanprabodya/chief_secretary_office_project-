@@ -15,9 +15,10 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import CalendarWidget from '../components/Dashboard/CalendarWidget';
+import ApprovalActivityLog from '../components/Dashboard/ApprovalActivityLog';
 import { useAuth } from '../context/AuthContext';
 import { approvalService } from '../services/approvalService';
-import type { ApprovableDocument } from '../types/approval';
+import type { ApprovableDocument, ApprovalActivityItem } from '../types/approval';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-orange-50 text-orange-700',
@@ -42,6 +43,10 @@ export default function ChiefSecretaryDashboard() {
   const [documents, setDocuments] = useState<ApprovableDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePanel, setActivePanel] = useState<'queue' | 'activity'>('queue');
+  const [activities, setActivities] = useState<ApprovalActivityItem[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   const loadApprovals = async () => {
     setIsLoading(true);
@@ -62,6 +67,31 @@ export default function ChiefSecretaryDashboard() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadApprovals();
   }, []);
+
+  const loadActivity = async () => {
+    setActivityLoading(true);
+    setActivityError(null);
+    try {
+      setActivities(await approvalService.getActivityLog(15));
+    } catch (err) {
+      console.error(err);
+      setActivityError('Unable to load activity log.');
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadActivity();
+  }, []);
+
+  const subjectLabel = (doc: ApprovableDocument) => {
+    const code = doc.subject_code?.trim();
+    const category = doc.subject_category?.trim();
+    if (code && category) return `${code} - ${category}`;
+    return code || '—';
+  };
 
   const stats = useMemo(() => {
     const finalQueue = documents.filter((doc) => {
@@ -183,8 +213,8 @@ export default function ChiefSecretaryDashboard() {
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Final Approval Queue</h2>
-                <p className="text-sm text-slate-500">Documents approved by Deputy and waiting for final decision.</p>
+                <h2 className="text-lg font-bold text-slate-900">Chief Secretary Desk</h2>
+                <p className="text-sm text-slate-500">Incoming final approvals and your action history.</p>
               </div>
               <button
                 onClick={() => navigate('/approvals')}
@@ -193,6 +223,30 @@ export default function ChiefSecretaryDashboard() {
                 View all
               </button>
             </div>
+
+            <div className="mb-4 flex gap-3 border-b border-slate-200">
+              <button
+                onClick={() => setActivePanel('queue')}
+                className={`-mb-px border-b-2 px-1 py-2 text-sm font-medium ${activePanel === 'queue' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              >
+                Incoming Queue
+              </button>
+              <button
+                onClick={() => setActivePanel('activity')}
+                className={`-mb-px border-b-2 px-1 py-2 text-sm font-medium ${activePanel === 'activity' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              >
+                Activity Log
+              </button>
+            </div>
+
+            {activePanel === 'activity' ? (
+              <ApprovalActivityLog
+                items={activities}
+                isLoading={activityLoading}
+                error={activityError}
+                onRefresh={loadActivity}
+              />
+            ) : (
 
             <div className="overflow-hidden rounded-lg border border-slate-100">
               <table className="w-full">
@@ -225,7 +279,7 @@ export default function ChiefSecretaryDashboard() {
                         className="cursor-pointer hover:bg-slate-50"
                         onClick={() => navigate('/approvals', { state: { selectedDocumentId: doc.document_id } })}
                       >
-                        <td className="px-4 py-4 text-sm font-semibold text-slate-800">{doc.subject_code ?? '—'}</td>
+                        <td className="px-4 py-4 text-sm font-semibold text-slate-800">{subjectLabel(doc)}</td>
                         <td className="px-4 py-4 text-sm text-slate-600">{doc.subject}</td>
                         <td className="px-4 py-4 text-sm text-slate-500">{doc.submitter?.full_name ?? 'Unknown'}</td>
                         <td className="px-4 py-4">
@@ -240,6 +294,7 @@ export default function ChiefSecretaryDashboard() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
 
           <div className="approval-dashboard-sidebar">

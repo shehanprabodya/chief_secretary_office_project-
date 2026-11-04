@@ -3,60 +3,72 @@ import {
   Calendar,
   CheckCircle,
   FileText,
+  History,
   Users,
   Files,
   BookOpen,
   ImageUp,
+  HardDriveDownload,
 } from "lucide-react";
 
 export const navigation = {
   admin: [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      labelKey: 'nav.dashboard',
       href: "/dashboard/admin",
     },
     {
       icon: Users,
-      label: "Users",
+      labelKey: 'nav.users',
       href: "/admin/users",
     },
     {
       icon: BookOpen,
-      label: "Subjects",
+      labelKey: 'nav.subjects',
       href: "/admin/subjects",
     },
     {
       icon: ImageUp,
-      label: "Signature Upload",
+      labelKey: 'nav.signatureUpload',
       href: "/admin/signatures",
+    },
+    {
+      icon: HardDriveDownload,
+      labelKey: 'nav.backups',
+      href: "/admin/backups",
     },
   ],
 
   officer: [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      labelKey: 'nav.dashboard',
       href: "/dashboard/officer",
     },
     {
       icon: Calendar,
-      label: "Meetings",
+      labelKey: 'nav.meetings',
       href: "/meetings",
     },
     {
       icon: CheckCircle,
-      label: "Approvals",
+      labelKey: 'nav.approvals',
       href: "/approvals",
     },
     {
+      icon: History,
+      labelKey: 'nav.activityLog',
+      href: '/activity-log',
+    },
+    {
       icon: FileText,
-      label: "Minutes",
+      labelKey: 'nav.minutes',
       href: "/minutes",
     },
     {
       icon: Users,
-      label: "Attendance",
+      labelKey: 'nav.attendance',
       href: "/attendance",
     },
     
@@ -65,40 +77,50 @@ export const navigation = {
   chief_secretary: [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      labelKey: 'nav.dashboard',
       href: "/dashboard/chief-secretary",
     },
     {
       icon: CheckCircle,
-      label: "Approvals",
+      labelKey: 'nav.approvals',
       href: "/approvals",
+    },
+    {
+      icon: History,
+      labelKey: 'nav.activityLog',
+      href: '/activity-log',
     },
   ],
 
   deputy: [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      labelKey: 'nav.dashboard',
       href: "/dashboard/deputy",
     },
     {
       icon: CheckCircle,
-      label: "Approvals",
+      labelKey: 'nav.approvals',
       href: "/approvals",
     },
     {
+      icon: History,
+      labelKey: 'nav.activityLog',
+      href: '/activity-log',
+    },
+    {
       icon: Files,
-      label: "Meeting Letters",
+      labelKey: 'nav.meetingLetters',
       href: "/dept-head/letters",
     },
     {
       icon: Users,
-      label: "Attendance",
+      labelKey: 'nav.attendance',
       href: "/dept-head/attendance",
     },
     {
       icon: FileText,
-      label: "Minutes",
+      labelKey: 'nav.minutes',
       href: "/dept-head/minutes",
     },
   ],
@@ -106,27 +128,32 @@ export const navigation = {
   dept_head: [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      labelKey: 'nav.dashboard',
       href: "/dashboard/dept-head",
     },
     {
       icon: CheckCircle,
-      label: "Approvals",
+      labelKey: 'nav.approvals',
       href: "/approvals",
     },
     {
+      icon: History,
+      labelKey: 'nav.activityLog',
+      href: '/activity-log',
+    },
+    {
       icon: Files,
-      label: "Meeting Letters",
+      labelKey: 'nav.meetingLetters',
       href: "/dept-head/letters",
     },
     {
       icon: Users,
-      label: "Attendance",
+      labelKey: 'nav.attendance',
       href: "/dept-head/attendance",
     },
     {
       icon: FileText,
-      label: "Minutes",
+      labelKey: 'nav.minutes',
       href: "/dept-head/minutes",
     },
   ],
@@ -134,17 +161,17 @@ export const navigation = {
   external_officer: [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      labelKey: 'nav.dashboard',
       href: "/dashboard/external-officer",
     },
     {
       icon: Calendar,
-      label: "My Meetings",
+      labelKey: 'nav.myMeetings',
       href: "/dashboard/external-officer#meetings",
     },
     {
       icon: FileText,
-      label: "Minutes",
+      labelKey: 'nav.minutes',
       href: "/dashboard/external-officer#minutes",
     },
     

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle, Building2, CalendarDays, CalendarX2, CheckCircle2, ChevronRight,
   Clock3, Download, FileText, MapPin, Pencil, RefreshCw, Search, Users, Video, X,
+  Eye,
 } from 'lucide-react';
 import axios from 'axios';
 import DashboardLayout from '../components/layouts/DashboardLayout';
@@ -12,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { externalOfficerService } from '../services/externalOfficerService';
 import { letterService } from '../services/letterService';
+import { minuteService } from '../services/minuteService';
 import type { ExcuseReasonCategory, ExternalOfficerMeeting } from '../types/externalOfficer';
 import { sanitizeDocumentHtml } from '../utils/sanitizeHtml';
 
@@ -93,6 +95,9 @@ export default function ExternalOfficerDashboard() {
   const [isExcuseProcessing, setIsExcuseProcessing] = useState(false);
   const [showWithdrawConfirmation, setShowWithdrawConfirmation] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [minutePreviewUrl, setMinutePreviewUrl] = useState('');
+  const [minutePreviewTitle, setMinutePreviewTitle] = useState('Meeting Minutes Preview');
+  const [minutePreviewId, setMinutePreviewId] = useState<number | null>(null);
 
   const loadDashboard = async () => {
     setIsLoading(true);
@@ -226,6 +231,30 @@ export default function ExternalOfficerDashboard() {
     } finally {
       setIsExcuseProcessing(false);
     }
+  };
+
+  const openMinuteDocument = async (minuteId: number, title?: string | null) => {
+    try {
+      const blob = await minuteService.downloadPdf(minuteId);
+      const url = URL.createObjectURL(blob);
+      setMinutePreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return url;
+      });
+      setMinutePreviewTitle(title?.trim() || 'Meeting Minutes Preview');
+      setMinutePreviewId(minuteId);
+    } catch (err) {
+      console.error(err);
+      setActionMessage({ type: 'error', text: 'Unable to open this minute document.' });
+    }
+  };
+
+  const closeMinuteDocument = () => {
+    if (minutePreviewUrl) {
+      URL.revokeObjectURL(minutePreviewUrl);
+    }
+    setMinutePreviewUrl('');
+    setMinutePreviewId(null);
   };
 
   const excusePanel = selected ? (() => {
@@ -390,6 +419,16 @@ export default function ExternalOfficerDashboard() {
 
               {selectedMinute && <article className="rounded-2xl border border-slate-200 bg-slate-100 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 sm:p-5">
                 <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:space-y-8 sm:p-8 lg:p-10">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void openMinuteDocument(selectedMinute.minute_id, selectedMinute.meeting.title)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View Officer Document
+                    </button>
+                  </div>
                   <header className="rounded-xl bg-slate-50 px-5 py-7 text-center dark:bg-slate-900/70 sm:px-8">
                     <h2 className="mt-3 text-3xl font-bold leading-relaxed text-slate-900 dark:text-white">{selectedMinute.meeting.title}</h2>
                     <p className="mt-2 text-base text-slate-600 dark:text-slate-300">{selectedMinute.meeting.meeting_code && <>{selectedMinute.meeting.meeting_code} · </>}{formatDate(selectedMinute.meeting.meeting_date)}</p>
@@ -518,6 +557,8 @@ export default function ExternalOfficerDashboard() {
           }}
         />
       )}
+
+      {minutePreviewUrl && <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"><div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-4 py-3"><div><h2 className="text-lg font-bold text-slate-900">{minutePreviewTitle}</h2><p className="text-sm text-slate-500">Officer minute document preview</p></div><button type="button" onClick={closeMinuteDocument} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><X className="h-4 w-4" />Close</button></div><div className="flex-1 overflow-hidden bg-slate-100 p-2"><iframe src={minutePreviewUrl} title="Meeting Minutes Preview" className="h-full w-full rounded-xl border-0 bg-white" /></div><div className="flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3"><button type="button" onClick={() => { if (!minutePreviewUrl || !minutePreviewId) return; const link = document.createElement('a'); link.href = minutePreviewUrl; link.download = `minutes-${minutePreviewId}.pdf`; document.body.appendChild(link); link.click(); link.remove(); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"><Download className="h-4 w-4" />Download</button></div></div></div>}
 
       {letterMeeting?.letter && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && setLetterMeeting(null)}><div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-slate-100 shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3"><div><h2 className="font-bold text-slate-900">Meeting letter</h2><p className="text-xs text-slate-500">Subject Code: {letterMeeting.meeting_code ?? letterMeeting.subject?.code ?? '—'} · {letterMeeting.letter.status}</p></div><div className="flex gap-2"><button onClick={async () => { if (letterMeeting?.letter?.letter_id) { await letterService.downloadPdf(letterMeeting.letter.letter_id); } }} className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" />Print / Save PDF</button><button onClick={() => setLetterMeeting(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close letter"><X className="h-5 w-5" /></button></div></div><div className="overflow-y-auto p-4 sm:p-8"><article className="mx-auto min-h-[720px] max-w-2xl bg-white px-8 py-10 text-slate-800 shadow-sm sm:px-14">{(letterMeeting.letter.sender_name || letterMeeting.letter.organization_name || letterMeeting.letter.organization_address) && <div className="border-b-2 border-slate-800 pb-5 text-center">{letterMeeting.letter.sender_name && <p className="text-lg font-bold uppercase">{letterMeeting.letter.sender_name}</p>}{letterMeeting.letter.organization_name && <p className="mt-1 text-sm">{letterMeeting.letter.organization_name}</p>}{letterMeeting.letter.organization_address && <p className="mt-1 whitespace-pre-line text-xs text-slate-500">{letterMeeting.letter.organization_address}</p>}</div>}<div className="mt-6 flex justify-between text-sm"><span>Subject Code: <strong>{letterMeeting.meeting_code ?? letterMeeting.subject?.code ?? '—'}</strong></span>{letterMeeting.letter.signature_date && <span>{formatDate(letterMeeting.letter.signature_date)}</span>}</div>{letterMeeting.letter.title && <h3 className="mt-8 text-center text-sm font-bold uppercase underline underline-offset-4">{plainText(letterMeeting.letter.title)}</h3>}{letterMeeting.letter.content && <div className="mt-8 text-sm leading-7 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeDocumentHtml(letterMeeting.letter.content) }} />}{(letterMeeting.letter.signatory_name || letterMeeting.letter.designation) && <div className="mt-12 text-sm"><div className="mt-10 w-52 border-t border-slate-500 pt-2">{letterMeeting.letter.signatory_name && <p className="font-bold">{letterMeeting.letter.signatory_name}</p>}{letterMeeting.letter.designation && <p className="text-xs text-slate-500">{letterMeeting.letter.designation}</p>}</div></div>}</article></div></div></div>}
     </DashboardLayout>

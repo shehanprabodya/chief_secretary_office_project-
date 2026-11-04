@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { CalendarDays, ClipboardList, Eye, RefreshCw, X } from 'lucide-react';
+import { ClipboardList, Download, Eye, RefreshCw, X } from 'lucide-react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import RecordFilters from '../components/DepartmentHead/RecordFilters';
 import { emptyRecordFilters } from '../components/DepartmentHead/recordFilterValues';
 import RecordPagination from '../components/DepartmentHead/RecordPagination';
 import { departmentHeadRecordService } from '../services/departmentHeadRecordService';
-import type { MeetingMinute } from '../types/minute';
-import type { Meeting } from '../types/meeting';
+import { minuteService } from '../services/minuteService';
 import type { DepartmentHeadMinute, DepartmentOfficer } from '../types/departmentHeadRecords';
 
 const initialFilters = emptyRecordFilters;
@@ -16,34 +15,6 @@ const statusStyle: Record<DepartmentHeadMinute['status'], string> = {
   pending_approval: 'bg-amber-50 text-amber-700',
   approved: 'bg-emerald-50 text-emerald-700',
 };
-type MinuteDetail = MeetingMinute & { meeting: Meeting };
-
-const attendeeLabel = (attendee: NonNullable<Meeting['attendees']>[number]) => [
-  `${attendee.full_name}${attendee.designation ? ` — ${attendee.designation}` : ''}`,
-  attendee.organization?.organization_name,
-  attendee.organization?.address,
-].filter(Boolean).join(', ');
-
-const responsibilityDetails = (responsibility: string | null, attendees: NonNullable<Meeting['attendees']> = []) => {
-  if (!responsibility) return '';
-  let selectedIds: number[] = [];
-  try {
-    const parsed: unknown = JSON.parse(responsibility);
-    if (Array.isArray(parsed)) selectedIds = parsed.map(Number).filter((id) => Number.isInteger(id));
-  } catch {
-    // Older rows store a full attendee label instead of selected attendee IDs.
-  }
-  if (!selectedIds.length) {
-    const legacyAttendee = attendees.find((attendee) => attendeeLabel(attendee) === responsibility);
-    if (legacyAttendee) selectedIds = [legacyAttendee.user_id];
-  }
-  return attendees
-    .filter((attendee) => selectedIds.includes(attendee.user_id))
-    .map((attendee) => [attendee.designation, attendee.organization?.address].filter(Boolean).join(', '))
-    .filter(Boolean)
-    .join('; ');
-};
-
 export default function DeptHeadMinutesPage() {
   const [minutes, setMinutes] = useState<DepartmentHeadMinute[]>([]);
   const [officers, setOfficers] = useState<DepartmentOfficer[]>([]);
@@ -54,7 +25,9 @@ export default function DeptHeadMinutesPage() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [detail, setDetail] = useState<MinuteDetail | null>(null);
+  const [previewTitle, setPreviewTitle] = useState('Meeting Minutes Preview');
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewMinuteId, setPreviewMinuteId] = useState<number | null>(null);
   const [openingId, setOpeningId] = useState<number | null>(null);
 
   const loadMinutes = useCallback(async () => {
@@ -89,16 +62,31 @@ export default function DeptHeadMinutesPage() {
     loadMinutes();
   }, [loadMinutes]);
 
-  const openDetail = async (minuteId: number) => {
+  const openDetail = async (minuteId: number, title?: string | null) => {
     setOpeningId(minuteId);
     setError('');
     try {
-      setDetail(await departmentHeadRecordService.getMinute(minuteId));
+      const blob = await minuteService.downloadPdf(minuteId);
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return url;
+      });
+      setPreviewMinuteId(minuteId);
+      setPreviewTitle(title?.trim() || 'Meeting Minutes Preview');
     } catch {
       setError('Unable to open these meeting minutes.');
     } finally {
       setOpeningId(null);
     }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl('');
+    setPreviewMinuteId(null);
   };
 
   return (
@@ -119,20 +107,13 @@ export default function DeptHeadMinutesPage() {
               <td className="max-w-sm px-5 py-4 text-slate-600"><p className="line-clamp-2">{minute.discussion_summary || 'No discussion summary provided.'}</p></td>
               <td className="px-5 py-4 text-xs text-slate-600">{minute.decisions_count} decision{minute.decisions_count === 1 ? '' : 's'}</td>
               <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle[minute.status]}`}>{minute.status.replace('_', ' ')}</span></td>
-              <td className="px-5 py-4 text-right"><button onClick={() => openDetail(minute.minute_id)} disabled={openingId === minute.minute_id} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-4 py-2 text-xs font-semibold text-blue-700 disabled:opacity-40"><Eye className="h-3.5 w-3.5" />{openingId === minute.minute_id ? 'Opening...' : 'View'}</button></td>
+              <td className="px-5 py-4 text-right"><button onClick={() => openDetail(minute.minute_id, minute.meeting?.title)} disabled={openingId === minute.minute_id} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-4 py-2 text-xs font-semibold text-blue-700 disabled:opacity-40"><Eye className="h-3.5 w-3.5" />{openingId === minute.minute_id ? 'Opening...' : 'View'}</button></td>
             </tr>)}</tbody></table></div>
           <RecordPagination page={page} lastPage={lastPage} disabled={isLoading} onPageChange={setPage} />
         </section>
       </div>
 
-      {detail && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><button aria-label="Close minutes" className="absolute inset-0 bg-black/60" onClick={() => setDetail(null)} /><div className="relative z-10 max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-start justify-between border-b bg-white px-6 py-4"><div><h2 className="text-xl font-bold text-slate-900">{detail.meeting.title}</h2><p className="mt-1 text-sm text-slate-500">Read-only meeting minutes</p></div><button onClick={() => setDetail(null)} className="rounded-full p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div><div className="space-y-6 p-6">
-        <div className="grid gap-3 sm:grid-cols-3">{[{ icon: CalendarDays, label: 'Meeting date', value: new Date(detail.meeting.meeting_date).toLocaleDateString() }, { icon: ClipboardList, label: 'Decisions', value: detail.decisions.length }].map((item) => <div key={item.label} className="flex items-center gap-3 rounded-lg border bg-slate-50 p-4"><item.icon className="h-5 w-5 text-blue-700" /><div><p className="text-xs uppercase text-slate-400">{item.label}</p><p className="font-semibold text-slate-800">{item.value}</p></div></div>)}</div>
-        <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Attendees</h3><div className="mt-3 overflow-hidden rounded-lg border"><table className="min-w-full divide-y text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">No.</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Designation and organization</th></tr></thead><tbody className="divide-y">{detail.meeting.attendees?.length ? detail.meeting.attendees.map((attendee, index) => <tr key={attendee.user_id}><td className="px-4 py-3 text-slate-500">{String(index + 1).padStart(2, '0')}</td><td className="px-4 py-3 font-medium text-slate-700">{attendee.full_name}</td><td className="px-4 py-3 text-slate-600">{attendee.designation || '—'}{attendee.organization ? `, ${attendee.organization.organization_name}` : ''}</td></tr>) : <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">No attendees recorded.</td></tr>}</tbody></table></div></section>
-        <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Welcome and purpose</h3><p className="mt-3 whitespace-pre-line rounded-lg border bg-slate-50 p-4 text-sm leading-7 text-slate-700">{detail.discussion_summary || 'No opening summary provided.'}</p></section>
-        <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Discussion points and decisions</h3><div className="mt-3 overflow-hidden rounded-lg border"><table className="min-w-full divide-y text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-3">No.</th><th className="px-3 py-3">Topic</th><th className="px-3 py-3">Discussion and decision</th><th className="px-3 py-3">Responsibility</th></tr></thead><tbody className="divide-y">{detail.decisions.map((decision) => <tr key={`decision-${decision.decision_id}`}><td className="px-3 py-3 text-slate-500">{String(decision.decision_order).padStart(2, '0')}</td><td className="px-3 py-3 text-slate-700">{decision.topic || '—'}</td><td className="px-3 py-3 whitespace-pre-line text-slate-700">{decision.decision_text}</td><td className="px-3 py-3 text-slate-600">{responsibilityDetails(decision.responsibility, detail.meeting.attendees) || '—'}</td></tr>)}{!detail.decisions.length && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No discussion items recorded.</td></tr>}</tbody></table></div></section>
-        {detail.closing_remarks && <section><h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Closing remarks</h3><p className="mt-3 whitespace-pre-line rounded-lg border bg-slate-50 p-4 text-sm leading-7 text-slate-700">{detail.closing_remarks}</p></section>}
-        {(detail.signatory_name || detail.signatory_designation) && <section className="max-w-md border-t pt-5"><div className="h-8 text-slate-500">................................................</div><p className="font-semibold text-slate-800">{detail.signatory_name}</p><p className="text-sm text-slate-600">{detail.signatory_designation}</p></section>}
-      </div></div></div>}
+      {previewUrl && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"><div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-4 py-3"><div><h2 className="text-lg font-bold text-slate-900">{previewTitle}</h2><p className="text-sm text-slate-500">Officer minute document preview</p></div><button type="button" onClick={closePreview} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><X className="h-4 w-4" />Close</button></div><div className="flex-1 overflow-hidden bg-slate-100 p-2"><iframe src={previewUrl} title="Meeting Minutes Preview" className="h-full w-full rounded-xl border-0 bg-white" /></div><div className="flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3"><button type="button" onClick={() => { if (!previewUrl || !previewMinuteId) return; const link = document.createElement('a'); link.href = previewUrl; link.download = `minutes-${previewMinuteId}.pdf`; document.body.appendChild(link); link.click(); link.remove(); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"><Download className="h-4 w-4" />Download</button></div></div></div>}
     </DashboardLayout>
   );
 }

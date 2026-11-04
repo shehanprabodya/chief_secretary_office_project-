@@ -1,6 +1,7 @@
 import { api } from '../lib/axios';
-import type { ApprovableDocument, ApprovalComment, EligibleDeputy } from '../types/approval';
+import type { ApprovableDocument, ApprovalActivityItem, ApprovalComment, EligibleDeputy } from '../types/approval';
 import type { Organization } from '../types/letter';
+import type { MeetingMinute } from '../types/minute';
 
 export interface SubmitApprovalPayload {
   document_type: 'letter' | 'minute' | 'grant' | 'training_request' | 'hr_transfer';
@@ -31,7 +32,7 @@ export type DepartmentHeadEditPayload =
       signatory_name?: string | null;
       signatory_designation?: string | null;
       decisions: Array<{
-        decision_id: number;
+        decision_id?: number;
         topic: string | null;
         decision_text: string;
         responsibility: string | null;
@@ -70,6 +71,18 @@ export const approvalService = {
     return data.document;
   },
 
+  async getActivityLog(limit = 20): Promise<ApprovalActivityItem[]> {
+    const { data } = await api.get<{ activities: ApprovalActivityItem[] }>('/approvals/activity-log', {
+      params: { limit },
+    });
+    return data.activities;
+  },
+
+  async getDepartmentHeadMinute(minuteId: number): Promise<MeetingMinute> {
+    const { data } = await api.get<{ minute: MeetingMinute }>(`/dept-head/minutes/${minuteId}`);
+    return data.minute;
+  },
+
   async submit(payload: SubmitApprovalPayload): Promise<ApprovableDocument> {
     const { data } = await api.post<{ document: ApprovableDocument }>('/approvals', payload);
     return data.document;
@@ -102,9 +115,9 @@ export const approvalService = {
     return data.document;
   },
 
-  async signDocument(documentType: string, documentId: number, password: string, sourceDocumentId?: number): Promise<{ message: string; document_signature: { document_type: string; document_id: number; signer_id: number; primary_signer_id?: number | null; signing_type?: string | null } }> {
+  async signDocument(documentType: string, documentId: number, password: string, sourceDocumentId?: number): Promise<{ message: string; auto_approved?: boolean; document_signature: { document_type: string; document_id: number; signer_id: number; primary_signer_id?: number | null; signing_type?: string | null } }> {
     const resolvedDocumentId = sourceDocumentId ?? documentId;
-    const { data } = await api.post<{ message: string; document_signature: { document_type: string; document_id: number; signer_id: number; primary_signer_id?: number | null; signing_type?: string | null } }>(`/signing/documents/${documentType}/${resolvedDocumentId}/sign`, {
+    const { data } = await api.post<{ message: string; auto_approved?: boolean; document_signature: { document_type: string; document_id: number; signer_id: number; primary_signer_id?: number | null; signing_type?: string | null } }>(`/signing/documents/${documentType}/${resolvedDocumentId}/sign`, {
       confirm: true,
       password,
     });

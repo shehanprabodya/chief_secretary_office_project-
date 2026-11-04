@@ -20,7 +20,7 @@ class DepartmentHeadRecordController extends Controller
     public function letterRecipientOrganizations(): JsonResponse
     {
         $organizations = Organization::where('status', 'ACTIVE')
-            ->with(['users' => fn (Builder $query) => $query
+            ->with(['users' => fn ($query) => $query
                 ->where('status', 'ACTIVE')
                 ->whereHas('role', fn (Builder $role) => $role->where('role_name', 'external_officer'))])
             ->orderBy('organization_name')

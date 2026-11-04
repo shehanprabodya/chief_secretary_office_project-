@@ -146,6 +146,12 @@ class MinuteController extends Controller
     {
         $minute = MeetingMinute::findOrFail($id);
 
+        if ($minute->status === 'approved') {
+            return response()->json([
+                'message' => 'Approved meeting minutes are read-only and cannot be edited.',
+            ], 409);
+        }
+
         if ((int) $minute->created_by !== (int) $request->user()->user_id) {
             return response()->json([
                 'message' => 'Only the minute creator can save changes to this minute.',
@@ -218,6 +224,12 @@ class MinuteController extends Controller
     {
         $minute = MeetingMinute::findOrFail($minuteId);
 
+        if ($minute->status === 'approved') {
+            return response()->json([
+                'message' => 'Approved meeting minutes are read-only and cannot be edited.',
+            ], 409);
+        }
+
         if ((int) $minute->created_by !== (int) $request->user()->user_id) {
             return response()->json([
                 'message' => 'Only the minute creator can modify decisions for this minute.',
@@ -251,6 +263,12 @@ class MinuteController extends Controller
     {
         $decision = MinuteDecision::with('minute')->findOrFail($decisionId);
 
+        if ($decision->minute->status === 'approved') {
+            return response()->json([
+                'message' => 'Approved meeting minutes are read-only and cannot be edited.',
+            ], 409);
+        }
+
         if ((int) $decision->minute->created_by !== (int) $request->user()->user_id) {
             return response()->json([
                 'message' => 'Only the minute creator can delete decisions from this minute.',
@@ -264,6 +282,12 @@ class MinuteController extends Controller
     public function updateDecision(Request $request, int $decisionId): JsonResponse
     {
         $decision = MinuteDecision::with('minute')->findOrFail($decisionId);
+
+        if ($decision->minute->status === 'approved') {
+            return response()->json([
+                'message' => 'Approved meeting minutes are read-only and cannot be edited.',
+            ], 409);
+        }
 
         if ((int) $decision->minute->created_by !== (int) $request->user()->user_id) {
             return response()->json([
@@ -293,6 +317,12 @@ class MinuteController extends Controller
     public function addActionItem(Request $request, int $minuteId): JsonResponse
     {
         $minute = MeetingMinute::findOrFail($minuteId);
+
+        if ($minute->status === 'approved') {
+            return response()->json([
+                'message' => 'Approved meeting minutes are read-only and cannot be edited.',
+            ], 409);
+        }
 
         if ((int) $minute->created_by !== (int) $request->user()->user_id) {
             return response()->json([
@@ -324,6 +354,12 @@ class MinuteController extends Controller
     {
         $item = ActionItem::with('minute')->findOrFail($itemId);
 
+        if ($item->minute->status === 'approved') {
+            return response()->json([
+                'message' => 'Approved meeting minutes are read-only and cannot be edited.',
+            ], 409);
+        }
+
         if ((int) $item->minute->created_by !== (int) $request->user()->user_id) {
             return response()->json([
                 'message' => 'Only the minute creator can remove action items from this minute.',
@@ -338,11 +374,34 @@ class MinuteController extends Controller
     {
         $minute = MeetingMinute::with([
             'meeting.attendees.organization',
+            'meeting.letters.recipients',
             'decisions',
         ])->findOrFail($id);
 
         // Officers may preview the minute, but editing remains limited to the creator.
-        if (
+        if ($request->user()->hasRole('external_officer')) {
+            $userId = (int) $request->user()->user_id;
+
+            $isMeetingAttendee = collect($minute->meeting->attendees ?? [])->contains(
+                fn ($attendee) => (int) $attendee->user_id === $userId
+            );
+
+            $isApprovedRecipient = collect($minute->meeting->letters ?? [])->contains(function ($letter) use ($userId) {
+                if (!in_array($letter->status, ['approved', 'dispatched'], true)) {
+                    return false;
+                }
+
+                return collect($letter->recipients ?? [])->contains(
+                    fn ($recipient) => (int) ($recipient->user_id ?? 0) === $userId
+                );
+            });
+
+            if ($minute->status !== 'approved' || (!$isMeetingAttendee && !$isApprovedRecipient)) {
+                return response()->json([
+                    'message' => 'You do not have permission to export these minutes.',
+                ], 403);
+            }
+        } elseif (
             !$request->user()->hasRole('officer')
             && !$request->user()->hasRole('dept_head')
             && !$request->user()->hasRole('deputy')
@@ -357,23 +416,15 @@ class MinuteController extends Controller
         // use the same base64-embedded Iskoola Pota font that Playwright verifies.
         $fontFace = (new \App\Services\LetterPdfService())->fontFaceCss();
 
-        $signatureDataUri = null;
-        $documentSignature = DocumentSignature::query()
-            ->where('document_type', 'minute')
-            ->where('document_id', $minute->minute_id)
-            ->latest('signed_at')
-            ->first();
+        $signatureContext = $this->resolveSignatureContext($minute);
+        $signatureDataUri = $signatureContext['signatureDataUri'];
+        $signatoryName = $signatureContext['signatoryName'];
+        $signatoryDesignation = $signatureContext['signatoryDesignation'];
+        $signatoryOffice = $signatureContext['signatoryOffice'];
+        $isDelegatedSignature = $signatureContext['isDelegatedSignature'];
+        $delegatedPrefixLine = $signatureContext['delegatedPrefixLine'];
 
-        if ($documentSignature && $documentSignature->signer) {
-            $signatureDataUri = app(SignatureManagementService::class)->dataUriForUser($documentSignature->signer);
-        }
-
-        $html = view('minutes.pdf', [
-            'minute' => $minute,
-            'meeting' => $minute->meeting,
-            'fontFace' => $fontFace,
-            'signatureDataUri' => $signatureDataUri,
-        ])->render();
+        $html = $this->renderSignedMinuteHtml($minute, $fontFace, $signatureDataUri, $signatoryName, $signatoryDesignation, $signatoryOffice, $isDelegatedSignature, $delegatedPrefixLine);
 
         $filename = 'minutes-' .
             ($minute->meeting->meeting_code ?? $minute->minute_id) .
@@ -387,6 +438,72 @@ class MinuteController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
+    }
+
+    public function renderSignedMinuteHtml(
+        MeetingMinute $minute,
+        ?string $fontFace = null,
+        ?string $signatureDataUri = null,
+        ?string $signatoryName = null,
+        ?string $signatoryDesignation = null,
+        ?string $signatoryOffice = null,
+        ?bool $isDelegatedSignature = null,
+        ?string $delegatedPrefixLine = null,
+    ): string {
+        $minute->loadMissing('meeting.attendees.organization', 'decisions');
+
+        $signatureContext = $this->resolveSignatureContext($minute);
+
+        return view('minutes.pdf', [
+            'minute' => $minute,
+            'meeting' => $minute->meeting,
+            'fontFace' => $fontFace ?? (new \App\Services\LetterPdfService())->fontFaceCss(),
+            'signatureDataUri' => $signatureDataUri ?? $signatureContext['signatureDataUri'],
+            'signatoryName' => $signatoryName ?? $signatureContext['signatoryName'],
+            'signatoryDesignation' => $signatoryDesignation ?? $signatureContext['signatoryDesignation'],
+            'signatoryOffice' => $signatoryOffice ?? $signatureContext['signatoryOffice'],
+            'isDelegatedSignature' => $isDelegatedSignature ?? $signatureContext['isDelegatedSignature'],
+            'delegatedPrefixLine' => $delegatedPrefixLine ?? $signatureContext['delegatedPrefixLine'],
+        ])->render();
+    }
+
+    private function resolveSignatureContext(MeetingMinute $minute): array
+    {
+        $signatoryName = $minute->signatory_name;
+        $signatoryDesignation = $minute->signatory_designation;
+        $signatoryOffice = 'දකුණු පළාත';
+        $signatureDataUri = null;
+        $isDelegatedSignature = false;
+        $delegatedPrefixLine = null;
+
+        $documentSignature = DocumentSignature::query()
+            ->where('document_type', 'minute')
+            ->where('document_id', $minute->minute_id)
+            ->with('signer')
+            ->latest('signed_at')
+            ->first();
+
+        if ($documentSignature && $documentSignature->signer) {
+            $signatureDataUri = app(SignatureManagementService::class)->dataUriForUser($documentSignature->signer);
+
+            if ($documentSignature->signing_type === 'DELEGATED') {
+                $isDelegatedSignature = true;
+                $delegatedPrefixLine = 'ප්‍රධාන ලේකම් වෙනුවෙන්,';
+                $signatoryName = $documentSignature->signer_name_snapshot ?: $documentSignature->signer->displayNameSinhala();
+                $signatoryDesignation = $documentSignature->signer_designation_snapshot
+                    ?: ($documentSignature->signer->designationSinhala() ?? 'නියෝජ්‍ය ප්‍රධාන ලේකම්');
+                $signatoryOffice = $documentSignature->signer_office_snapshot ?: 'දකුණු පළාත් සභාව';
+            }
+        }
+
+        return [
+            'signatureDataUri' => $signatureDataUri,
+            'signatoryName' => $signatoryName,
+            'signatoryDesignation' => $signatoryDesignation,
+            'signatoryOffice' => $signatoryOffice,
+            'isDelegatedSignature' => $isDelegatedSignature,
+            'delegatedPrefixLine' => $delegatedPrefixLine,
+        ];
     }
 
     private function convertHtmlWithLibreOffice(string $html): string

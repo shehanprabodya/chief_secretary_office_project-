@@ -1,6 +1,7 @@
 import { useAuth } from '../../context/AuthContext';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LogOut, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { navigation } from "./navigation";
 
 interface SidebarProps {
@@ -13,6 +14,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const location = useLocation();
 
   const navigationItems =
@@ -41,7 +43,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-6">
           <div className="flex items-center gap-3">
-            <span className="font-bold">MMCS</span>
+              <span className="font-bold">{t('sidebar.appName')}</span>
           </div>
           <button
             onClick={onClose}
@@ -55,7 +57,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <nav className='mt-12'>
         {navigationItems.map((item) => (
               <NavLink
-                key={item.label}
+                key={item.href}
                 to={item.href}
                 className={() => {
                   const [itemPath, itemHash = ''] = item.href.split('#');
@@ -66,13 +68,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   `flex items-center gap-3  px-4 py-3  transition-all duration-200  ${
                     isActive
                       ? 'border-r-4 border-slate-600 bg-slate-200 text-black font-bold'
-                      : 'border-r-4 border-transparent text-slate-100 font-medium hover:bg-slate-100'
+                      : 'border-r-4 border-transparent text-slate-700 font-medium hover:bg-slate-100'
                   }`
                   );
                 }}
               >
               <item.icon className="h-5 w-5" />
-              <span className="font-medium">{item.label}</span>
+              <span className="font-medium">{t(item.labelKey)}</span>
             </NavLink>
       ))}
       </nav>
@@ -81,10 +83,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="absolute bottom-0 left-0 right-0  p-6">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-800 transition-colors"
+            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100 transition-colors"
           >
             <LogOut className="h-5 w-5" />
-            <span className="font-medium">Logout</span>
+            <span className="font-medium">{t('sidebar.logout')}</span>
           </button>
         </div>
       </div>
