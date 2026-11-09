@@ -10,6 +10,7 @@ use App\Models\Meeting;
 use App\Models\MeetingMinute;
 use App\Models\MinuteDecision;
 use App\Services\SignatureManagementService;
+use App\Services\DocumentDistributionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -18,6 +19,7 @@ use Throwable;
 
 class MinuteController extends Controller
 {
+    public function __construct(private readonly DocumentDistributionService $distributionService) {}
     public function index(Request $request): JsonResponse
     {
         $minutes = MeetingMinute::with('meeting')
@@ -438,6 +440,29 @@ class MinuteController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
+    }
+
+    public function emailRecipients(Request $request, int $id): JsonResponse
+    {
+        $minute = MeetingMinute::with('meeting')->findOrFail($id);
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) return response()->json(['message' => 'Only the minute creator can distribute these minutes.'], 403);
+        return response()->json(['recipients' => $this->distributionService->recipients('minute', $minute)]);
+    }
+
+    public function queueEmailDistribution(Request $request, int $id): JsonResponse
+    {
+        $minute = MeetingMinute::with('meeting')->findOrFail($id);
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) return response()->json(['message' => 'Only the minute creator can distribute these minutes.'], 403);
+        $data = $request->validate(['recipient_keys' => ['required', 'array', 'min:1'], 'recipient_keys.*' => ['string', 'max:160']]);
+        $summary = $this->distributionService->queue('minute', $minute, $request->user(), $data['recipient_keys']);
+        return response()->json(['message' => 'Approved minutes email distribution has been queued.', 'summary' => $summary], 202);
+    }
+
+    public function emailDistributionHistory(Request $request, int $id): JsonResponse
+    {
+        $minute = MeetingMinute::findOrFail($id);
+        if ((int) $minute->created_by !== (int) $request->user()->user_id) return response()->json(['message' => 'Only the minute creator can view this distribution history.'], 403);
+        return response()->json($this->distributionService->history('minute', $minute->minute_id));
     }
 
     public function renderSignedMinuteHtml(

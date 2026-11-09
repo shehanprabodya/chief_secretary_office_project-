@@ -18,6 +18,7 @@ export interface AuthUser {
   designation_si?: string | null;
     status: 'ACTIVE' | 'INACTIVE';
     preferred_locale?: 'en' | 'si';
+    must_change_password?: boolean;
 }
 
 export interface AuthResponse {

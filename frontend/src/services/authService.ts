@@ -59,38 +59,4 @@ export const authService = {
     await api.post('/auth/change-password', payload);
   },
 
-  async validateInvitation(invitationId: number, token: string): Promise<{
-    invitation: {
-      id: number;
-      expires_at: string;
-      locale: 'en' | 'si';
-      user: {
-        full_name: string;
-        email: string;
-        username: string;
-        role: string | null;
-        organization: string | null;
-      };
-    };
-  }> {
-    const { data } = await api.get(`/auth/invitations/${invitationId}/validate`, {
-      params: { token },
-    });
-    return data;
-  },
-
-  async acceptInvitation(payload: {
-    invitationId: number;
-    token: string;
-    password: string;
-    password_confirmation: string;
-    locale: 'en' | 'si';
-  }): Promise<void> {
-    await api.post(`/auth/invitations/${payload.invitationId}/accept`, {
-      token: payload.token,
-      password: payload.password,
-      password_confirmation: payload.password_confirmation,
-      locale: payload.locale,
-    });
-  },
 };

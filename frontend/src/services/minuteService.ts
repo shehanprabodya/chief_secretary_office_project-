@@ -50,5 +50,6 @@ export const minuteService = {
       return response.data;
     }
   },
+  async emailRecipients(minuteId: number): Promise<any[]> { const { data } = await api.get(`/officer/minutes/${minuteId}/email-recipients`); return data.recipients; },
+  async queueEmailDistribution(minuteId: number, recipient_keys: string[]): Promise<any> { const { data } = await api.post(`/officer/minutes/${minuteId}/email-distributions`, { recipient_keys }); return data; },
 };
-

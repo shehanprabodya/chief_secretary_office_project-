@@ -34,6 +34,7 @@ class User extends Authenticatable
         'status',
         'preferred_locale',
         'invitation_pending',
+        'must_change_password',
         'invited_at',
         'password_changed_at',
         'last_login_at',
@@ -43,6 +44,7 @@ class User extends Authenticatable
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'invitation_pending' => 'boolean',
+        'must_change_password' => 'boolean',
         'invited_at' => 'datetime',
         'password_changed_at' => 'datetime',
         'last_login_at' => 'datetime',
@@ -84,11 +86,6 @@ class User extends Authenticatable
     public function additionalAttendanceEntries(): HasMany
     {
         return $this->hasMany(AdditionalAttendee::class, 'user_id', 'user_id');
-    }
-
-    public function invitations(): HasMany
-    {
-        return $this->hasMany(UserInvitation::class, 'user_id', 'user_id');
     }
 
     public function addedAttendanceEntries(): HasMany

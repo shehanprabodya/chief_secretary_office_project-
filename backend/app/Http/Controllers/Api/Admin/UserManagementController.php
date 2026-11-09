@@ -3,27 +3,23 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Mail\PasswordChangedMail;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\UserInvitation;
-use App\Services\InvitationService;
+use App\Services\TemporaryCredentialService;
 use App\Services\SecurityAuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
-use Illuminate\Support\Str;
 
 class UserManagementController extends Controller
 {
     public function __construct(
-        private readonly InvitationService $invitationService,
+        private readonly TemporaryCredentialService $temporaryCredentialService,
         private readonly SecurityAuditService $securityAuditService,
     ) {
     }
@@ -204,11 +200,9 @@ class UserManagementController extends Controller
             'full_name_si' => 'nullable|string|max:255',
             'email' => 'required|email|unique:users,email',
             'username' => 'required|string|max:100|unique:users,username',
-            'password' => ['nullable', 'string', 'min:12', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
             'role_id' => 'required|exists:roles,role_id',
             'organization_id' => 'nullable|exists:organizations,organization_id',
             'status' => 'nullable|in:ACTIVE,INACTIVE',
-            'send_invitation' => 'nullable|boolean',
             'locale' => 'nullable|in:en,si',
         ]);
 
@@ -219,47 +213,51 @@ class UserManagementController extends Controller
             ], 422);
         }
 
-        $sendInvitation = $request->boolean('send_invitation', true);
-        $rawPassword = (string) ($request->input('password') ?? Str::random(40));
-
-        $user = DB::transaction(function () use ($request, $rawPassword, $sendInvitation) {
+        $temporaryPassword = $this->temporaryCredentialService->generate();
+        $user = DB::transaction(function () use ($request, $temporaryPassword) {
             $user = User::create([
                 'full_name' => $request->full_name,
                 'email' => $request->email,
                 'username' => $request->username,
-                'password_hash' => Hash::make($rawPassword),
+                'password_hash' => Hash::make($temporaryPassword),
                 'designation' => $request->designation,
                 'designation_si' => $request->designation_si,
                 'full_name_si' => $request->full_name_si,
                 'role_id' => $request->role_id,
                 'organization_id' => $request->organization_id,
                 'status' => $request->status ?? 'ACTIVE',
-                'invitation_pending' => $sendInvitation,
-                'invited_at' => $sendInvitation ? now() : null,
+                'invitation_pending' => false,
+                'must_change_password' => true,
+                'invited_at' => null,
                 'preferred_locale' => in_array((string) $request->input('locale'), ['en', 'si'], true)
                     ? (string) $request->input('locale')
                     : 'en',
             ]);
-
-            if ($sendInvitation) {
-                /** @var User $admin */
-                $admin = $request->user();
-                $this->invitationService->createAndSend($user, $admin, $user->preferred_locale);
-            }
 
             $this->securityAuditService->log(
                 eventType: 'admin.user.created',
                 actor: $request->user(),
                 target: $user,
                 request: $request,
-                metadata: ['invitation_sent' => $sendInvitation]
+                metadata: ['temporary_credentials_generated' => true]
             );
 
             return $user;
         });
 
+        try {
+            $this->temporaryCredentialService->send($user, $temporaryPassword, $user->preferred_locale ?? 'en');
+            $message = 'User created successfully. Account credentials email has been sent successfully.';
+            $emailStatus = 'sent';
+        } catch (\Throwable $exception) {
+            report($exception);
+            $message = 'User created successfully, but unable to send the account credentials email. Please use Resend Account Email.';
+            $emailStatus = 'failed';
+        }
+
         return response()->json([
-            'message' => 'User created successfully',
+            'message' => $message,
+            'email_status' => $emailStatus,
             'user' => $user->load('role', 'organization'),
         ], 201);
     }
@@ -304,7 +302,7 @@ class UserManagementController extends Controller
     public function resetPassword(Request $request, int $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'new_password' => ['required', 'confirmed', 'string', 'min:12', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
+            'new_password' => ['nullable', 'confirmed', 'string', 'min:12', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
         ]);
 
         if ($validator->fails()) {
@@ -318,18 +316,11 @@ class UserManagementController extends Controller
         $admin = $request->user();
         $target = User::findOrFail($id);
 
-        DB::transaction(function () use ($request, $target, $admin) {
-            $target->update([
-                'password_hash' => Hash::make((string) $request->input('new_password')),
-                'password_changed_at' => now(),
-                'invitation_pending' => false,
-            ]);
-
+        $temporaryPassword = (string) $request->input('new_password');
+        if ($temporaryPassword === '') $temporaryPassword = $this->temporaryCredentialService->generate();
+        DB::transaction(function () use ($request, $target, $admin, $temporaryPassword) {
+            $target->update(['password_hash' => Hash::make($temporaryPassword), 'password_changed_at' => null, 'must_change_password' => true, 'invitation_pending' => false]);
             $target->tokens()->delete();
-
-            if (!app()->runningUnitTests()) {
-                Mail::to($target->email)->send(new PasswordChangedMail($target, $target->preferred_locale ?? 'en'));
-            }
 
             $this->securityAuditService->log(
                 eventType: 'admin.user.password_reset',
@@ -340,46 +331,37 @@ class UserManagementController extends Controller
             );
         });
 
-        return response()->json(['message' => 'Password reset successfully']);
+        try {
+            $this->temporaryCredentialService->send($target->fresh(), $temporaryPassword, $target->preferred_locale ?? 'en');
+            return response()->json(['message' => 'Password reset successfully. Notification email sent to the officer.', 'email_status' => 'sent']);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['message' => 'Password reset successfully, but the notification email could not be sent. Use Resend Account Email to retry.', 'email_status' => 'failed'], 202);
+        }
     }
 
-    public function resendInvitation(Request $request, int $id): JsonResponse
+    public function resendCredentials(Request $request, int $id): JsonResponse
     {
-        $user = User::with('invitations')->findOrFail($id);
-
-        /** @var UserInvitation|null $latest */
-        $latest = $user->invitations()
-            ->whereNull('accepted_at')
-            ->latest('created_at')
-            ->first();
-
-        if ($latest === null) {
-            return response()->json([
-                'message' => 'No pending invitation found for this user.',
-            ], 404);
-        }
-
+        $user = User::findOrFail($id);
         /** @var User $admin */
         $admin = $request->user();
-        $newInvitation = $this->invitationService->resend($latest, $admin);
+        $temporaryPassword = DB::transaction(fn () => $this->temporaryCredentialService->rotate($user, $user->preferred_locale ?? 'en'));
 
         $this->securityAuditService->log(
-            eventType: 'admin.user.invitation_resent',
+            eventType: 'admin.user.credentials_resent',
             actor: $admin,
             target: $user,
             request: $request,
-            metadata: ['invitation_id' => $newInvitation->invitation_id]
+            metadata: ['temporary_credentials_rotated' => true]
         );
 
-        return response()->json([
-            'message' => 'Invitation sent successfully.',
-            'invitation' => [
-                'id' => $newInvitation->invitation_id,
-                'expires_at' => $newInvitation->expires_at,
-                'email' => $newInvitation->email,
-                'resent_count' => $newInvitation->resent_count,
-            ],
-        ]);
+        try {
+            $this->temporaryCredentialService->send($user->fresh(), $temporaryPassword, $user->preferred_locale ?? 'en');
+            return response()->json(['message' => 'Account credentials email has been sent successfully.', 'email_status' => 'sent']);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['message' => 'Unable to send the account credentials email. Please try again.', 'email_status' => 'failed'], 500);
+        }
     }
 
     /**

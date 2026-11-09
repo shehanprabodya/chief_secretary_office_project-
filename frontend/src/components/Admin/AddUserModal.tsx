@@ -22,8 +22,6 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
     full_name_si: editUser?.full_name_si ?? '',
     email: editUser?.email ?? '',
     username: editUser?.username ?? '',
-    password: '',
-    send_invitation: true,
     locale: 'en',
     role_id: editUser?.role.role_id ?? 0,
     designation: editUser?.designation ?? '',
@@ -66,17 +64,12 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
       setError('Please fill in all required fields');
       return;
     }
-    if (!editUser && form.send_invitation === false && !(form.password && form.password.length >= 12)) {
-      setError('Provide a strong temporary password (minimum 12 characters) when invitation is disabled.');
-      return;
-    }
     setIsSaving(true);
     setError(null);
 
     try {
       if (editUser) {
         const updatePayload: Partial<CreateUserPayload> = { ...form };
-        delete updatePayload.password;
         await adminService.updateUser(editUser.user_id, updatePayload);
       } else {
         await adminService.createUser(form);
@@ -170,30 +163,10 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
 
             {!editUser && (
               <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">Account Setup Method</label>
                 <div className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
-                  <label className="flex items-center gap-2 text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.send_invitation)}
-                      onChange={(e) => handleChange('send_invitation', e.target.checked)}
-                    />
-                    Send secure invitation email (recommended)
-                  </label>
-                  {!form.send_invitation && (
-                    <div className="mt-3">
-                      <label className="mb-1.5 block text-sm font-medium text-slate-700">Temporary Password *</label>
-                      <input
-                        type="password"
-                        value={form.password ?? ''}
-                        onChange={(e) => handleChange('password', e.target.value)}
-                        placeholder="Strong temporary password"
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                      />
-                    </div>
-                  )}
+                  <p className="text-slate-700">A secure 8-character temporary password will be generated and emailed to this user. They must change it on first sign-in.</p>
                   <div className="mt-3">
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Invitation Language</label>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Email Language</label>
                     <select
                       value={form.locale ?? 'en'}
                       onChange={(e) => handleChange('locale', e.target.value as 'en' | 'si')}
