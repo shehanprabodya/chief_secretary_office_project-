@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\PasswordChangedMail;
 use App\Models\User;
-use App\Services\InvitationService;
 use App\Services\SecurityAuditService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +17,6 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly SecurityAuditService $securityAuditService,
-        private readonly InvitationService $invitationService,
     ) {
     }
 
@@ -84,6 +82,7 @@ class AuthController extends Controller
         return response()->json([
             'user' => $this->formatUser($user),
             'token' => $token,
+            'must_change_password' => (bool) $user->must_change_password,
         ]);
     }
 
@@ -187,6 +186,7 @@ class AuthController extends Controller
                         'password_hash' => Hash::make($password),
                         'password_changed_at' => now(),
                         'invitation_pending' => false,
+                        'must_change_password' => false,
                     ])->save();
 
                     $user->tokens()->delete();
@@ -260,9 +260,16 @@ class AuthController extends Controller
             $user->update([
                 'password_hash' => Hash::make((string) $request->input('password')),
                 'password_changed_at' => now(),
+                'must_change_password' => false,
+                'invitation_pending' => false,
             ]);
 
-            $user->tokens()->delete();
+            // Keep this token alive so the user can continue after a forced change;
+            // all other active Sanctum sessions are revoked.
+            $currentTokenId = $user->currentAccessToken()?->id;
+            $tokens = $user->tokens();
+            if ($currentTokenId) $tokens->where('id', '!=', $currentTokenId);
+            $tokens->delete();
 
             $this->securityAuditService->log(
                 eventType: 'auth.password.changed',
@@ -303,101 +310,6 @@ class AuthController extends Controller
         return response()->json(['message' => 'Language preference updated.']);
     }
 
-    public function validateInvitation(Request $request, int $invitationId): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'token' => 'required|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            $invitation = $this->invitationService->validateInvitation($invitationId, (string) $request->input('token'));
-        } catch (\Throwable) {
-            return response()->json(['message' => 'Invitation is invalid or expired.'], 422);
-        }
-
-        return response()->json([
-            'invitation' => [
-                'id' => $invitation->invitation_id,
-                'expires_at' => $invitation->expires_at,
-                'locale' => $invitation->locale,
-                'user' => [
-                    'full_name' => $invitation->user->full_name,
-                    'email' => $invitation->user->email,
-                    'username' => $invitation->user->username,
-                    'role' => $invitation->user->role?->role_name,
-                    'organization' => $invitation->user->organization?->organization_name,
-                ],
-            ],
-        ]);
-    }
-
-    public function acceptInvitation(Request $request, int $invitationId): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'token' => 'required|string',
-            'password' => ['required', 'confirmed', 'string', 'min:12', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
-            'locale' => 'nullable|in:en,si',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            $invitation = $this->invitationService->validateInvitation($invitationId, (string) $request->input('token'));
-        } catch (\Throwable) {
-            return response()->json(['message' => 'Invitation is invalid or expired.'], 422);
-        }
-
-        DB::transaction(function () use ($invitation, $request) {
-            $user = $invitation->user;
-            $locale = in_array((string) $request->input('locale'), ['en', 'si'], true)
-                ? (string) $request->input('locale')
-                : $invitation->locale;
-
-            $user->update([
-                'password_hash' => Hash::make((string) $request->input('password')),
-                'invitation_pending' => false,
-                'password_changed_at' => now(),
-                'preferred_locale' => $locale,
-            ]);
-
-            $invitation->update([
-                'accepted_at' => now(),
-                'invalidated_at' => null,
-            ]);
-
-            $user->tokens()->delete();
-
-            if (!app()->runningUnitTests()) {
-                Mail::to($user->email)->send(new PasswordChangedMail($user, $locale));
-            }
-
-            $this->securityAuditService->log(
-                eventType: 'auth.invitation.accepted',
-                actor: $user,
-                target: $user,
-                request: $request,
-                severity: 'warning',
-                metadata: ['invitation_id' => $invitation->invitation_id]
-            );
-        });
-
-        return response()->json([
-            'message' => 'Invitation accepted. You can now sign in.',
-        ]);
-    }
-
     /**
      * Consistent response shape — frontend routes purely on `role` string.
      */
@@ -415,6 +327,7 @@ class AuthController extends Controller
             'designation_si'   => $user->designation_si,
             'status'        => $user->status,
             'preferred_locale' => $user->preferred_locale ?? 'en',
+            'must_change_password' => (bool) $user->must_change_password,
         ];
     }
 }

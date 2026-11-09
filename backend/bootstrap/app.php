@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
         'role' => \App\Http\Middleware\CheckRole::class,
         'admin' => \App\Http\Middleware\RequireAdmin::class,
+        'password.change.required' => \App\Http\Middleware\RequirePasswordChange::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

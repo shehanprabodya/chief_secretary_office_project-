@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 @endif
-@if ($preview)
+@if ($preview ?? false)
     <div class="recipients" style="margin-bottom: 0.5cm;">
         @foreach ($recipientLines as $recipientLine)
             <span>{{ $recipientLine }}</span>@if (! $loop->last)<br>@endif

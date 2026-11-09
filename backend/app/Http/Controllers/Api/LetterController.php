@@ -17,12 +17,11 @@ use Illuminate\Support\Facades\Validator;
 use Symfony\Component\Process\Process;
 use Throwable;
 use ZipArchive;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\MeetingLetterMail;
+use App\Services\DocumentDistributionService;
 
 class LetterController extends Controller
 {
-    public function __construct(private readonly LetterPdfService $letterPdfService)
+    public function __construct(private readonly LetterPdfService $letterPdfService, private readonly DocumentDistributionService $distributionService)
     {
     }
 
@@ -457,66 +456,28 @@ class LetterController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    /**
-     * Send the meeting letter PDF to recipients via email and mark dispatched.
-     */
-    public function send(Request $request, int $id): JsonResponse
+    /** Recipient data comes only from relationships already attached to this letter/meeting. */
+    public function emailRecipients(Request $request, int $id): JsonResponse
     {
-        $letter = Letter::with('recipients.user', 'recipients.organization', 'subject', 'creator')
-            ->findOrFail($id);
+        $letter = Letter::with('meeting')->findOrFail($id);
+        if (!$this->canExportLetter($request, $letter)) return response()->json(['message' => 'You do not have permission to distribute this letter.'], 403);
+        return response()->json(['recipients' => $this->distributionService->recipients('letter', $letter)]);
+    }
 
-        if (!$this->canExportLetter($request, $letter)) {
-            return response()->json(['message' => 'You do not have permission to send this letter.'], 403);
-        }
+    public function queueEmailDistribution(Request $request, int $id): JsonResponse
+    {
+        $letter = Letter::with('meeting')->findOrFail($id);
+        if (!$this->canExportLetter($request, $letter)) return response()->json(['message' => 'You do not have permission to distribute this letter.'], 403);
+        $data = $request->validate(['recipient_keys' => ['required', 'array', 'min:1'], 'recipient_keys.*' => ['string', 'max:160']]);
+        $summary = $this->distributionService->queue('letter', $letter, $request->user(), $data['recipient_keys']);
+        return response()->json(['message' => 'Official letter email distribution has been queued.', 'summary' => $summary], 202);
+    }
 
-        if (empty($letter->content)) {
-            return response()->json(['message' => 'Letter content is empty. Please write the letter body first.'], 422);
-        }
-
-        $filename = 'letter-' . $letter->letter_id . '-' . now()->format('Ymd') . '.pdf';
-        $emails = $letter->recipients->map(fn($r) => $r->user?->email)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        if (empty($emails)) {
-            return response()->json(['message' => 'No recipient email addresses found.'], 422);
-        }
-
-        try {
-            $html = $this->buildLetterHtml($letter, true);
-            $pdf = $this->letterPdfService->generate($html);
-        } catch (Throwable $exception) {
-            report($exception);
-
-            return response()->json([
-                'message' => 'The letter PDF could not be rendered. Check the server Playwright and Chromium installation.',
-            ], 503);
-        }
-
-        try {
-            $pdfPath = tempnam(sys_get_temp_dir(), 'letter-pdf-');
-            if ($pdfPath === false || file_put_contents($pdfPath, $pdf) === false) {
-                throw new \RuntimeException('Could not create the temporary email attachment.');
-            }
-            Mail::to($emails)->send(new MeetingLetterMail($letter, $pdfPath, $filename));
-        } catch (Throwable $exception) {
-            report($exception);
-
-            return response()->json([
-                'message' => 'The letter email could not be sent because mail delivery failed.',
-            ], 500);
-        } finally {
-            if (isset($pdfPath) && is_file($pdfPath)) {
-                @unlink($pdfPath);
-            }
-        }
-
-        // Mark as dispatched
-        $letter->update(['status' => 'dispatched']);
-
-        return response()->json(['message' => 'Letter sent to recipients', 'emails' => $emails]);
+    public function emailDistributionHistory(Request $request, int $id): JsonResponse
+    {
+        $letter = Letter::findOrFail($id);
+        if (!$this->canExportLetter($request, $letter)) return response()->json(['message' => 'You do not have permission to view this distribution history.'], 403);
+        return response()->json($this->distributionService->history('letter', $letter->letter_id));
     }
 
     private function convertHtmlWithLibreOffice(string $html, string $format): string

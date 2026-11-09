@@ -124,8 +124,9 @@ export const letterService = {
     return data.subjects;
   },
 
-  async send(id: number): Promise<any> {
-    const { data } = await api.post(`/officer/letters/${id}/send`);
+  async emailRecipients(id: number): Promise<any[]> { const { data } = await api.get(`/officer/letters/${id}/email-recipients`); return data.recipients; },
+  async queueEmailDistribution(id: number, recipient_keys: string[]): Promise<any> {
+    const { data } = await api.post(`/officer/letters/${id}/email-distributions`, { recipient_keys });
     return data;
   },
 };

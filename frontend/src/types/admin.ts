@@ -55,8 +55,6 @@ export interface CreateUserPayload {
   full_name_si?: string;
   email: string;
   username: string;
-  password?: string;
-  send_invitation?: boolean;
   locale?: 'en' | 'si';
   role_id: number;
   designation?: string;

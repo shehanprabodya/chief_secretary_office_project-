@@ -2,9 +2,11 @@ import { useState } from 'react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 export default function ChangePasswordPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -34,6 +36,7 @@ export default function ChangePasswordPage() {
       setCurrentPassword('');
       setPassword('');
       setPasswordConfirmation('');
+      if (user?.must_change_password) window.location.assign('/');
     } catch {
       setError('Unable to change password. Please verify your current password.');
     } finally {

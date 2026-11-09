@@ -11,6 +11,7 @@ import RecipientTagInput from '../components/Letters/RecipientTagInput';
 import PreviewModal from '../components/Letters/PreviewModal';
 import ActionMessage, { type ActionMessageType } from '../components/shared/ActionMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
+import RecipientSelectionModal from '../components/shared/RecipientSelectionModal';
 import { letterService } from '../services/letterService';
 import { approvalService } from '../services/approvalService';
 import { useAuth } from '../context/AuthContext';
@@ -134,7 +135,7 @@ export default function GenerateLetterPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingApproval, setIsSendingApproval] = useState(false);
-  const [isSendingMail, setIsSendingMail] = useState(false);
+  const [showRecipientModal, setShowRecipientModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [letterStatus, setLetterStatus] = useState<LetterStatus>('draft');
@@ -427,22 +428,7 @@ export default function GenerateLetterPage() {
   const handleSendMail = async () => {
     if (!canEditLetter) return;
     if (!letterId) { setActionMessage({ type: 'info', text: 'Please save the draft before sending the letter.' }); return; }
-    setIsSendingMail(true);
-    setActionMessage({ type: 'info', text: 'Sending the meeting letter to recipients. Please wait…' });
-    try {
-      const saved = await letterService.saveDraft(buildPayload());
-      setLetterId(saved.letter_id);
-      setLetterStatus(saved.status);
-
-      const res = await letterService.send(saved.letter_id);
-      setActionMessage({ type: 'success', text: String(res.message ?? 'Letter sent to recipients.') });
-      setLetterStatus('dispatched');
-    } catch (err: unknown) {
-      console.error(err);
-      setActionMessage({ type: 'error', text: getErrorMessage(err, 'Failed to send letter') });
-    } finally {
-      setIsSendingMail(false);
-    }
+    setShowRecipientModal(true);
   };
 
   const handleSendForApproval = async () => {
@@ -771,10 +757,9 @@ export default function GenerateLetterPage() {
                     {letterStatus === 'approved' && isApprovedWithoutChanges ? (
                       <button
                         onClick={handleSendMail}
-                        disabled={isSendingMail}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                       >
-                        <Send className="h-4 w-4" /> {isSendingMail ? 'Sending...' : 'Send Mail'}
+                        <Send className="h-4 w-4" /> Send Mail
                       </button>
                     ) : (
                       <button
@@ -843,6 +828,15 @@ export default function GenerateLetterPage() {
           }}
           allowExports={canEditLetter}
           onClose={() => setShowPreview(false)}
+        />
+      )}
+      {showRecipientModal && letterId && (
+        <RecipientSelectionModal
+          title="Send Official Meeting Letter"
+          load={() => letterService.emailRecipients(letterId)}
+          send={(keys) => letterService.queueEmailDistribution(letterId, keys)}
+          onClose={() => setShowRecipientModal(false)}
+          onComplete={(text) => { setShowRecipientModal(false); setActionMessage({ type: 'success', text }); }}
         />
       )}
       <ConfirmDialog

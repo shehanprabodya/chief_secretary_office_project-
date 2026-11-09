@@ -26,7 +26,6 @@ import BackupManagementPage from './pages/BackupManagementPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
-import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 
 export default function App() {
@@ -38,7 +37,6 @@ export default function App() {
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/dashboard/admin" element={<AdminDashboard />} />

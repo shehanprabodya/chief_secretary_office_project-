@@ -9,6 +9,7 @@ import { approvalService } from '../services/approvalService';
 import { meetingService } from '../services/meetingService';
 import type { MeetingMinute, MinuteDecision } from '../types/minute';
 import type { Meeting } from '../types/meeting';
+import RecipientSelectionModal from '../components/shared/RecipientSelectionModal';
 
 type DecisionRow = Pick<MinuteDecision, 'decision_order' | 'topic' | 'decision_text' | 'responsibility'> & { rowKey: string; decision_id?: number };
 
@@ -73,6 +74,8 @@ export default function CreateMinutesPage() {
   const [meetingLoadError, setMeetingLoadError] = useState('');
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
+  const [showRecipientModal, setShowRecipientModal] = useState(false);
+  const [distributionMessage, setDistributionMessage] = useState('');
 
   useEffect(() => {
     decisionRowsRef.current = decisionRows;
@@ -521,10 +524,16 @@ export default function CreateMinutesPage() {
               <Send className="h-4 w-4" />
               {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
             </button>
+            {minute?.status === 'approved' && (
+              <button onClick={() => setShowRecipientModal(true)} className="inline-flex items-center gap-2 rounded-lg border border-blue-700 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                <Send className="h-4 w-4" /> Send Approved Minutes
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="space-y-6">
+      <div className="space-y-6">
+        {distributionMessage && <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{distributionMessage}</p>}
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr_1fr]">
                 <div className="xl:col-span-2">
@@ -645,6 +654,15 @@ export default function CreateMinutesPage() {
             </div>
         </div>
       </div>
+      {showRecipientModal && minute && (
+        <RecipientSelectionModal
+          title="Send Approved Meeting Minutes"
+          load={() => minuteService.emailRecipients(minute.minute_id)}
+          send={(keys) => minuteService.queueEmailDistribution(minute.minute_id, keys)}
+          onClose={() => setShowRecipientModal(false)}
+          onComplete={(text) => { setShowRecipientModal(false); setDistributionMessage(text); }}
+        />
+      )}
     </DashboardLayout>
   );
 }

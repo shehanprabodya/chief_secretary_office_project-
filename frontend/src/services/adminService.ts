@@ -52,15 +52,16 @@ export const adminService = {
     return data.user;
   },
 
-  async resetPassword(id: number, new_password: string): Promise<void> {
-    await api.post(`/admin/users/${id}/reset-password`, {
+  async resetPassword(id: number, new_password?: string): Promise<{ message: string; email_status: 'sent' | 'failed' }> {
+    const { data } = await api.post(`/admin/users/${id}/reset-password`, new_password ? {
       new_password,
       new_password_confirmation: new_password,
-    });
+    } : {});
+    return data;
   },
 
-  async resendInvitation(id: number): Promise<void> {
-    await api.post(`/admin/users/${id}/resend-invitation`);
+  async resendCredentials(id: number): Promise<void> {
+    await api.post(`/admin/users/${id}/resend-credentials`);
   },
 
   async toggleStatus(id: number): Promise<{ status: 'ACTIVE' | 'INACTIVE' }> {

@@ -20,10 +20,8 @@ use App\Http\Controllers\Api\Admin\SubjectManagementController;
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-recovery');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-recovery');
-Route::get('/auth/invitations/{invitationId}/validate', [AuthController::class, 'validateInvitation'])->middleware('throttle:password-recovery');
-Route::post('/auth/invitations/{invitationId}/accept', [AuthController::class, 'acceptInvitation'])->middleware('throttle:password-recovery');
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'password.change.required'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword'])->middleware('throttle:password-recovery');
@@ -95,7 +93,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/{id}', [UserManagementController::class, 'update']);
 
             Route::post('/{id}/reset-password', [UserManagementController::class, 'resetPassword']);
-            Route::post('/{id}/resend-invitation', [UserManagementController::class, 'resendInvitation']);
+            Route::post('/{id}/resend-credentials', [UserManagementController::class, 'resendCredentials']);
 
             Route::patch('/{id}/toggle-status', [UserManagementController::class, 'toggleStatus']);
 
@@ -142,7 +140,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/letters/{id}/preview',      [LetterController::class, 'preview']);
         Route::get('/letters/{id}/download/pdf', [LetterController::class, 'downloadPdf']);
         Route::get('/letters/{id}/download/docx', [LetterController::class, 'downloadDocx']);
-        Route::post('/letters/{id}/send', [LetterController::class, 'send']);
+        Route::get('/letters/{id}/email-recipients', [LetterController::class, 'emailRecipients']);
+        Route::post('/letters/{id}/email-distributions', [LetterController::class, 'queueEmailDistribution']);
+        Route::get('/letters/{id}/email-distributions', [LetterController::class, 'emailDistributionHistory']);
         Route::get('/letter-recipients/orgs',    [LetterController::class, 'getOrganizations']);
         Route::get('/subjects',                  [LetterController::class, 'getSubjects']);
         
@@ -176,6 +176,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/minutes/{minuteId}/action-items', [MinuteController::class, 'addActionItem']);
         Route::delete('/action-items/{itemId}', [MinuteController::class, 'deleteActionItem']);
         Route::get('/minutes/{id}/download/pdf',[MinuteController::class, 'downloadPdf']);
+        Route::get('/minutes/{id}/email-recipients', [MinuteController::class, 'emailRecipients']);
+        Route::post('/minutes/{id}/email-distributions', [MinuteController::class, 'queueEmailDistribution']);
+        Route::get('/minutes/{id}/email-distributions', [MinuteController::class, 'emailDistributionHistory']);
 
     });
 

@@ -15,17 +15,19 @@ export default function ResetPasswordModal({ user, onClose }: ResetPasswordModal
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [resultMessage, setResultMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 12) { setError('Minimum 12 characters'); return; }
-    if (password !== confirm) { setError('Passwords do not match'); return; }
+    if (password && password.length < 12) { setError('A manually entered password must be at least 12 characters.'); return; }
+    if (password && password !== confirm) { setError('Passwords do not match'); return; }
 
     setIsSaving(true);
     setError(null);
     try {
-      await adminService.resetPassword(user.user_id, password);
+      const result = await adminService.resetPassword(user.user_id, password || undefined);
       setSuccess(true);
+      setResultMessage(result.message);
       setTimeout(onClose, 1200);
     } catch {
       setError('Failed to reset password');
@@ -47,7 +49,7 @@ export default function ResetPasswordModal({ user, onClose }: ResetPasswordModal
 
         {success ? (
           <div className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
-            ✓ Password reset successfully
+            ✓ {resultMessage || 'Password reset successfully'}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-6 mt-4">
@@ -57,20 +59,21 @@ export default function ResetPasswordModal({ user, onClose }: ResetPasswordModal
                 type={showPw ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="New password"
+                placeholder="Optional: enter a strong password"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-10 text-sm focus:border-blue-500 focus:outline-none"
               />
               <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-3 text-slate-400">
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <input
+              <input
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Confirm new password"
+                placeholder="Confirm manually entered password"
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
-            />
+              />
+            <p className="-mt-4 text-xs text-slate-500">Leave both fields blank to generate and email a new temporary password. The officer must change it on next sign-in.</p>
             <div className="flex justify-end gap-3">
               <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
                 Cancel

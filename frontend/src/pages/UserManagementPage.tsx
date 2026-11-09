@@ -164,8 +164,8 @@ export default function UserManagementPage() {
     setEditOrganization(null);
   };
 
-  const handleResendInvitation = async (userId: number) => {
-    await adminService.resendInvitation(userId);
+  const handleResendCredentials = async (userId: number) => {
+    await adminService.resendCredentials(userId);
   };
 
   const handleDeleteOrganization = async () => {
@@ -327,11 +327,10 @@ export default function UserManagementPage() {
                             >
                               <RotateCcw className="h-4 w-4" />
                             </button>
-                            {/* Resend invitation */}
                             <button
-                              onClick={() => void handleResendInvitation(u.user_id)}
+                              onClick={() => void handleResendCredentials(u.user_id)}
                               className="rounded-lg p-1.5 text-indigo-500 hover:bg-indigo-50"
-                              title="Resend invitation"
+                              title="Resend account credentials"
                             >
                               <Mail className="h-4 w-4" />
                             </button>
