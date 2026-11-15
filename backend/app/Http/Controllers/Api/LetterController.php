@@ -834,13 +834,21 @@ class LetterController extends Controller
     /**
      * Build formatted letter HTML — the core generation logic.
      * Matches the official Sri Lanka government letter format.
+     * public function renderSignedLetterHtml(Letter $letter, bool $standalone = true, bool $preview = false): string
+      *  {
+       **}
      */
-    public function renderSignedLetterHtml(Letter $letter, bool $standalone = true, bool $preview = false): string
-    {
-        return $this->buildLetterHtml($letter, $standalone, $preview);
-    }
+    public function renderSignedLetterHtml(Letter $letter,bool $standalone = true,bool $preview = false,bool $emailLetterhead = false): string {
+            return $this->buildLetterHtml(
+                $letter,
+                $standalone,
+                $preview,
+                $emailLetterhead
+            );
+        }
+    
 
-    private function buildLetterHtml(Letter $letter, bool $standalone = false, bool $preview = false): string
+    private function buildLetterHtml(Letter $letter,bool $standalone = false,bool $preview = false,bool $emailLetterhead = false ): string
     {
         $date = $letter->signature_date
             ? \Carbon\Carbon::parse($letter->signature_date)->format('Y.m.d')
@@ -910,9 +918,43 @@ class LetterController extends Controller
 
         $fontFace = $this->letterPdfService->fontFaceCss();
 
+        $yourRef = $letter->your_ref ?? '';
+
+        $emailHeaderDataUri = null;
+        $emailFooterDataUri = null;
+
+        if ($emailLetterhead) {
+            $letterheadDirectory = base_path('../frontend/public/letterhead');
+
+            $headerPath = $letterheadDirectory . '/letter_Header.png';
+            $footerPath = $letterheadDirectory . '/letter_footer.png';
+
+            foreach ([$headerPath, $footerPath] as $imagePath) {
+                if (!is_file($imagePath) || !is_readable($imagePath)) {
+                    throw new \RuntimeException(
+                        'Required official letterhead image is missing: ' . basename($imagePath)
+                    );
+                }
+            }
+
+            $headerContents = file_get_contents($headerPath);
+            $footerContents = file_get_contents($footerPath);
+
+            if ($headerContents === false || $footerContents === false) {
+                throw new \RuntimeException('Unable to read official letterhead images.');
+            }
+
+            $emailHeaderDataUri = 'data:image/png;base64,' . base64_encode($headerContents);
+            $emailFooterDataUri = 'data:image/png;base64,' . base64_encode($footerContents);
+        }
+
         return view('letters.document', compact(
             'standalone',
             'preview',
+            'emailLetterhead',
+            'emailHeaderDataUri',
+            'emailFooterDataUri',
+            'yourRef',
             'fontFace',
             'subjectCode',
             'date',
@@ -924,7 +966,7 @@ class LetterController extends Controller
             'office',
             'signatureDataUri',
             'isDelegatedSignature',
-            'delegatedPrefixLine',
+            'delegatedPrefixLine'
         ))->render();
     }
 

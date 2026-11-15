@@ -18,6 +18,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Non-Delivery Mailers
+    |--------------------------------------------------------------------------
+    |
+    | These transports intentionally do not deliver to real inboxes. They are
+    | used for local development and testing and should be reported as
+    | "logged" rather than "sent" in API responses.
+    |
+    */
+
+    'non_delivery_mailers' => ['log', 'array'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Mailer Configurations
     |--------------------------------------------------------------------------
     |
