@@ -245,15 +245,14 @@ class UserManagementController extends Controller
             return $user;
         });
 
+        $emailStatus = TemporaryCredentialService::EMAIL_STATUS_FAILED;
         try {
-            $this->temporaryCredentialService->send($user, $temporaryPassword, $user->preferred_locale ?? 'en');
-            $message = 'User created successfully. Account credentials email has been sent successfully.';
-            $emailStatus = 'sent';
-        } catch (\Throwable $exception) {
-            report($exception);
-            $message = 'User created successfully, but unable to send the account credentials email. Please use Resend Account Email.';
-            $emailStatus = 'failed';
+            $emailStatus = $this->temporaryCredentialService->deliver($user, $temporaryPassword, $user->preferred_locale ?? 'en');
+        } catch (\Throwable) {
+            $emailStatus = TemporaryCredentialService::EMAIL_STATUS_FAILED;
         }
+
+        $message = $this->emailStatusMessage($emailStatus, true);
 
         return response()->json([
             'message' => $message,
@@ -331,21 +330,74 @@ class UserManagementController extends Controller
             );
         });
 
+        $emailStatus = TemporaryCredentialService::EMAIL_STATUS_FAILED;
         try {
-            $this->temporaryCredentialService->send($target->fresh(), $temporaryPassword, $target->preferred_locale ?? 'en');
-            return response()->json(['message' => 'Password reset successfully. Notification email sent to the officer.', 'email_status' => 'sent']);
-        } catch (\Throwable $exception) {
-            report($exception);
-            return response()->json(['message' => 'Password reset successfully, but the notification email could not be sent. Use Resend Account Email to retry.', 'email_status' => 'failed'], 202);
+            $emailStatus = $this->temporaryCredentialService->deliver($target->fresh(), $temporaryPassword, $target->preferred_locale ?? 'en');
+        } catch (\Throwable) {
+            $emailStatus = TemporaryCredentialService::EMAIL_STATUS_FAILED;
         }
+
+        return response()->json([
+            'message' => $this->emailStatusMessage($emailStatus, false),
+            'email_status' => $emailStatus,
+        ], $emailStatus === TemporaryCredentialService::EMAIL_STATUS_FAILED ? 202 : 200);
     }
 
     public function resendCredentials(Request $request, int $id): JsonResponse
     {
+        /** @var User $user */
         $user = User::findOrFail($id);
         /** @var User $admin */
         $admin = $request->user();
-        $temporaryPassword = DB::transaction(fn () => $this->temporaryCredentialService->rotate($user, $user->preferred_locale ?? 'en'));
+        $temporaryPassword = $this->temporaryCredentialService->generate();
+        $locale = $user->preferred_locale ?? 'en';
+
+        $previousState = [
+            'password_hash' => $user->password_hash,
+            'must_change_password' => (bool) $user->must_change_password,
+            'password_changed_at' => $user->password_changed_at,
+            'invitation_pending' => (bool) $user->invitation_pending,
+            'invited_at' => $user->invited_at,
+            'preferred_locale' => $user->preferred_locale,
+        ];
+
+        DB::transaction(function () use ($user, $temporaryPassword, $locale) {
+            $user->update([
+                'password_hash' => Hash::make($temporaryPassword),
+                'must_change_password' => true,
+                'password_changed_at' => null,
+                'invitation_pending' => false,
+                'invited_at' => null,
+                'preferred_locale' => $locale,
+            ]);
+            $user->tokens()->delete();
+        });
+
+        $emailStatus = TemporaryCredentialService::EMAIL_STATUS_FAILED;
+
+        try {
+            $emailStatus = $this->temporaryCredentialService->deliver($user->fresh(), $temporaryPassword, $locale);
+        } catch (\Throwable) {
+            $emailStatus = TemporaryCredentialService::EMAIL_STATUS_FAILED;
+        }
+
+        if ($emailStatus === TemporaryCredentialService::EMAIL_STATUS_FAILED) {
+            DB::transaction(function () use ($user, $previousState) {
+                $user->forceFill([
+                    'password_hash' => $previousState['password_hash'],
+                    'must_change_password' => $previousState['must_change_password'],
+                    'password_changed_at' => $previousState['password_changed_at'],
+                    'invitation_pending' => $previousState['invitation_pending'],
+                    'invited_at' => $previousState['invited_at'],
+                    'preferred_locale' => $previousState['preferred_locale'],
+                ])->save();
+            });
+
+            return response()->json([
+                'message' => 'Unable to send the account credentials email. The existing password was kept unchanged.',
+                'email_status' => TemporaryCredentialService::EMAIL_STATUS_FAILED,
+            ], 500);
+        }
 
         $this->securityAuditService->log(
             eventType: 'admin.user.credentials_resent',
@@ -355,13 +407,34 @@ class UserManagementController extends Controller
             metadata: ['temporary_credentials_rotated' => true]
         );
 
-        try {
-            $this->temporaryCredentialService->send($user->fresh(), $temporaryPassword, $user->preferred_locale ?? 'en');
-            return response()->json(['message' => 'Account credentials email has been sent successfully.', 'email_status' => 'sent']);
-        } catch (\Throwable $exception) {
-            report($exception);
-            return response()->json(['message' => 'Unable to send the account credentials email. Please try again.', 'email_status' => 'failed'], 500);
-        }
+        return response()->json([
+            'message' => $this->resendStatusMessage($emailStatus),
+            'email_status' => $emailStatus,
+        ]);
+    }
+
+    private function emailStatusMessage(string $emailStatus, bool $forUserCreation): string
+    {
+        $baseSuccess = $forUserCreation
+            ? 'User created successfully.'
+            : 'Password reset successfully.';
+
+        return match ($emailStatus) {
+            TemporaryCredentialService::EMAIL_STATUS_SENT => $baseSuccess . ' Account credentials were accepted by the email server.',
+            TemporaryCredentialService::EMAIL_STATUS_LOGGED => $baseSuccess . ' Account credentials were only written to the application log.',
+            TemporaryCredentialService::EMAIL_STATUS_NOT_CONFIGURED => $baseSuccess . ' Email delivery is not configured.',
+            default => $baseSuccess . ' Account credentials email could not be sent.',
+        };
+    }
+
+    private function resendStatusMessage(string $emailStatus): string
+    {
+        return match ($emailStatus) {
+            TemporaryCredentialService::EMAIL_STATUS_SENT => 'Account credentials were accepted by the email server.',
+            TemporaryCredentialService::EMAIL_STATUS_LOGGED => 'Credentials were generated, but the email was only written to the application log.',
+            TemporaryCredentialService::EMAIL_STATUS_NOT_CONFIGURED => 'Credentials were generated, but email delivery is not configured.',
+            default => 'Account credentials email could not be sent.',
+        };
     }
 
     /**

@@ -507,13 +507,9 @@ public function index(Request $request): JsonResponse
                     ->latest('signed_at')
                     ->first();
 
-                abort_unless(
-                    $delegatedSignature,
-                    422,
-                    'Please sign the document before approving it.'
-                );
-
-                $isDelegatedDeputyAutoApproval = true;
+                // Only complete the entire workflow if the Deputy has signed.
+                // Without a signature, the document must go to the Chief Secretary.
+                $isDelegatedDeputyAutoApproval = (bool) $delegatedSignature;
             }
 
             $nextStep = $document->steps()->where('step_order', $currentStep->step_order + 1)->lockForUpdate()->first();

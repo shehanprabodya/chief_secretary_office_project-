@@ -392,45 +392,93 @@ export default function ApprovalsPage() {
   };
 
   const confirmDocumentSigning = async () => {
-    if (!selectedDoc || !signPassword.trim()) {
-      setError('Enter your password to sign this document.');
-      return;
-    }
-    if (!signConfirmed) {
-      setError('Please confirm that you are signing as the authorized signatory.');
-      return;
+  if (!selectedDoc || !signPassword.trim()) {
+    setError('Enter your password to sign this document.');
+    return;
+  }
+
+  if (!signConfirmed) {
+    setError('Please confirm that you are signing as the authorized signatory.');
+    return;
+  }
+
+  setIsActing(true);
+  setError(null);
+  setSuccessMessage(null);
+
+  try {
+    // First, save the digital signature.
+    const result = await approvalService.signDocument(
+      selectedDoc.document_type,
+      selectedDoc.document_id,
+      signPassword,
+      selectedDoc.source_id ?? undefined,
+    );
+
+    setShowSignDialog(false);
+    setSignPassword('');
+    setSignConfirmed(false);
+
+    // Chief Secretary's PRIMARY signature must complete approval.
+    if (
+      user?.role === 'chief_secretary' &&
+      ['letter', 'minute'].includes(selectedDoc.document_type) &&
+      !result.auto_approved
+    ) {
+      const approvedDocument = await approvalService.approve(
+        selectedDoc.document_id,
+        commentText || undefined,
+      );
+
+      setSelectedDoc(approvedDocument);
+      setCommentText('');
+
+      setSuccessMessage(
+        'Document signed and finally approved successfully.'
+      );
+
+    } else if (result.auto_approved) {
+
+      // Deputy signing on behalf of the Chief Secretary.
+      setSuccessMessage(
+        'නියෝජ්‍ය ප්‍රධාන ලේකම් විසින් ප්‍රධාන ලේකම් වෙනුවෙන් ලේඛනය අත්සන් කර සාර්ථකව අනුමත කරන ලදී.'
+      );
+
+    } else {
+
+      setSuccessMessage(
+        result.message || 'Document signed successfully.'
+      );
     }
 
-    setIsActing(true);
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      const result = await approvalService.signDocument(
-        selectedDoc.document_type,
-        selectedDoc.document_id,
-        signPassword,
-        selectedDoc.source_id ?? undefined,
-      );
-      setShowSignDialog(false);
-      setSignPassword('');
-      setSignConfirmed(false);
-      if (result.auto_approved) {
-        setSuccessMessage('නියෝජ්‍ය ප්‍රධාන ලේකම් විසින් ප්‍රධාන ලේකම් වෙනුවෙන් ලේඛනය අත්සන් කර සාර්ථකව අනුමත කරන ලදී.');
-      } else {
-        setSuccessMessage(result.message || 'Document signed successfully.');
-      }
-      await fetchList();
-    } catch (signError) {
-      console.error(signError);
-      const maybeError = signError as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
-      const firstValidationMessage = maybeError.response?.data?.errors
-        ? Object.values(maybeError.response.data.errors).flat()[0]
-        : null;
-      setError(firstValidationMessage || maybeError.response?.data?.message || 'Could not sign this document. Check your password, delegation status, or uploaded signature image.');
-    } finally {
-      setIsActing(false);
-    }
-  };
+    await fetchList();
+
+  } catch (signError) {
+    console.error(signError);
+
+    const maybeError = signError as {
+      response?: {
+        data?: {
+          message?: string;
+          errors?: Record<string, string[]>;
+        };
+      };
+    };
+
+    const firstValidationMessage = maybeError.response?.data?.errors
+      ? Object.values(maybeError.response.data.errors).flat()[0]
+      : null;
+
+    setError(
+      firstValidationMessage ||
+      maybeError.response?.data?.message ||
+      'Could not sign this document. Check your password, delegation status, or uploaded signature image.'
+    );
+
+  } finally {
+    setIsActing(false);
+  }
+};
 
   const handleReject = async () => {
     if (!selectedDoc) return;
@@ -948,10 +996,10 @@ export default function ApprovalsPage() {
             {user?.role === 'deputy' && (
               <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-800">
                 <div className="text-xs leading-6 text-violet-900">
-                  <p>ප්‍රධාන ලේකම් වෙනුවෙන්,</p>
                   <p>{deputySinhalaName}</p>
                   <p>{deputySinhalaDesignation}</p>
-                  <p>දකුණු පළාත් සභාව</p>
+                  <p>ප්‍රධාන ලේකම් වෙනුවට,</p>
+                  <p>දකුණු පළාත</p>
                 </div>
               </div>
             )}

@@ -15,7 +15,12 @@ class RequirePasswordChange
         }
 
         // These endpoints are necessary to complete the password-change flow.
-        if (in_array($request->path(), ['api/auth/change-password', 'api/auth/logout', 'api/auth/logout-all', 'api/auth/me'], true)) {
+        if (
+            $request->is('api/auth/change-password')
+            || $request->is('api/auth/logout')
+            || $request->is('api/auth/logout-all')
+            || $request->is('api/auth/me')
+        ) {
             return $next($request);
         }
 

@@ -37,19 +37,22 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $identifier = $request->input('identifier');
+        $identifier = trim((string) $request->input('identifier'));
+        $password = (string) $request->input('password');
+
+        $normalizedIdentifier = strtolower($identifier);
 
         $user = User::with('role', 'organization')
-            ->where('email', $identifier)
-            ->orWhere('username', $identifier)
+            ->whereRaw('LOWER(email) = ?', [$normalizedIdentifier])
+            ->orWhereRaw('LOWER(username) = ?', [$normalizedIdentifier])
             ->first();
 
-        if (!$user || !Hash::check($request->password, $user->password_hash)) {
+        if (!$user || !Hash::check($password, $user->password_hash)) {
             $this->securityAuditService->log(
                 eventType: 'auth.login.failed',
                 request: $request,
                 severity: 'warning',
-                metadata: ['identifier' => (string) $request->input('identifier')]
+                metadata: ['identifier' => $identifier]
             );
 
             return response()->json([
