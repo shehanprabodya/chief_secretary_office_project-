@@ -149,18 +149,27 @@
 
     @if(($signatoryName ?? $minute->signatory_name) || ($signatoryDesignation ?? $minute->signatory_designation) || !empty($signatureDataUri))
         <div class="signature">
+
             @if (!empty($signatureDataUri))
-                <img src="{{ $signatureDataUri }}" alt="Official signature" style="max-height: 52px; max-width: 170px; display: block; margin-bottom: 8px; object-fit: contain;" />
+                <img src="{{ $signatureDataUri }}"
+                    alt="Official signature"
+                    style="max-height: 52px; max-width: 170px; display: block; margin-bottom: 8px; object-fit: contain;" />
             @else
                 <div class="signature-line">........................................................</div>
             @endif
+
+            <strong>{{ $signatoryName ?? $minute->signatory_name }}</strong><br>
+
+            {{ $signatoryDesignation ?? $minute->signatory_designation }}<br>
+
             @if (!empty($isDelegatedSignature) && !empty($delegatedPrefixLine))
                 {{ $delegatedPrefixLine }}<br>
             @endif
-            <strong>{{ $signatoryName ?? $minute->signatory_name }}</strong><br>
-            {{ $signatoryDesignation ?? $minute->signatory_designation }}<br>
+
             {{ $signatoryOffice ?? 'දකුණු පළාත' }}<br>
+
             දිනය: {{ optional($meeting->meeting_date)->format('Y.m.d') ?? '-' }}
+
         </div>
     @endif
 

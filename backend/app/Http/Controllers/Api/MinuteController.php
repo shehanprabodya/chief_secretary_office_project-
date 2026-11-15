@@ -513,11 +513,11 @@ class MinuteController extends Controller
 
             if ($documentSignature->signing_type === 'DELEGATED') {
                 $isDelegatedSignature = true;
-                $delegatedPrefixLine = 'ප්‍රධාන ලේකම් වෙනුවෙන්,';
+                $delegatedPrefixLine = 'ප්‍රධාන ලේකම් වෙනුවට,';
                 $signatoryName = $documentSignature->signer_name_snapshot ?: $documentSignature->signer->displayNameSinhala();
                 $signatoryDesignation = $documentSignature->signer_designation_snapshot
                     ?: ($documentSignature->signer->designationSinhala() ?? 'නියෝජ්‍ය ප්‍රධාන ලේකම්');
-                $signatoryOffice = $documentSignature->signer_office_snapshot ?: 'දකුණු පළාත් සභාව';
+                $signatoryOffice = $documentSignature->signer_office_snapshot ?: 'දකුණු පළාත';
             }
         }
 
