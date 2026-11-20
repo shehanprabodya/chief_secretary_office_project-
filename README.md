@@ -5,6 +5,7 @@ Province. The application supports meeting management, official letters,
 attendance, meeting minutes, approval workflows, notifications, user
 administration, and role-based dashboards.
 
+URL-https://cs.sp.gov.lk/spmms/
 ## Technology stack
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
