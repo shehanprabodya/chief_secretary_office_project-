@@ -63,6 +63,19 @@ export interface CreateUserPayload {
   status?: 'ACTIVE' | 'INACTIVE';
 }
 
+export type EmailDeliveryStatus = 'sent' | 'logged' | 'failed' | 'not_configured';
+
+export interface AdminUserCreateResponse {
+  message: string;
+  email_status: EmailDeliveryStatus;
+  user: AdminUser;
+}
+
+export interface AdminCredentialActionResponse {
+  message: string;
+  email_status: EmailDeliveryStatus;
+}
+
 export interface BackupArchiveRecord {
   backup_id: number;
   type: 'database' | 'files' | 'full';
