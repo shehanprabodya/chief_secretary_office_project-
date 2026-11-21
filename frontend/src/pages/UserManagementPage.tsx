@@ -9,7 +9,7 @@ import AddUserModal from '../components/Admin/AddUserModal';
 import OrganizationModal from '../components/Admin/OrganizationModal';
 import ResetPasswordModal from '../components/Admin/ResetPasswordModal';
 import { adminService } from '../services/adminService';
-import type { AccessLog, AdminUser, Organization, UserStats } from '../types/admin';
+import type { AccessLog, AdminUser, Organization, UserStats, AdminUserCreateResponse, EmailDeliveryStatus } from '../types/admin';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 
@@ -34,6 +34,49 @@ const AVATAR_COLORS = [
 
 function avatarColor(id: number) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length];
+}
+
+type BannerTone = 'success' | 'warning' | 'error';
+
+interface ActionNotice {
+  tone: BannerTone;
+  message: string;
+}
+
+function mapStatusToNotice(status: EmailDeliveryStatus, fallbackMessage?: string): ActionNotice {
+  const fallback = fallbackMessage ?? 'Operation completed.';
+
+  if (status === 'sent') {
+    return { tone: 'success', message: 'User created successfully. Account credentials were accepted by the email server.' };
+  }
+
+  if (status === 'logged') {
+    return { tone: 'warning', message: 'User created successfully, but the email was only written to the application log. Configure SMTP to send real emails.' };
+  }
+
+  if (status === 'not_configured') {
+    return { tone: 'warning', message: 'User created successfully. Email delivery is not configured.' };
+  }
+
+  return { tone: 'error', message: fallback };
+}
+
+function mapResendStatusToNotice(status: EmailDeliveryStatus, fallbackMessage?: string): ActionNotice {
+  const fallback = fallbackMessage ?? 'The account credentials email could not be sent. Please check the email configuration and try again.';
+
+  if (status === 'sent') {
+    return { tone: 'success', message: 'Account credentials were accepted by the email server.' };
+  }
+
+  if (status === 'logged') {
+    return { tone: 'warning', message: 'Credentials were generated, but the email was only written to the application log. Configure SMTP to send real emails.' };
+  }
+
+  if (status === 'not_configured') {
+    return { tone: 'warning', message: 'Credentials were generated, but email delivery is not configured.' };
+  }
+
+  return { tone: 'error', message: fallback };
 }
 
 export default function UserManagementPage() {
@@ -69,6 +112,7 @@ export default function UserManagementPage() {
   const [resetUser, setResetUser] = useState<AdminUser | null>(null);
   const [statusUser, setStatusUser] = useState<AdminUser | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null);
 
   const fetchStats = () => adminService.getUserStats().then(setStats);
 
@@ -156,16 +200,31 @@ export default function UserManagementPage() {
     }
   };
 
-  const handleSaved = () => {
+  const handleSaved = (result?: AdminUserCreateResponse) => {
     fetchUsers();
     fetchStats();
     fetchOrganizations();
     setEditUser(null);
     setEditOrganization(null);
+
+    if (result) {
+      setActionNotice(mapStatusToNotice(result.email_status, result.message));
+    } else {
+      setActionNotice({ tone: 'success', message: 'User details were updated successfully.' });
+    }
   };
 
   const handleResendCredentials = async (userId: number) => {
-    await adminService.resendCredentials(userId);
+    try {
+      const result = await adminService.resendCredentials(userId);
+      setActionNotice(mapResendStatusToNotice(result.email_status, result.message));
+    } catch (err: unknown) {
+      const errWithResponse = err as { response?: { data?: { message?: string } } };
+      setActionNotice({
+        tone: 'error',
+        message: errWithResponse?.response?.data?.message ?? 'Unable to send the account credentials email. Please try again.',
+      });
+    }
   };
 
   const handleDeleteOrganization = async () => {
@@ -197,6 +256,12 @@ export default function UserManagementPage() {
             <UserPlus className="h-4 w-4" /> Add New User
           </button>
         </div>
+
+        {actionNotice && (
+          <div className={`rounded-lg border px-4 py-3 text-sm ${actionNotice.tone === 'success' ? 'border-green-200 bg-green-50 text-green-800' : actionNotice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
+            {actionNotice.message}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-6 border-b border-slate-200">

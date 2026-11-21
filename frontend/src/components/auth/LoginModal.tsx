@@ -41,17 +41,19 @@ export default function LoginModal({ onClose }: LoginModalProps) {
     e.preventDefault();
     setFormError(null);
 
-    if (!credentials.identifier || !credentials.password) {
+    const identifier = credentials.identifier.trim();
+
+    if (!identifier || !credentials.password) {
       setFormError(t('auth.missingCredentials'));
       return;
     }
 
     try {
-      const loggedInUser = await login({ ...credentials, rememberMe });
+      const loggedInUser = await login({ ...credentials, identifier, rememberMe });
 
       if (rememberMe) {
         localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('rememberedIdentifier', credentials.identifier);
+        localStorage.setItem('rememberedIdentifier', identifier);
       } else {
         localStorage.removeItem('rememberMe');
         localStorage.removeItem('rememberedIdentifier');

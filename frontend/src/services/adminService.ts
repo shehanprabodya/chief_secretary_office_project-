@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import type { AdminStats, UserStats, ActivityItem, AdminUser,CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting,Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs, PaginatedOrganizations, OrganizationPayload, PaginatedBackups} from '../types/admin';
+import type { AdminStats, UserStats, ActivityItem, AdminUser, CreateUserPayload, PaginatedUsers, Role, UpcomingMeeting, Organization, PaginatedSubjects, SubjectPayload, SubjectRecord, PaginatedAccessLogs, PaginatedOrganizations, OrganizationPayload, PaginatedBackups, AdminUserCreateResponse, AdminCredentialActionResponse } from '../types/admin';
 
 export interface UserFilters {
   search?: string;
@@ -42,9 +42,9 @@ export const adminService = {
     return data.user;
   },
 
-  async createUser(payload: CreateUserPayload): Promise<AdminUser> {
-    const { data } = await api.post<{ user: AdminUser }>('/admin/users', payload);
-    return data.user;
+  async createUser(payload: CreateUserPayload): Promise<AdminUserCreateResponse> {
+    const { data } = await api.post<AdminUserCreateResponse>('/admin/users', payload);
+    return data;
   },
 
   async updateUser(id: number, payload: Partial<CreateUserPayload>): Promise<AdminUser> {
@@ -52,16 +52,17 @@ export const adminService = {
     return data.user;
   },
 
-  async resetPassword(id: number, new_password?: string): Promise<{ message: string; email_status: 'sent' | 'failed' }> {
-    const { data } = await api.post(`/admin/users/${id}/reset-password`, new_password ? {
+  async resetPassword(id: number, new_password?: string): Promise<AdminCredentialActionResponse> {
+    const { data } = await api.post<AdminCredentialActionResponse>(`/admin/users/${id}/reset-password`, new_password ? {
       new_password,
       new_password_confirmation: new_password,
     } : {});
     return data;
   },
 
-  async resendCredentials(id: number): Promise<void> {
-    await api.post(`/admin/users/${id}/resend-credentials`);
+  async resendCredentials(id: number): Promise<AdminCredentialActionResponse> {
+    const { data } = await api.post<AdminCredentialActionResponse>(`/admin/users/${id}/resend-credentials`);
+    return data;
   },
 
   async toggleStatus(id: number): Promise<{ status: 'ACTIVE' | 'INACTIVE' }> {
