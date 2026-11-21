@@ -38,6 +38,16 @@ jobs:
       - name: Install Composer Dependencies
         run: composer install --prefer-dist --no-interaction
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify Node.js
+        run: |
+          node --version
+          which node
+
       - name: Prepare Laravel Environment
         run: |
           cp .env.example .env
