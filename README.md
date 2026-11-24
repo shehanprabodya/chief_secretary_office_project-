@@ -101,7 +101,7 @@ php artisan queue:work
 ## Seeded login accounts
 
 Running `php artisan migrate --seed` creates development accounts. All seeded
-accounts use the password `password`.
+accounts are here.
 
 | Role | Email |
 | --- | --- |
