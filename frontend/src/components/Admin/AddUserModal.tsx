@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { adminService } from '../../services/adminService';
-import type { AdminUser, CreateUserPayload, Role, Organization } from '../../types/admin';
+import type { AdminUser, CreateUserPayload, Role, Organization, AdminUserCreateResponse } from '../../types/admin';
 
 interface AddUserModalProps {
   editUser?: AdminUser | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (result?: AdminUserCreateResponse) => void;
 }
 
 export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModalProps) {
@@ -71,10 +71,11 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
       if (editUser) {
         const updatePayload: Partial<CreateUserPayload> = { ...form };
         await adminService.updateUser(editUser.user_id, updatePayload);
+        onSaved();
       } else {
-        await adminService.createUser(form);
+        const result = await adminService.createUser(form);
+        onSaved(result);
       }
-      onSaved();
       onClose();
     } catch (err: unknown) {
       const errWithResponse = err as { response?: { data?: { message?: string } } };
@@ -164,7 +165,7 @@ export default function AddUserModal({ editUser, onClose, onSaved }: AddUserModa
             {!editUser && (
               <div className="sm:col-span-2">
                 <div className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
-                  <p className="text-slate-700">A secure 8-character temporary password will be generated and emailed to this user. They must change it on first sign-in.</p>
+                  <p className="text-slate-700">A secure policy-compliant temporary password will be generated and emailed to this user. They must change it on first sign-in.</p>
                   <div className="mt-3">
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">Email Language</label>
                     <select
